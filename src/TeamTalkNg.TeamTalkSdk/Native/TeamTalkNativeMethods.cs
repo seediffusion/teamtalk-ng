@@ -13,6 +13,10 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int CloseTeamTalk(IntPtr instance);
 
+    [DllImport(LibraryName, EntryPoint = "TT_GetMessage")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetMessage(IntPtr instance, IntPtr message, ref int waitMilliseconds);
+
     [DllImport(LibraryName, EntryPoint = "TT_Connect", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int Connect(
@@ -23,4 +27,35 @@ internal static partial class TeamTalkNativeMethods
         int localTcpPort,
         int localUdpPort,
         [MarshalAs(UnmanagedType.I4)] int encrypted);
+
+    [DllImport(LibraryName, EntryPoint = "TT_Disconnect")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int Disconnect(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoLoginEx", CharSet = CharSet.Unicode)]
+    internal static extern int DoLoginEx(
+        IntPtr instance,
+        string nickname,
+        string username,
+        string password,
+        string clientName);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoJoinChannelByID", CharSet = CharSet.Unicode)]
+    internal static extern int DoJoinChannelById(IntPtr instance, int channelId, string password);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoTextMessage")]
+    internal static extern int DoTextMessage(IntPtr instance, ref NativeTextMessage textMessage);
+
+    [DllImport(LibraryName, EntryPoint = "TT_GetChannelIDFromPath", CharSet = CharSet.Unicode)]
+    internal static extern int GetChannelIdFromPath(IntPtr instance, string channelPath);
+
+    [DllImport(LibraryName, EntryPoint = "TT_GetChannelPath", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetChannelPath(IntPtr instance, int channelId, [Out] char[] channelPath);
+
+    [DllImport(LibraryName, EntryPoint = "TT_GetMyChannelID")]
+    internal static extern int GetMyChannelId(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DBG_SIZEOF")]
+    internal static extern int DebugSizeOf(TTType type);
 }

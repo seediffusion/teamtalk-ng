@@ -24,7 +24,8 @@ public static class TeamTalkNativeLibrary
         [
             Path.Combine(AppContext.BaseDirectory, LibraryFileName),
             Path.Combine(AppContext.BaseDirectory, "sdk", LibraryFileName),
-            Path.Combine(Environment.CurrentDirectory, LibraryFileName)
+            Path.Combine(Environment.CurrentDirectory, LibraryFileName),
+            Path.Combine(Environment.CurrentDirectory, "sdk", LibraryFileName)
         ];
 
         string? foundPath = candidatePaths.FirstOrDefault(File.Exists);

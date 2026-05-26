@@ -9,6 +9,12 @@
 # Binaries generated from builds
 bin/
 
+# Local TeamTalk SDK/runtime binaries. Download from BearWare as needed.
+sdk/
+scratch/
+TeamTalk5.dll
+TeamTalk5Pro.dll
+
 # User-specific files
 *.rsuser
 *.suo
