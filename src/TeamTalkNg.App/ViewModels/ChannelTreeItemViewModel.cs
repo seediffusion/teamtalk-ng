@@ -49,4 +49,18 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             return $"{Name}, {type}{state}";
         }
     }
+
+    public string AccessibleHelpText => Kind switch
+    {
+        ChannelTreeItemKind.Server => "TeamTalk server",
+        ChannelTreeItemKind.Channel => "TeamTalk channel",
+        ChannelTreeItemKind.User when IsTalking => "TeamTalk user, currently transmitting",
+        ChannelTreeItemKind.User => "TeamTalk user",
+        _ => string.Empty
+    };
+
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
 }

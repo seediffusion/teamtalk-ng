@@ -16,4 +16,11 @@ public sealed class ChatMessageViewModel
     public string Sender { get; }
 
     public string Text { get; }
+
+    public string AccessibleName => $"{Time}, {Sender}: {Text}";
+
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
 }

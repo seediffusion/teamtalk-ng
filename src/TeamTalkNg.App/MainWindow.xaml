@@ -26,6 +26,9 @@
 
   <DockPanel>
     <Menu DockPanel.Dock="Top"
+          Focusable="False"
+          IsTabStop="False"
+          KeyboardNavigation.TabNavigation="None"
           Background="{DynamicResource PanelBackgroundBrush}"
           Foreground="{DynamicResource TextBrush}">
       <MenuItem Header="_Client">
@@ -50,21 +53,50 @@
       </MenuItem>
     </Menu>
 
-    <ToolBarTray DockPanel.Dock="Top" Background="{DynamicResource PanelBackgroundBrush}">
-      <ToolBar Background="{DynamicResource PanelBackgroundBrush}">
-        <Button Command="{Binding ConnectCommand}" AutomationProperties.Name="Connect to server">
+    <ToolBarTray DockPanel.Dock="Top"
+                 Focusable="False"
+                 KeyboardNavigation.TabNavigation="Continue"
+                 Background="{DynamicResource PanelBackgroundBrush}">
+      <ToolBar x:Name="MainToolBar"
+               Background="{DynamicResource PanelBackgroundBrush}"
+               Focusable="True"
+               IsTabStop="True"
+               GotKeyboardFocus="MainToolBar_OnGotKeyboardFocus"
+               PreviewKeyDown="MainToolBar_OnPreviewKeyDown"
+               KeyboardNavigation.TabNavigation="Continue"
+               KeyboardNavigation.ControlTabNavigation="Continue"
+               KeyboardNavigation.DirectionalNavigation="Contained"
+               AutomationProperties.Name="Toolbar">
+        <Button x:Name="ConnectToolBarButton"
+                Tag="ToolbarButton"
+                Command="{Binding ConnectCommand}"
+                Focusable="True"
+                IsTabStop="False"
+                AutomationProperties.Name="Connect to server">
           <StackPanel Orientation="Horizontal">
             <TextBlock Text="Connect" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding TogglePushToTalkCommand}" AutomationProperties.Name="Enable or disable push to talk">
+        <Button Command="{Binding TogglePushToTalkCommand}"
+                Tag="ToolbarButton"
+                Focusable="True"
+                IsTabStop="False"
+                AutomationProperties.Name="Enable or disable push to talk">
           <TextBlock Text="Push To Talk" />
         </Button>
-        <Button Command="{Binding ToggleVoiceActivationCommand}" AutomationProperties.Name="Enable or disable voice activation">
+        <Button Command="{Binding ToggleVoiceActivationCommand}"
+                Tag="ToolbarButton"
+                Focusable="True"
+                IsTabStop="False"
+                AutomationProperties.Name="Enable or disable voice activation">
           <TextBlock Text="Voice Activation" />
         </Button>
         <Separator />
-        <Button Command="{Binding SimulateUserJoinedCommand}" AutomationProperties.Name="Simulate a user joining the channel">
+        <Button Command="{Binding SimulateUserJoinedCommand}"
+                Tag="ToolbarButton"
+                Focusable="True"
+                IsTabStop="False"
+                AutomationProperties.Name="Simulate a user joining the channel">
           <TextBlock Text="Simulate Join" />
         </Button>
       </ToolBar>
@@ -101,12 +133,21 @@
         <GroupBox Header="Channels and users"
                   Foreground="{DynamicResource TextBrush}"
                   BorderBrush="{DynamicResource BorderBrush}">
-          <TreeView ItemsSource="{Binding Channels}"
+          <TreeView x:Name="ChannelsTree"
+                    ItemsSource="{Binding Channels}"
                     SelectedItemChanged="ChannelsTree_OnSelectedItemChanged"
                     Background="{DynamicResource ControlBackgroundBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    AutomationProperties.Name="Channels and users" />
+                    AutomationProperties.Name="Channels and users">
+            <TreeView.ItemContainerStyle>
+              <Style TargetType="{x:Type TreeViewItem}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+                <Setter Property="AutomationProperties.HelpText" Value="{Binding AccessibleHelpText}" />
+                <Setter Property="KeyboardNavigation.TabNavigation" Value="Continue" />
+              </Style>
+            </TreeView.ItemContainerStyle>
+          </TreeView>
         </GroupBox>
 
         <GroupBox Grid.Row="1"
@@ -165,6 +206,11 @@
                       Foreground="{DynamicResource TextBrush}"
                       BorderBrush="{DynamicResource BorderBrush}"
                       AutomationProperties.Name="Channel chat history">
+              <ListView.ItemContainerStyle>
+                <Style TargetType="{x:Type ListViewItem}">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+                </Style>
+              </ListView.ItemContainerStyle>
               <ListView.View>
                 <GridView>
                   <GridViewColumn Header="Time" DisplayMemberBinding="{Binding Time}" Width="90" />
@@ -225,6 +271,11 @@
                     Foreground="{DynamicResource TextBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     AutomationProperties.Name="Channel files">
+            <ListView.ItemContainerStyle>
+              <Style TargetType="{x:Type ListViewItem}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+              </Style>
+            </ListView.ItemContainerStyle>
             <ListView.View>
               <GridView>
                 <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" Width="320" />
