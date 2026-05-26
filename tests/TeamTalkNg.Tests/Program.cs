@@ -188,6 +188,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesChannelTextMessage();
         DispatchesDirectTextMessage();
         DispatchesUserJoinedAndLeft();
+        DispatchesUserUpdated();
         DispatchesChannelAddedOrUpdated();
         DispatchesChannelRemoved();
         DispatchesConnectionLost();
@@ -292,6 +293,33 @@ internal static unsafe class SdkDispatchTests
         AssertEqual("Alex", joined.Nickname);
         AssertEqual("alex", joined.Username);
         AssertEqual(42, left!.Id);
+    }
+
+    private static void DispatchesUserUpdated()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        UserSummary? updated = null;
+        session.UserUpdated += (_, user) => updated = user;
+
+        NativeUser user = CreateUser(42, "alex", "Alex", channelId: 12);
+        user.UserState = 0x00000001;
+        user.StatusMode = 0x00000001;
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserUpdate,
+            Source: 0,
+            TTType.User,
+            user,
+            default,
+            default,
+            default,
+            0,
+            0));
+
+        Assert(updated is not null, "Expected user update event.");
+        AssertEqual(42, updated!.Id);
+        Assert(updated.IsTalking, "Expected user update to preserve talking state.");
+        Assert(updated.IsAway, "Expected user update to preserve away state.");
     }
 
     private static void DispatchesConnectionLost()

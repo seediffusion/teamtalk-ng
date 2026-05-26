@@ -82,6 +82,7 @@ public sealed class MainWindowViewModel : ObservableObject
         teamTalkSession.ChannelAddedOrUpdated += OnChannelAddedOrUpdated;
         teamTalkSession.ChannelRemoved += OnChannelRemoved;
         teamTalkSession.UserJoined += OnUserJoined;
+        teamTalkSession.UserUpdated += OnUserUpdated;
         teamTalkSession.UserLeft += OnUserLeft;
 
         BuildDisconnectedTree();
@@ -525,25 +526,18 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            ChannelTreeItemViewModel channel = EnsureChannel(user.ChannelPath, id: 0);
-            ChannelTreeItemViewModel? existingUser = channel.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.User && item.Id == user.Id);
-            if (existingUser is null)
-            {
-                channel.Children.Add(new ChannelTreeItemViewModel(user.Nickname, ChannelTreeItemKind.User, user.Id, user.ChannelPath)
-                {
-                    IsTalking = user.IsTalking
-                });
-            }
-            else
-            {
-                existingUser.Name = user.Nickname;
-                existingUser.IsTalking = user.IsTalking;
-            }
-
-            channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
+            AddOrUpdateUser(user);
         });
 
         _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+    }
+
+    private void OnUserUpdated(object? sender, UserSummary user)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            AddOrUpdateUser(user);
+        });
     }
 
     private void OnUserLeft(object? sender, UserSummary user)
@@ -560,6 +554,31 @@ public sealed class MainWindowViewModel : ObservableObject
         });
 
         _ = AnnounceAsync($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+    }
+
+    private void AddOrUpdateUser(UserSummary user)
+    {
+        ChannelTreeItemViewModel channel = EnsureChannel(user.ChannelPath, id: 0);
+        ChannelTreeItemViewModel? existingUser = Descendants(serverTreeItem)
+            .FirstOrDefault(item => item.Kind == ChannelTreeItemKind.User && item.Id == user.Id);
+
+        if (existingUser is not null && !string.Equals(existingUser.Path, user.ChannelPath, StringComparison.OrdinalIgnoreCase))
+        {
+            RemoveTreeItem(existingUser);
+            RefreshChannelUserCounts();
+            existingUser = null;
+        }
+
+        if (existingUser is null)
+        {
+            existingUser = new ChannelTreeItemViewModel(user.Nickname, ChannelTreeItemKind.User, user.Id, user.ChannelPath);
+            channel.Children.Add(existingUser);
+        }
+
+        existingUser.Name = user.Nickname;
+        existingUser.IsTalking = user.IsTalking;
+        existingUser.IsAway = user.IsAway;
+        channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
     }
 
     private void OnChannelAddedOrUpdated(object? sender, ChannelSummary channel)
@@ -692,6 +711,14 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         return RemoveTreeItem(serverTreeItem.Children, item);
+    }
+
+    private void RefreshChannelUserCounts()
+    {
+        foreach (ChannelTreeItemViewModel channel in Descendants(serverTreeItem).Where(item => item.Kind == ChannelTreeItemKind.Channel))
+        {
+            channel.UserCount = channel.Children.Count(child => child.Kind == ChannelTreeItemKind.User);
+        }
     }
 
     private static bool RemoveTreeItem(IList<ChannelTreeItemViewModel> collection, ChannelTreeItemViewModel item)

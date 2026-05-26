@@ -6,6 +6,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
 {
     private string name;
     private bool isTalking;
+    private bool isAway;
     private int userCount;
 
     public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
@@ -63,6 +64,21 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(AccessibleName));
                 OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(AccessibleHelpText));
+            }
+        }
+    }
+
+    public bool IsAway
+    {
+        get => isAway;
+        set
+        {
+            if (SetProperty(ref isAway, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(AccessibleHelpText));
             }
         }
     }
@@ -72,6 +88,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         ChannelTreeItemKind.Server => "Server",
         ChannelTreeItemKind.Channel => "#",
         ChannelTreeItemKind.User when IsTalking => "Speaking",
+        ChannelTreeItemKind.User when IsAway => "Away",
         ChannelTreeItemKind.User => "User",
         _ => string.Empty
     };
@@ -81,7 +98,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         get
         {
             string type = Kind.ToString().ToLowerInvariant();
-            string state = IsTalking ? ", transmitting" : string.Empty;
+            string state = IsTalking ? ", transmitting" : IsAway ? ", away" : string.Empty;
             string count = Kind == ChannelTreeItemKind.Channel ? $", {UserCount} users" : string.Empty;
             return $"{Name}, {type}{count}{state}";
         }
@@ -92,6 +109,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         ChannelTreeItemKind.Server => "TeamTalk server",
         ChannelTreeItemKind.Channel => "TeamTalk channel",
         ChannelTreeItemKind.User when IsTalking => "TeamTalk user, currently transmitting",
+        ChannelTreeItemKind.User when IsAway => "TeamTalk user, away",
         ChannelTreeItemKind.User => "TeamTalk user",
         _ => string.Empty
     };

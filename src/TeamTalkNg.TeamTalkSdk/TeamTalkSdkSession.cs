@@ -36,6 +36,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     public event EventHandler<ChannelSummary>? ChannelAddedOrUpdated;
     public event EventHandler<int>? ChannelRemoved;
     public event EventHandler<UserSummary>? UserJoined;
+    public event EventHandler<UserSummary>? UserUpdated;
     public event EventHandler<UserSummary>? UserLeft;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
@@ -552,6 +553,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.CommandUserJoined:
                 DispatchUserJoined(message.User);
                 break;
+            case ClientEvent.CommandUserUpdate:
+                DispatchUserUpdated(message.User);
+                break;
             case ClientEvent.CommandUserLeft:
                 DispatchUserLeft(message.User, message.Source);
                 break;
@@ -878,6 +882,11 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             currentChannelId = 0;
             SetStatus(ConnectionStatus.LoggedIn);
         }
+    }
+
+    private void DispatchUserUpdated(NativeUser user)
+    {
+        UserUpdated?.Invoke(this, CreateUserSummary(user, user.ChannelId));
     }
 
     private void DispatchTextMessage(NativeTextMessage textMessage)

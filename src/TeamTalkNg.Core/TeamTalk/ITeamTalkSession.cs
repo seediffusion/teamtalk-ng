@@ -7,6 +7,7 @@ public interface ITeamTalkSession
     event EventHandler<ChannelSummary>? ChannelAddedOrUpdated;
     event EventHandler<int>? ChannelRemoved;
     event EventHandler<UserSummary>? UserJoined;
+    event EventHandler<UserSummary>? UserUpdated;
     event EventHandler<UserSummary>? UserLeft;
 
     ConnectionStatus Status { get; }

@@ -11,6 +11,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public event EventHandler<ChannelSummary>? ChannelAddedOrUpdated;
     public event EventHandler<int>? ChannelRemoved;
     public event EventHandler<UserSummary>? UserJoined;
+    public event EventHandler<UserSummary>? UserUpdated;
     public event EventHandler<UserSummary>? UserLeft;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
@@ -188,6 +189,11 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public void SimulateUserLeft()
     {
         UserLeft?.Invoke(this, new UserSummary(44, "Morgan", "morgan", "/Lobby", IsTalking: false, IsAway: false, IsOperator: false));
+    }
+
+    public void SimulateUserTalking()
+    {
+        UserUpdated?.Invoke(this, new UserSummary(44, "Morgan", "morgan", "/Lobby", IsTalking: true, IsAway: false, IsOperator: false));
     }
 
     public void SimulateChannelRemoved(int channelId)
