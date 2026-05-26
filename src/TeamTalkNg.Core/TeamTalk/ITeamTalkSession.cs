@@ -4,6 +4,8 @@ public interface ITeamTalkSession
 {
     event EventHandler<ConnectionStatus>? ConnectionStatusChanged;
     event EventHandler<ChatMessage>? ChannelMessageReceived;
+    event EventHandler<ChannelSummary>? ChannelAddedOrUpdated;
+    event EventHandler<int>? ChannelRemoved;
     event EventHandler<UserSummary>? UserJoined;
     event EventHandler<UserSummary>? UserLeft;
 

@@ -4,19 +4,49 @@ namespace TeamTalkNg.App.ViewModels;
 
 public sealed class ChannelTreeItemViewModel : ObservableObject
 {
+    private string name;
     private bool isTalking;
+    private int userCount;
 
-    public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind)
+    public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
     {
-        Name = name;
+        this.name = name;
         Kind = kind;
+        Id = id;
+        Path = path;
     }
 
-    public string Name { get; }
+    public int Id { get; }
+
+    public string Path { get; }
+
+    public string Name
+    {
+        get => name;
+        set
+        {
+            if (SetProperty(ref name, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+            }
+        }
+    }
 
     public ChannelTreeItemKind Kind { get; }
 
     public ObservableCollection<ChannelTreeItemViewModel> Children { get; } = [];
+
+    public int UserCount
+    {
+        get => userCount;
+        set
+        {
+            if (SetProperty(ref userCount, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+            }
+        }
+    }
 
     public bool IsTalking
     {
@@ -46,7 +76,8 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         {
             string type = Kind.ToString().ToLowerInvariant();
             string state = IsTalking ? ", transmitting" : string.Empty;
-            return $"{Name}, {type}{state}";
+            string count = Kind == ChannelTreeItemKind.Channel ? $", {UserCount} users" : string.Empty;
+            return $"{Name}, {type}{count}{state}";
         }
     }
 

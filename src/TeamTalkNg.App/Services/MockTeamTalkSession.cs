@@ -8,6 +8,8 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
     public event EventHandler<ConnectionStatus>? ConnectionStatusChanged;
     public event EventHandler<ChatMessage>? ChannelMessageReceived;
+    public event EventHandler<ChannelSummary>? ChannelAddedOrUpdated;
+    public event EventHandler<int>? ChannelRemoved;
     public event EventHandler<UserSummary>? UserJoined;
     public event EventHandler<UserSummary>? UserLeft;
 
@@ -23,6 +25,9 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         SetStatus(ConnectionStatus.LoggedIn);
         await Task.Delay(250, cancellationToken);
         SetStatus(ConnectionStatus.InChannel);
+        string channelPath = string.IsNullOrWhiteSpace(profile.ChannelPath) ? "/" : profile.ChannelPath;
+        ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(1, GetChannelName(channelPath), channelPath, 1, IsProtected: false, IsPermanent: true));
+        UserJoined?.Invoke(this, new UserSummary(1, profile.Nickname, profile.Username, channelPath, IsTalking: false, IsAway: false, IsOperator: true));
 
         ChannelMessageReceived?.Invoke(this, new ChatMessage(
             DateTimeOffset.Now,
@@ -60,9 +65,26 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         UserLeft?.Invoke(this, new UserSummary(44, "Morgan", "morgan", "/Lobby", IsTalking: false, IsAway: false, IsOperator: false));
     }
 
+    public void SimulateChannelRemoved(int channelId)
+    {
+        ChannelRemoved?.Invoke(this, channelId);
+    }
+
     private void SetStatus(ConnectionStatus status)
     {
         Status = status;
         ConnectionStatusChanged?.Invoke(this, status);
+    }
+
+    private static string GetChannelName(string? channelPath)
+    {
+        if (string.IsNullOrWhiteSpace(channelPath) || channelPath == "/")
+        {
+            return "Root";
+        }
+
+        string trimmed = channelPath.Trim().Trim('/');
+        int lastSlash = trimmed.LastIndexOf('/');
+        return lastSlash >= 0 ? trimmed[(lastSlash + 1)..] : trimmed;
     }
 }

@@ -26,6 +26,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
     public event EventHandler<ConnectionStatus>? ConnectionStatusChanged;
     public event EventHandler<ChatMessage>? ChannelMessageReceived;
+    public event EventHandler<ChannelSummary>? ChannelAddedOrUpdated;
+    public event EventHandler<int>? ChannelRemoved;
     public event EventHandler<UserSummary>? UserJoined;
     public event EventHandler<UserSummary>? UserLeft;
 
@@ -280,6 +282,13 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.CommandUserTextMessage:
                 DispatchTextMessage(message.TextMessage);
                 break;
+            case ClientEvent.CommandChannelNew:
+            case ClientEvent.CommandChannelUpdate:
+                DispatchChannelAddedOrUpdated(message.Channel);
+                break;
+            case ClientEvent.CommandChannelRemove:
+                ChannelRemoved?.Invoke(this, message.Source);
+                break;
         }
     }
 
@@ -393,6 +402,24 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             DateTimeOffset.Now,
             sender,
             textMessage.ReadMessage()));
+    }
+
+    private void DispatchChannelAddedOrUpdated(NativeChannel channel)
+    {
+        string channelName = channel.ReadName();
+        string channelPath = GetChannelPath(channel.ChannelId);
+        if (string.IsNullOrWhiteSpace(channelName))
+        {
+            channelName = channelPath == "/" ? "Root" : channelPath.Trim('/').Split('/').LastOrDefault() ?? "Channel";
+        }
+
+        ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(
+            channel.ChannelId,
+            channelName,
+            channelPath,
+            UserCount: 0,
+            IsProtected: channel.HasPassword != 0,
+            IsPermanent: true));
     }
 
     private UserSummary CreateUserSummary(NativeUser user, int channelId)

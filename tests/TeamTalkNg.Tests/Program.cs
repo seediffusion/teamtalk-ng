@@ -173,6 +173,8 @@ internal static unsafe class SdkDispatchTests
     {
         DispatchesChannelTextMessage();
         DispatchesUserJoinedAndLeft();
+        DispatchesChannelAddedOrUpdated();
+        DispatchesChannelRemoved();
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         Console.WriteLine("TeamTalk NG SDK dispatch tests passed.");
@@ -265,6 +267,52 @@ internal static unsafe class SdkDispatchTests
 
         AssertEqual(ConnectionStatus.Disconnected, session.Status);
         Assert(systemMessage is { IsSystem: true }, "Expected system message for connection lost.");
+    }
+
+    private static void DispatchesChannelAddedOrUpdated()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        ChannelSummary? received = null;
+        session.ChannelAddedOrUpdated += (_, channel) => received = channel;
+
+        NativeChannel channel = default;
+        channel.ChannelId = 22;
+        WriteString(channel.Name, "Lobby");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandChannelNew,
+            Source: 22,
+            TTType.Channel,
+            default,
+            default,
+            default,
+            channel,
+            0,
+            0));
+
+        Assert(received is not null, "Expected channel event.");
+        AssertEqual(22, received!.Id);
+        AssertEqual("Lobby", received.Name);
+    }
+
+    private static void DispatchesChannelRemoved()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        int removedChannelId = 0;
+        session.ChannelRemoved += (_, channelId) => removedChannelId = channelId;
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandChannelRemove,
+            Source: 45,
+            TTType.Int32,
+            default,
+            default,
+            default,
+            default,
+            0,
+            45));
+
+        AssertEqual(45, removedChannelId);
     }
 
     private static void DispatchesLoggedInStatusWithoutNativeInstance()

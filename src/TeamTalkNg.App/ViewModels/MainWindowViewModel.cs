@@ -28,6 +28,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool voiceActivationEnabled;
     private TeamTalkServerProfile? activeProfile;
     private AppSettings settings;
+    private ChannelTreeItemViewModel? serverTreeItem;
 
     public MainWindowViewModel(
         ITeamTalkSession teamTalkSession,
@@ -66,6 +67,8 @@ public sealed class MainWindowViewModel : ObservableObject
         announcements.AnnouncementRaised += OnAnnouncementRaised;
         teamTalkSession.ConnectionStatusChanged += OnConnectionStatusChanged;
         teamTalkSession.ChannelMessageReceived += OnChannelMessageReceived;
+        teamTalkSession.ChannelAddedOrUpdated += OnChannelAddedOrUpdated;
+        teamTalkSession.ChannelRemoved += OnChannelRemoved;
         teamTalkSession.UserJoined += OnUserJoined;
         teamTalkSession.UserLeft += OnUserLeft;
 
@@ -178,8 +181,8 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         activeProfile = profile;
         await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        BuildConnectingTree(profile);
         await teamTalkSession.ConnectAsync(profile);
-        BuildConnectedTree();
         RaiseCommandStateChanged();
     }
 
@@ -309,8 +312,22 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            ChannelTreeItemViewModel? channel = Channels.FirstOrDefault()?.Children.FirstOrDefault(item => item.Name == GetChannelName(user.ChannelPath));
-            channel?.Children.Add(new ChannelTreeItemViewModel(user.Nickname, ChannelTreeItemKind.User));
+            ChannelTreeItemViewModel channel = EnsureChannel(user.ChannelPath, id: 0);
+            ChannelTreeItemViewModel? existingUser = channel.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.User && item.Id == user.Id);
+            if (existingUser is null)
+            {
+                channel.Children.Add(new ChannelTreeItemViewModel(user.Nickname, ChannelTreeItemKind.User, user.Id, user.ChannelPath)
+                {
+                    IsTalking = user.IsTalking
+                });
+            }
+            else
+            {
+                existingUser.Name = user.Nickname;
+                existingUser.IsTalking = user.IsTalking;
+            }
+
+            channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
         });
 
         _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
@@ -318,7 +335,45 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void OnUserLeft(object? sender, UserSummary user)
     {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            ChannelTreeItemViewModel? channel = FindChannelByPath(user.ChannelPath);
+            ChannelTreeItemViewModel? existingUser = channel?.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.User && item.Id == user.Id);
+            if (existingUser is not null && channel is not null)
+            {
+                channel.Children.Remove(existingUser);
+                channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
+            }
+        });
+
         _ = AnnounceAsync($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+    }
+
+    private void OnChannelAddedOrUpdated(object? sender, ChannelSummary channel)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            ChannelTreeItemViewModel item = EnsureChannel(channel.Path, channel.Id);
+            item.Name = channel.Name;
+            item.UserCount = channel.UserCount > 0 ? channel.UserCount : item.Children.Count(child => child.Kind == ChannelTreeItemKind.User);
+        });
+    }
+
+    private void OnChannelRemoved(object? sender, int channelId)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (serverTreeItem is null)
+            {
+                return;
+            }
+
+            ChannelTreeItemViewModel? channel = serverTreeItem.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel && item.Id == channelId);
+            if (channel is not null)
+            {
+                serverTreeItem.Children.Remove(channel);
+            }
+        });
     }
 
     private void OnAnnouncementRaised(object? sender, ScreenReaderAnnouncement announcement)
@@ -335,28 +390,43 @@ public sealed class MainWindowViewModel : ObservableObject
     private void BuildDisconnectedTree()
     {
         Channels.Clear();
-        Channels.Add(new ChannelTreeItemViewModel("Not connected", ChannelTreeItemKind.Server));
+        serverTreeItem = new ChannelTreeItemViewModel("Not connected", ChannelTreeItemKind.Server);
+        Channels.Add(serverTreeItem);
     }
 
-    private void BuildConnectedTree()
+    private void BuildConnectingTree(TeamTalkServerProfile profile)
     {
         Channels.Clear();
+        serverTreeItem = new ChannelTreeItemViewModel(profile.DisplayName, ChannelTreeItemKind.Server);
+        Channels.Add(serverTreeItem);
+    }
 
-        string serverName = activeProfile?.DisplayName ?? "Connected server";
-        string channelName = GetChannelName(activeProfile?.ChannelPath);
-        string nickname = string.IsNullOrWhiteSpace(activeProfile?.Nickname) ? "You" : activeProfile.Nickname;
+    private ChannelTreeItemViewModel EnsureChannel(string? channelPath, int id)
+    {
+        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+        serverTreeItem ??= Channels.FirstOrDefault();
+        if (serverTreeItem is null)
+        {
+            serverTreeItem = new ChannelTreeItemViewModel(activeProfile?.DisplayName ?? "Connected server", ChannelTreeItemKind.Server);
+            Channels.Add(serverTreeItem);
+        }
 
-        var server = new ChannelTreeItemViewModel(serverName, ChannelTreeItemKind.Server);
-        var lobby = new ChannelTreeItemViewModel(channelName, ChannelTreeItemKind.Channel);
-        lobby.Children.Add(new ChannelTreeItemViewModel(nickname, ChannelTreeItemKind.User));
-        lobby.Children.Add(new ChannelTreeItemViewModel("Riley", ChannelTreeItemKind.User) { IsTalking = true });
+        ChannelTreeItemViewModel? existing = FindChannelByPath(normalizedPath);
+        if (existing is not null)
+        {
+            return existing;
+        }
 
-        var music = new ChannelTreeItemViewModel("Music Room", ChannelTreeItemKind.Channel);
-        music.Children.Add(new ChannelTreeItemViewModel("Sam", ChannelTreeItemKind.User));
+        var channel = new ChannelTreeItemViewModel(GetChannelName(normalizedPath), ChannelTreeItemKind.Channel, id, normalizedPath);
+        serverTreeItem.Children.Add(channel);
+        return channel;
+    }
 
-        server.Children.Add(lobby);
-        server.Children.Add(music);
-        Channels.Add(server);
+    private ChannelTreeItemViewModel? FindChannelByPath(string? channelPath)
+    {
+        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+        return serverTreeItem?.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel
+            && string.Equals(item.Path, normalizedPath, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task SaveRecentProfileAsync(IReadOnlyList<TeamTalkServerProfile> profiles, TeamTalkServerProfile selectedProfile)
