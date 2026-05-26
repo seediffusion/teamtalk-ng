@@ -1,13 +1,14 @@
 using System.Windows;
 using TeamTalkNg.App.ViewModels;
+using TeamTalkNg.Core.TeamTalk;
 
 namespace TeamTalkNg.App.Services;
 
 public sealed class PreferencesDialogService : IPreferencesDialogService
 {
-    public AppSettings? ShowPreferencesDialog(AppSettings currentSettings)
+    public AppSettings? ShowPreferencesDialog(AppSettings currentSettings, IReadOnlyList<AudioDeviceSummary> audioDevices)
     {
-        var viewModel = new PreferencesDialogViewModel(currentSettings);
+        var viewModel = new PreferencesDialogViewModel(currentSettings, audioDevices);
         var dialog = new PreferencesDialog
         {
             Owner = Application.Current.MainWindow,

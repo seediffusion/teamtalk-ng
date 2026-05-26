@@ -46,6 +46,19 @@ internal enum TextMsgType
     Custom = 4
 }
 
+internal enum SoundSystem
+{
+    None = 0,
+    WinMm = 1,
+    DSound = 2,
+    Alsa = 3,
+    CoreAudio = 4,
+    Wasapi = 5,
+    OpenSlesAndroid = 7,
+    AudioUnit = 8,
+    PulseAudio = 10
+}
+
 [Flags]
 internal enum ChannelType : uint
 {
@@ -73,6 +86,7 @@ internal static unsafe class NativeConstants
     public const int StringLength = 512;
     public const int TransmitUsersMax = 128;
     public const int TransmitQueueMax = 16;
+    public const int SampleRatesMax = 16;
     public const int MessageHeaderSize = 16;
 
     public static string ReadString(char* value)
@@ -95,6 +109,31 @@ internal static unsafe class NativeConstants
         for (int index = length + 1; index < StringLength; index++)
         {
             destination[index] = '\0';
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeSoundDevice
+{
+    public int DeviceId;
+    public SoundSystem SoundSystem;
+    public fixed char DeviceName[NativeConstants.StringLength];
+    public fixed char DeviceIdentifier[NativeConstants.StringLength];
+    public int WaveDeviceId;
+    public int Supports3D;
+    public int MaxInputChannels;
+    public int MaxOutputChannels;
+    public fixed int InputSampleRates[NativeConstants.SampleRatesMax];
+    public fixed int OutputSampleRates[NativeConstants.SampleRatesMax];
+    public int DefaultSampleRate;
+    public uint SoundDeviceFeatures;
+
+    public string ReadName()
+    {
+        fixed (char* value = DeviceName)
+        {
+            return NativeConstants.ReadString(value);
         }
     }
 }

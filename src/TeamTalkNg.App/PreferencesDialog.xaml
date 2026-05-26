@@ -56,6 +56,57 @@
         </Grid>
       </TabItem>
 
+      <TabItem Header="Audio">
+        <Grid Margin="8,14,8,8">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="180" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <Label Target="{Binding ElementName=InputDeviceBox}" Content="Microphone" />
+          <ComboBox x:Name="InputDeviceBox"
+                    Grid.Column="1"
+                    ItemsSource="{Binding InputDevices}"
+                    SelectedValue="{Binding SelectedInputDeviceId}"
+                    SelectedValuePath="Id"
+                    DisplayMemberPath="Name"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    Foreground="{DynamicResource TextBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    AutomationProperties.Name="Microphone device" />
+
+          <Label Grid.Row="1" Target="{Binding ElementName=OutputDeviceBox}" Content="Speaker" />
+          <ComboBox x:Name="OutputDeviceBox"
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    ItemsSource="{Binding OutputDevices}"
+                    SelectedValue="{Binding SelectedOutputDeviceId}"
+                    SelectedValuePath="Id"
+                    DisplayMemberPath="Name"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    Foreground="{DynamicResource TextBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    AutomationProperties.Name="Speaker device" />
+
+          <Label Grid.Row="2" Target="{Binding ElementName=VoiceActivationLevelBox}" Content="Voice activation level" />
+          <Slider x:Name="VoiceActivationLevelBox"
+                  Grid.Row="2"
+                  Grid.Column="1"
+                  Minimum="0"
+                  Maximum="100"
+                  TickFrequency="5"
+                  IsSnapToTickEnabled="True"
+                  Value="{Binding VoiceActivationLevel}"
+                  AutomationProperties.Name="Voice activation level" />
+        </Grid>
+      </TabItem>
+
       <TabItem Header="Screen reader">
         <StackPanel Margin="8,14,8,8">
           <CheckBox Content="Announce channel messages"

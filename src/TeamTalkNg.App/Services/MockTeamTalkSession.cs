@@ -15,6 +15,21 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
+    public Task<IReadOnlyList<AudioDeviceSummary>> GetAudioDevicesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<AudioDeviceSummary> devices =
+        [
+            new AudioDeviceSummary(1, "Default microphone", SupportsInput: true, SupportsOutput: false, IsDefaultInput: true, IsDefaultOutput: false),
+            new AudioDeviceSummary(2, "Default speaker", SupportsInput: false, SupportsOutput: true, IsDefaultInput: false, IsDefaultOutput: true)
+        ];
+        return Task.FromResult(devices);
+    }
+
+    public Task SetAudioDevicesAsync(int? inputDeviceId, int? outputDeviceId, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         activeProfile = profile;

@@ -13,4 +13,10 @@ public sealed record AppSettings
     public bool AnnounceSelectionChanges { get; init; } = true;
 
     public bool SendAnnouncementsToBraille { get; init; } = true;
+
+    public int? AudioInputDeviceId { get; init; }
+
+    public int? AudioOutputDeviceId { get; init; }
+
+    public int VoiceActivationLevel { get; init; } = 50;
 }

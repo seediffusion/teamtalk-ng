@@ -1,6 +1,8 @@
+using TeamTalkNg.Core.TeamTalk;
+
 namespace TeamTalkNg.App.Services;
 
 public interface IPreferencesDialogService
 {
-    AppSettings? ShowPreferencesDialog(AppSettings currentSettings);
+    AppSettings? ShowPreferencesDialog(AppSettings currentSettings, IReadOnlyList<AudioDeviceSummary> audioDevices);
 }

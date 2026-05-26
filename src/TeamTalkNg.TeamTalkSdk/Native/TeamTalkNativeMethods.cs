@@ -21,6 +21,14 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int GetDefaultSoundDevices(out int inputDeviceId, out int outputDeviceId);
 
+    [DllImport(LibraryName, EntryPoint = "TT_GetSoundDevices")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetSoundDevices(IntPtr soundDevices, ref int deviceCount);
+
+    [DllImport(LibraryName, EntryPoint = "TT_RestartSoundSystem")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int RestartSoundSystem();
+
     [DllImport(LibraryName, EntryPoint = "TT_InitSoundInputDevice")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int InitSoundInputDevice(IntPtr instance, int inputDeviceId);

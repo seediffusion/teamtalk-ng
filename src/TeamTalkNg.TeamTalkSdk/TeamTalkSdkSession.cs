@@ -21,6 +21,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private bool audioDevicesInitialized;
     private bool voiceTransmissionEnabled;
     private bool voiceActivationEnabled;
+    private int? configuredInputDeviceId;
+    private int? configuredOutputDeviceId;
 
     public TeamTalkSdkSession(TeamTalkSdkOptions options)
     {
@@ -37,6 +39,39 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
     public TeamTalkSdkAvailability Availability => TeamTalkNativeLibrary.Probe(options);
+
+    public Task<IReadOnlyList<AudioDeviceSummary>> GetAudioDevicesAsync(CancellationToken cancellationToken = default)
+    {
+        TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);
+        if (!availability.IsAvailable)
+        {
+            return Task.FromResult<IReadOnlyList<AudioDeviceSummary>>([]);
+        }
+
+        return Task.FromResult<IReadOnlyList<AudioDeviceSummary>>(ReadAudioDevices());
+    }
+
+    public Task SetAudioDevicesAsync(int? inputDeviceId, int? outputDeviceId, CancellationToken cancellationToken = default)
+    {
+        lock (stateLock)
+        {
+            configuredInputDeviceId = inputDeviceId;
+            configuredOutputDeviceId = outputDeviceId;
+
+            if (instance != IntPtr.Zero && audioDevicesInitialized)
+            {
+                StopVoiceInput();
+                CloseSoundDevices();
+            }
+        }
+
+        if (instance != IntPtr.Zero && Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
+        {
+            InitializeDefaultAudioDevices();
+        }
+
+        return Task.CompletedTask;
+    }
 
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
@@ -605,6 +640,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             return;
         }
 
+        inputDeviceId = configuredInputDeviceId ?? inputDeviceId;
+        outputDeviceId = configuredOutputDeviceId ?? outputDeviceId;
+
         int inputReady;
         int outputReady;
         lock (stateLock)
@@ -662,6 +700,61 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         TeamTalkNativeMethods.CloseSoundInputDevice(instance);
         TeamTalkNativeMethods.CloseSoundOutputDevice(instance);
         audioDevicesInitialized = false;
+    }
+
+    private static IReadOnlyList<AudioDeviceSummary> ReadAudioDevices()
+    {
+        TeamTalkNativeMethods.RestartSoundSystem();
+
+        int count = 0;
+        if (TeamTalkNativeMethods.GetSoundDevices(IntPtr.Zero, ref count) == 0 || count <= 0)
+        {
+            return [];
+        }
+
+        int size = Marshal.SizeOf<NativeSoundDevice>();
+        IntPtr buffer = Marshal.AllocHGlobal(size * count);
+        try
+        {
+            if (TeamTalkNativeMethods.GetSoundDevices(buffer, ref count) == 0 || count <= 0)
+            {
+                return [];
+            }
+
+            TeamTalkNativeMethods.GetDefaultSoundDevices(out int defaultInputId, out int defaultOutputId);
+            List<AudioDeviceSummary> devices = [];
+            for (int index = 0; index < count; index++)
+            {
+                IntPtr deviceAddress = IntPtr.Add(buffer, index * size);
+                NativeSoundDevice nativeDevice = Marshal.PtrToStructure<NativeSoundDevice>(deviceAddress);
+                bool supportsInput = nativeDevice.MaxInputChannels > 0;
+                bool supportsOutput = nativeDevice.MaxOutputChannels > 0;
+                if (!supportsInput && !supportsOutput)
+                {
+                    continue;
+                }
+
+                string name = nativeDevice.ReadName();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = $"Audio device {nativeDevice.DeviceId}";
+                }
+
+                devices.Add(new AudioDeviceSummary(
+                    nativeDevice.DeviceId,
+                    name,
+                    supportsInput,
+                    supportsOutput,
+                    nativeDevice.DeviceId == defaultInputId,
+                    nativeDevice.DeviceId == defaultOutputId));
+            }
+
+            return devices;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     private void DispatchUserJoined(NativeUser user)

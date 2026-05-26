@@ -11,6 +11,10 @@ public interface ITeamTalkSession
 
     ConnectionStatus Status { get; }
 
+    Task<IReadOnlyList<AudioDeviceSummary>> GetAudioDevicesAsync(CancellationToken cancellationToken = default);
+
+    Task SetAudioDevicesAsync(int? inputDeviceId, int? outputDeviceId, CancellationToken cancellationToken = default);
+
     Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default);
 
     Task DisconnectAsync(CancellationToken cancellationToken = default);

@@ -227,6 +227,7 @@ public sealed class MainWindowViewModel : ObservableObject
         activeProfile = profile;
         await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         BuildConnectingTree(profile);
+        await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
         await teamTalkSession.ConnectAsync(profile);
         RaiseCommandStateChanged();
     }
@@ -362,7 +363,7 @@ public sealed class MainWindowViewModel : ObservableObject
         bool target = !IsVoiceActivationEnabled;
         try
         {
-            await teamTalkSession.SetVoiceActivationAsync(target);
+            await teamTalkSession.SetVoiceActivationAsync(target, settings.VoiceActivationLevel);
             IsVoiceActivationEnabled = target;
             if (target)
             {
@@ -380,7 +381,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task ShowPreferencesAsync()
     {
-        AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(settings);
+        IReadOnlyList<AudioDeviceSummary> audioDevices = await teamTalkSession.GetAudioDevicesAsync();
+        AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(settings, audioDevices);
         if (updatedSettings is null)
         {
             return;
@@ -388,6 +390,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
+        await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
         await settingsStore.SaveAsync(settings);
         await AnnounceAsync("Preferences saved", AnnouncementPriority.Normal, AnnouncementKind.System);
     }

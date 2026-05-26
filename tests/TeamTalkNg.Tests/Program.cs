@@ -130,6 +130,7 @@ internal static class SdkProbeTests
     {
         ReportsMissingConfiguredLibrary();
         VerifiesNativeSizesWhenSdkIsPresent();
+        EnumeratesAudioDevicesWhenSdkIsPresent();
         Console.WriteLine("TeamTalk NG SDK probe tests passed.");
     }
 
@@ -156,6 +157,19 @@ internal static class SdkProbeTests
 
         IReadOnlyList<string> mismatches = TeamTalkNativeSizeVerifier.VerifyLoadedSdkSizes();
         Assert(mismatches.Count == 0, string.Join(Environment.NewLine, mismatches));
+    }
+
+    private static void EnumeratesAudioDevicesWhenSdkIsPresent()
+    {
+        TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(new TeamTalkSdkOptions());
+        if (!availability.IsAvailable)
+        {
+            return;
+        }
+
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        IReadOnlyList<AudioDeviceSummary> devices = session.GetAudioDevicesAsync().GetAwaiter().GetResult();
+        Assert(devices.All(device => !string.IsNullOrWhiteSpace(device.Name)), "Expected audio devices to have display names.");
     }
 
     private static void Assert(bool condition, string message)
