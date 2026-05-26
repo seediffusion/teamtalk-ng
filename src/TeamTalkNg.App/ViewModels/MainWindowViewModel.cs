@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IChannelDialogService channelDialogService;
     private readonly IDirectMessageDialogService directMessageDialogService;
     private readonly IStatusDialogService statusDialogService;
+    private readonly IJoinChannelDialogService joinChannelDialogService;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
@@ -46,6 +47,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IChannelDialogService channelDialogService,
         IDirectMessageDialogService directMessageDialogService,
         IStatusDialogService statusDialogService,
+        IJoinChannelDialogService joinChannelDialogService,
         AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
@@ -59,6 +61,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.channelDialogService = channelDialogService;
         this.directMessageDialogService = directMessageDialogService;
         this.statusDialogService = statusDialogService;
+        this.joinChannelDialogService = joinChannelDialogService;
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
@@ -231,8 +234,21 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
+            string password = string.Empty;
+            if (channel.IsProtected)
+            {
+                string? enteredPassword = joinChannelDialogService.ShowJoinChannelDialog(channel.Name);
+                if (enteredPassword is null)
+                {
+                    await AnnounceAsync("Join channel canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+                    return;
+                }
+
+                password = enteredPassword;
+            }
+
             await AnnounceAsync($"Joining {channel.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
-            await teamTalkSession.JoinChannelAsync(channel.Path);
+            await teamTalkSession.JoinChannelAsync(channel.Path, password);
         }
         catch (Exception ex)
         {
@@ -624,6 +640,8 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             ChannelTreeItemViewModel item = EnsureChannel(channel.Path, channel.Id);
             item.Name = channel.Name;
+            item.IsProtected = channel.IsProtected;
+            item.IsPermanent = channel.IsPermanent;
             item.UserCount = channel.UserCount > 0 ? channel.UserCount : item.Children.Count(child => child.Kind == ChannelTreeItemKind.User);
         });
     }
@@ -717,6 +735,7 @@ public sealed class MainWindowViewModel : ObservableObject
             if (rootChannel is null)
             {
                 rootChannel = new ChannelTreeItemViewModel("Root", ChannelTreeItemKind.Channel, id, "/");
+                rootChannel.IsPermanent = true;
                 serverTreeItem.Children.Add(rootChannel);
             }
 

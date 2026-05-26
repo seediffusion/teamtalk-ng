@@ -354,6 +354,8 @@ internal static unsafe class SdkDispatchTests
 
         NativeChannel channel = default;
         channel.ChannelId = 22;
+        channel.HasPassword = 1;
+        channel.ChannelType = (uint)ChannelType.Permanent;
         WriteString(channel.Name, "Lobby");
 
         session.DispatchMessageForTest(new TeamTalkMessage(
@@ -370,6 +372,8 @@ internal static unsafe class SdkDispatchTests
         Assert(received is not null, "Expected channel event.");
         AssertEqual(22, received!.Id);
         AssertEqual("Lobby", received.Name);
+        Assert(received.IsProtected, "Expected channel to preserve password-protected state.");
+        Assert(received.IsPermanent, "Expected channel to preserve permanent state.");
     }
 
     private static void DispatchesChannelRemoved()
