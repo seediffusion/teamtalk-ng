@@ -1,7 +1,10 @@
 using TeamTalkNg.Core.TeamTalk;
 using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
+using TeamTalkNg.TeamTalkSdk;
+using TeamTalkNg.TeamTalkSdk.Native;
 
 ParserTests.RunAll();
+SdkProbeTests.RunAll();
 
 internal static class ParserTests
 {
@@ -116,6 +119,36 @@ internal static class ParserTests
         if (!EqualityComparer<T>.Default.Equals(expected, actual))
         {
             throw new InvalidOperationException($"Expected {expected}, got {actual}.");
+        }
+    }
+}
+
+internal static class SdkProbeTests
+{
+    public static void RunAll()
+    {
+        ReportsMissingConfiguredLibrary();
+        Console.WriteLine("TeamTalk NG SDK probe tests passed.");
+    }
+
+    private static void ReportsMissingConfiguredLibrary()
+    {
+        var options = new TeamTalkSdkOptions
+        {
+            NativeLibraryPath = Path.Combine(Path.GetTempPath(), $"missing-teamtalk-{Guid.NewGuid():N}.dll")
+        };
+
+        TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.Probe(options);
+
+        Assert(!availability.IsAvailable, "Expected missing configured SDK library to be unavailable.");
+        Assert(!string.IsNullOrWhiteSpace(availability.Reason), "Expected missing SDK library to provide a reason.");
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
         }
     }
 }

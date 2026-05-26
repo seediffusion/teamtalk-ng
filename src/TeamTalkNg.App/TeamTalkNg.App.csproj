@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\TeamTalkNg.Accessibility\TeamTalkNg.Accessibility.csproj" />
     <ProjectReference Include="..\TeamTalkNg.Core\TeamTalkNg.Core.csproj" />
+    <ProjectReference Include="..\TeamTalkNg.TeamTalkSdk\TeamTalkNg.TeamTalkSdk.csproj" />
   </ItemGroup>
 </Project>

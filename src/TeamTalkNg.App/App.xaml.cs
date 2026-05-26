@@ -23,7 +23,7 @@ public partial class App : Application
                 : new DebugScreenReaderOutput();
 
             announcementService = new QueuedAnnouncementService(screenReaderOutput);
-            ITeamTalkSession teamTalkSession = new MockTeamTalkSession();
+            ITeamTalkSession teamTalkSession = TeamTalkSessionFactory.CreateDefaultSession();
             IThemeService themeService = new ThemeService();
             IAppSettingsStore settingsStore = new JsonAppSettingsStore();
             AppSettings appSettings = await settingsStore.LoadAsync();
