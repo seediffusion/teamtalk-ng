@@ -4,6 +4,7 @@ using System.Windows.Input;
 using TeamTalkNg.App.Services;
 using TeamTalkNg.Core.Accessibility;
 using TeamTalkNg.Core.TeamTalk;
+using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
 
 namespace TeamTalkNg.App.ViewModels;
 
@@ -14,6 +15,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IThemeService themeService;
     private readonly IServerProfileStore profileStore;
     private readonly IConnectionDialogService connectionDialogService;
+    private readonly IConnectionTargetDialogService connectionTargetDialogService;
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
     private string connectionStatusText = "Disconnected";
@@ -33,6 +35,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IThemeService themeService,
         IServerProfileStore profileStore,
         IConnectionDialogService connectionDialogService,
+        IConnectionTargetDialogService connectionTargetDialogService,
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
         AppSettings settings)
@@ -42,11 +45,13 @@ public sealed class MainWindowViewModel : ObservableObject
         this.themeService = themeService;
         this.profileStore = profileStore;
         this.connectionDialogService = connectionDialogService;
+        this.connectionTargetDialogService = connectionTargetDialogService;
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
         this.settings = settings;
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
+        OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new RelayCommand(TogglePushToTalk);
@@ -77,6 +82,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<FileTransferViewModel> Files { get; } = [];
 
     public ICommand ConnectCommand { get; }
+
+    public ICommand OpenConnectionTargetCommand { get; }
 
     public ICommand DisconnectCommand { get; }
 
@@ -164,16 +171,36 @@ public sealed class MainWindowViewModel : ObservableObject
 
         activeProfile = profile;
         await SaveRecentProfileAsync(profiles, profile);
-        await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         await ConnectToProfileAsync(profile);
     }
 
     public async Task ConnectToProfileAsync(TeamTalkServerProfile profile)
     {
         activeProfile = profile;
+        await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         await teamTalkSession.ConnectAsync(profile);
         BuildConnectedTree();
         RaiseCommandStateChanged();
+    }
+
+    private async Task OpenConnectionTargetAsync()
+    {
+        string? target = connectionTargetDialogService.ShowConnectionTargetDialog();
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            await AnnounceAsync("Open connection target canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        if (!TeamTalkConnectionTargetParser.TryParse(target, out TeamTalkServerProfile profile, out string error))
+        {
+            await AnnounceAsync(error, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+            return;
+        }
+
+        IReadOnlyList<TeamTalkServerProfile> profiles = await profileStore.LoadAsync();
+        await SaveRecentProfileAsync(profiles, profile);
+        await ConnectToProfileAsync(profile);
     }
 
     private async Task DisconnectAsync()
@@ -402,6 +429,11 @@ public sealed class MainWindowViewModel : ObservableObject
         if (DisconnectCommand is AsyncRelayCommand disconnect)
         {
             disconnect.RaiseCanExecuteChanged();
+        }
+
+        if (OpenConnectionTargetCommand is AsyncRelayCommand openTarget)
+        {
+            openTarget.RaiseCanExecuteChanged();
         }
     }
 }

@@ -13,6 +13,7 @@ This repository currently contains the first application skeleton:
 - Screen-reader announcement abstraction with a Prismatoid adapter boundary.
 - Preferences for theme and screen-reader announcement behavior.
 - `tt://` URL and `.tt`/key-value connection target parsing for startup arguments.
+- In-app Open Connection Target flow for pasted `tt://` URLs or browsed `.tt` files.
 - Mock TeamTalk session service so UI and announcement flows can be exercised before the TeamTalk SDK adapter is connected.
 
 ## Accessibility Approach
@@ -30,9 +31,15 @@ The announcement service falls back to debug output when Prismatoid is not prese
 dotnet build TeamTalkNg.slnx
 ```
 
+## Parser Smoke Tests
+
+```powershell
+dotnet run --project tests\TeamTalkNg.Tests\TeamTalkNg.Tests.csproj
+```
+
 ## Next Implementation Targets
 
 - Replace `MockTeamTalkSession` with a real TeamTalk SDK adapter.
-- Add in-app file picker and protocol registration for `.tt` files and `tt://` URLs.
+- Add Windows protocol and file association registration for `.tt` files and `tt://` URLs.
 - Add Preferences, Sound System, Shortcuts, Text to Speech, and Video Capture screens.
 - Add automated UIA smoke checks and manual NVDA/JAWS verification notes.

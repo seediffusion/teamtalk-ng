@@ -34,7 +34,9 @@ public sealed class JsonServerProfileStore : IServerProfileStore
         }
 
         await using FileStream stream = File.OpenRead(profilePath);
-        List<TeamTalkServerProfile>? profiles = await JsonSerializer.DeserializeAsync<List<TeamTalkServerProfile>>(stream, JsonOptions, cancellationToken);
+        List<TeamTalkServerProfile>? profiles = await JsonSerializer
+            .DeserializeAsync<List<TeamTalkServerProfile>>(stream, JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
 
         if (profiles is null || profiles.Count == 0)
         {
@@ -57,7 +59,7 @@ public sealed class JsonServerProfileStore : IServerProfileStore
             .ToArray();
 
         await using FileStream stream = File.Create(profilePath);
-        await JsonSerializer.SerializeAsync(stream, safeProfiles, JsonOptions, cancellationToken);
+        await JsonSerializer.SerializeAsync(stream, safeProfiles, JsonOptions, cancellationToken).ConfigureAwait(false);
     }
 
     private static TeamTalkServerProfile CreateDefaultProfile()

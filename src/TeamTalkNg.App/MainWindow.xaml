@@ -12,6 +12,7 @@
         Foreground="{DynamicResource TextBrush}">
   <Window.InputBindings>
     <KeyBinding Key="F2" Command="{Binding ConnectCommand}" />
+    <KeyBinding Modifiers="Control" Key="O" Command="{Binding OpenConnectionTargetCommand}" />
   </Window.InputBindings>
 
   <Window.Resources>
@@ -29,6 +30,7 @@
           Foreground="{DynamicResource TextBrush}">
       <MenuItem Header="_Client">
         <MenuItem Header="_Connect" Command="{Binding ConnectCommand}" InputGestureText="F2" />
+        <MenuItem Header="_Open Connection Target" Command="{Binding OpenConnectionTargetCommand}" InputGestureText="Ctrl+O" />
         <MenuItem Header="_Disconnect" Command="{Binding DisconnectCommand}" />
         <Separator />
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />

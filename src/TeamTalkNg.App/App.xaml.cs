@@ -12,48 +12,65 @@ public partial class App : Application
 {
     private IAnnouncementService? announcementService;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        IScreenReaderOutput screenReaderOutput = PrismatoidScreenReaderOutput.TryCreate(out IScreenReaderOutput prismatoidOutput)
-            ? new CompositeScreenReaderOutput(prismatoidOutput, new DebugScreenReaderOutput())
-            : new DebugScreenReaderOutput();
-
-        announcementService = new QueuedAnnouncementService(screenReaderOutput);
-        ITeamTalkSession teamTalkSession = new MockTeamTalkSession();
-        IThemeService themeService = new ThemeService();
-        IAppSettingsStore settingsStore = new JsonAppSettingsStore();
-        AppSettings appSettings = settingsStore.LoadAsync().GetAwaiter().GetResult();
-        themeService.UseTheme(appSettings.Theme);
-
-        IServerProfileStore profileStore = new JsonServerProfileStore();
-        IConnectionDialogService connectionDialogService = new ConnectionDialogService();
-        IPreferencesDialogService preferencesDialogService = new PreferencesDialogService();
-
-        var viewModel = new MainWindowViewModel(
-            teamTalkSession,
-            announcementService,
-            themeService,
-            profileStore,
-            connectionDialogService,
-            settingsStore,
-            preferencesDialogService,
-            appSettings);
-        var window = new MainWindow
+        try
         {
-            DataContext = viewModel
-        };
+            IScreenReaderOutput screenReaderOutput = PrismatoidScreenReaderOutput.TryCreate(out IScreenReaderOutput prismatoidOutput)
+                ? new CompositeScreenReaderOutput(prismatoidOutput, new DebugScreenReaderOutput())
+                : new DebugScreenReaderOutput();
 
-        window.Show();
+            announcementService = new QueuedAnnouncementService(screenReaderOutput);
+            ITeamTalkSession teamTalkSession = new MockTeamTalkSession();
+            IThemeService themeService = new ThemeService();
+            IAppSettingsStore settingsStore = new JsonAppSettingsStore();
+            AppSettings appSettings = await settingsStore.LoadAsync();
+            themeService.UseTheme(appSettings.Theme);
 
-        if (TryReadStartupConnectionTarget(e.Args, out TeamTalkServerProfile startupProfile, out string startupError))
-        {
-            _ = viewModel.ConnectToProfileAsync(startupProfile);
+            IServerProfileStore profileStore = new JsonServerProfileStore();
+            IConnectionDialogService connectionDialogService = new ConnectionDialogService();
+            IConnectionTargetDialogService connectionTargetDialogService = new ConnectionTargetDialogService();
+            IPreferencesDialogService preferencesDialogService = new PreferencesDialogService();
+
+            var viewModel = new MainWindowViewModel(
+                teamTalkSession,
+                announcementService,
+                themeService,
+                profileStore,
+                connectionDialogService,
+                connectionTargetDialogService,
+                settingsStore,
+                preferencesDialogService,
+                appSettings);
+            var window = new MainWindow
+            {
+                DataContext = viewModel
+            };
+
+            MainWindow = window;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            window.Show();
+            window.Activate();
+
+            if (TryReadStartupConnectionTarget(e.Args, out TeamTalkServerProfile startupProfile, out string startupError))
+            {
+                _ = viewModel.ConnectToProfileAsync(startupProfile);
+            }
+            else if (!string.IsNullOrEmpty(startupError))
+            {
+                _ = announcementService.AnnounceAsync(new ScreenReaderAnnouncement(startupError, AnnouncementPriority.High, Interrupt: true));
+            }
         }
-        else if (!string.IsNullOrEmpty(startupError))
+        catch (Exception ex)
         {
-            _ = announcementService.AnnounceAsync(new ScreenReaderAnnouncement(startupError, AnnouncementPriority.High, Interrupt: true));
+            MessageBox.Show(
+                ex.ToString(),
+                "TeamTalk NG failed to start",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(-1);
         }
     }
 

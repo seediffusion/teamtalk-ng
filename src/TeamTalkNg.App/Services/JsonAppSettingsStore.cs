@@ -35,7 +35,8 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
         try
         {
             await using FileStream stream = File.OpenRead(settingsPath);
-            return await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken) ?? new AppSettings();
+            return await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken).ConfigureAwait(false)
+                ?? new AppSettings();
         }
         catch (JsonException)
         {
@@ -47,6 +48,6 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
     {
         Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
         await using FileStream stream = File.Create(settingsPath);
-        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken).ConfigureAwait(false);
     }
 }
