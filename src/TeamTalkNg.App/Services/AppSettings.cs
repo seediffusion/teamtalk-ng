@@ -19,4 +19,8 @@ public sealed record AppSettings
     public int? AudioOutputDeviceId { get; init; }
 
     public int VoiceActivationLevel { get; init; } = 50;
+
+    public int InputVolume { get; init; } = 50;
+
+    public int OutputVolume { get; init; } = 50;
 }

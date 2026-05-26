@@ -192,6 +192,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         RejectsVoiceControlsBeforeJoiningChannel();
+        StoresAudioVolumeBeforeNativeInstanceExists();
         Console.WriteLine("TeamTalk NG SDK dispatch tests passed.");
     }
 
@@ -354,6 +355,13 @@ internal static unsafe class SdkDispatchTests
 
         AssertThrows(() => session.SetVoiceTransmissionAsync(true).GetAwaiter().GetResult());
         AssertThrows(() => session.SetVoiceActivationAsync(true).GetAwaiter().GetResult());
+    }
+
+    private static void StoresAudioVolumeBeforeNativeInstanceExists()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        session.SetAudioVolumeAsync(inputVolumePercent: 0, outputVolumePercent: 100).GetAwaiter().GetResult();
     }
 
     private static NativeUser CreateUser(int id, string username, string nickname, int channelId)

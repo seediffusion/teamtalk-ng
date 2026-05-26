@@ -22,8 +22,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
-    private double inputVolume = 75;
-    private double outputVolume = 80;
+    private double inputVolume = 50;
+    private double outputVolume = 50;
     private ChannelTreeItemViewModel? selectedChannelItem;
     private bool pushToTalkEnabled;
     private bool voiceActivationEnabled;
@@ -53,6 +53,8 @@ public sealed class MainWindowViewModel : ObservableObject
         this.preferencesDialogService = preferencesDialogService;
         this.channelDialogService = channelDialogService;
         this.settings = settings;
+        inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
+        outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
@@ -153,13 +155,25 @@ public sealed class MainWindowViewModel : ObservableObject
     public double InputVolume
     {
         get => inputVolume;
-        set => SetProperty(ref inputVolume, value);
+        set
+        {
+            if (SetProperty(ref inputVolume, Math.Clamp(value, 0, 100)))
+            {
+                _ = ApplyAudioVolumeAsync();
+            }
+        }
     }
 
     public double OutputVolume
     {
         get => outputVolume;
-        set => SetProperty(ref outputVolume, value);
+        set
+        {
+            if (SetProperty(ref outputVolume, Math.Clamp(value, 0, 100)))
+            {
+                _ = ApplyAudioVolumeAsync();
+            }
+        }
     }
 
     public bool IsPushToTalkEnabled
@@ -228,6 +242,7 @@ public sealed class MainWindowViewModel : ObservableObject
         await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         BuildConnectingTree(profile);
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+        await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
         await teamTalkSession.ConnectAsync(profile);
         RaiseCommandStateChanged();
     }
@@ -391,8 +406,30 @@ public sealed class MainWindowViewModel : ObservableObject
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+        await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
         await settingsStore.SaveAsync(settings);
         await AnnounceAsync("Preferences saved", AnnouncementPriority.Normal, AnnouncementKind.System);
+    }
+
+    private async Task ApplyAudioVolumeAsync()
+    {
+        int input = (int)Math.Round(InputVolume);
+        int output = (int)Math.Round(OutputVolume);
+        settings = settings with
+        {
+            InputVolume = input,
+            OutputVolume = output
+        };
+
+        try
+        {
+            await teamTalkSession.SetAudioVolumeAsync(input, output);
+            await settingsStore.SaveAsync(settings);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
     }
 
     private void SimulateUserJoined()

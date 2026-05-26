@@ -23,6 +23,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private bool voiceActivationEnabled;
     private int? configuredInputDeviceId;
     private int? configuredOutputDeviceId;
+    private int configuredInputVolumePercent = 50;
+    private int configuredOutputVolumePercent = 50;
 
     public TeamTalkSdkSession(TeamTalkSdkOptions options)
     {
@@ -70,6 +72,20 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             InitializeDefaultAudioDevices();
         }
 
+        return Task.CompletedTask;
+    }
+
+    public Task SetAudioVolumeAsync(int inputVolumePercent, int outputVolumePercent, CancellationToken cancellationToken = default)
+    {
+        configuredInputVolumePercent = Math.Clamp(inputVolumePercent, 0, 100);
+        configuredOutputVolumePercent = Math.Clamp(outputVolumePercent, 0, 100);
+
+        if (instance == IntPtr.Zero || !audioDevicesInitialized)
+        {
+            return Task.CompletedTask;
+        }
+
+        ApplyConfiguredAudioVolume();
         return Task.CompletedTask;
     }
 
@@ -661,7 +677,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             CloseSoundDevices();
             RaiseSystemMessage("TeamTalk could not initialize the default microphone and speaker. Voice features are unavailable.");
+            return;
         }
+
+        ApplyConfiguredAudioVolume();
     }
 
     private void EnsureAudioDevicesInitialized()
@@ -755,6 +774,47 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private void ApplyConfiguredAudioVolume()
+    {
+        int inputGainLevel = PercentToTeamTalkSoundLevel(configuredInputVolumePercent, SoundLevel.GainDefault, SoundLevel.GainMax);
+        int outputVolume = PercentToTeamTalkSoundLevel(configuredOutputVolumePercent, SoundLevel.VolumeDefault, SoundLevel.VolumeMax);
+
+        int inputReady;
+        int outputReady;
+        lock (stateLock)
+        {
+            if (instance == IntPtr.Zero)
+            {
+                return;
+            }
+
+            inputReady = TeamTalkNativeMethods.SetSoundInputGainLevel(instance, inputGainLevel);
+            outputReady = TeamTalkNativeMethods.SetSoundOutputVolume(instance, outputVolume);
+        }
+
+        if (inputReady == 0)
+        {
+            RaiseSystemMessage("TeamTalk could not apply the microphone volume.");
+        }
+
+        if (outputReady == 0)
+        {
+            RaiseSystemMessage("TeamTalk could not apply the speaker volume.");
+        }
+    }
+
+    private static int PercentToTeamTalkSoundLevel(int percent, int defaultLevel, int maxLevel)
+    {
+        int clampedPercent = Math.Clamp(percent, 0, 100);
+        if (clampedPercent <= 50)
+        {
+            return (int)Math.Round(defaultLevel * (clampedPercent / 50.0));
+        }
+
+        int boostedLevel = defaultLevel + (int)Math.Round(defaultLevel * ((clampedPercent - 50) / 50.0));
+        return Math.Clamp(boostedLevel, 0, maxLevel);
     }
 
     private void DispatchUserJoined(NativeUser user)

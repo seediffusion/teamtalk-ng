@@ -15,6 +15,8 @@ public interface ITeamTalkSession
 
     Task SetAudioDevicesAsync(int? inputDeviceId, int? outputDeviceId, CancellationToken cancellationToken = default);
 
+    Task SetAudioVolumeAsync(int inputVolumePercent, int outputVolumePercent, CancellationToken cancellationToken = default);
+
     Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default);
 
     Task DisconnectAsync(CancellationToken cancellationToken = default);

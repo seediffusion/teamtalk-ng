@@ -59,6 +59,16 @@ internal enum SoundSystem
     PulseAudio = 10
 }
 
+internal static class SoundLevel
+{
+    public const int VolumeMin = 0;
+    public const int VolumeDefault = 1000;
+    public const int VolumeMax = 32000;
+    public const int GainMin = 0;
+    public const int GainDefault = 1000;
+    public const int GainMax = 32000;
+}
+
 [Flags]
 internal enum ChannelType : uint
 {
