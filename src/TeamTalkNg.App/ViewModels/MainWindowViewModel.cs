@@ -325,7 +325,10 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            LiveAnnouncement = announcement.Text;
+            if (announcement.UpdateLiveRegion)
+            {
+                LiveAnnouncement = announcement.Text;
+            }
         });
     }
 
@@ -388,11 +391,14 @@ public sealed class MainWindowViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
+        bool updateLiveRegion = kind != AnnouncementKind.Selection;
+
         return announcements.AnnounceAsync(new ScreenReaderAnnouncement(
             text,
             priority,
             interrupt,
-            includeBraille ?? settings.SendAnnouncementsToBraille)).AsTask();
+            includeBraille ?? settings.SendAnnouncementsToBraille,
+            updateLiveRegion)).AsTask();
     }
 
     private bool ShouldAnnounce(AnnouncementKind kind)

@@ -4,4 +4,5 @@ public sealed record ScreenReaderAnnouncement(
     string Text,
     AnnouncementPriority Priority = AnnouncementPriority.Normal,
     bool Interrupt = false,
-    bool IncludeBraille = true);
+    bool IncludeBraille = true,
+    bool UpdateLiveRegion = true);
