@@ -14,6 +14,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IThemeService themeService;
     private readonly IServerProfileStore profileStore;
     private readonly IConnectionDialogService connectionDialogService;
+    private readonly IAppSettingsStore settingsStore;
+    private readonly IPreferencesDialogService preferencesDialogService;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
@@ -23,19 +25,26 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool pushToTalkEnabled;
     private bool voiceActivationEnabled;
     private TeamTalkServerProfile? activeProfile;
+    private AppSettings settings;
 
     public MainWindowViewModel(
         ITeamTalkSession teamTalkSession,
         IAnnouncementService announcements,
         IThemeService themeService,
         IServerProfileStore profileStore,
-        IConnectionDialogService connectionDialogService)
+        IConnectionDialogService connectionDialogService,
+        IAppSettingsStore settingsStore,
+        IPreferencesDialogService preferencesDialogService,
+        AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
         this.announcements = announcements;
         this.themeService = themeService;
         this.profileStore = profileStore;
         this.connectionDialogService = connectionDialogService;
+        this.settingsStore = settingsStore;
+        this.preferencesDialogService = preferencesDialogService;
+        this.settings = settings;
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
@@ -43,8 +52,9 @@ public sealed class MainWindowViewModel : ObservableObject
         TogglePushToTalkCommand = new RelayCommand(TogglePushToTalk);
         ToggleVoiceActivationCommand = new RelayCommand(ToggleVoiceActivation);
         SimulateUserJoinedCommand = new RelayCommand(SimulateUserJoined);
-        UseLightThemeCommand = new RelayCommand(themeService.UseLightTheme);
-        UseDarkThemeCommand = new RelayCommand(themeService.UseDarkTheme);
+        UseLightThemeCommand = new AsyncRelayCommand(() => SetThemeAsync(AppTheme.Light));
+        UseDarkThemeCommand = new AsyncRelayCommand(() => SetThemeAsync(AppTheme.Dark));
+        PreferencesCommand = new AsyncRelayCommand(ShowPreferencesAsync);
         AboutCommand = new RelayCommand(ShowAbout);
         ExitCommand = new RelayCommand(() => Application.Current.Shutdown());
 
@@ -81,6 +91,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand UseLightThemeCommand { get; }
 
     public ICommand UseDarkThemeCommand { get; }
+
+    public ICommand PreferencesCommand { get; }
 
     public ICommand AboutCommand { get; }
 
@@ -135,7 +147,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             if (SetProperty(ref selectedChannelItem, value) && value is not null)
             {
-                _ = announcements.AnnounceAsync(new ScreenReaderAnnouncement($"Selected {value.AccessibleName}", AnnouncementPriority.Low));
+                _ = AnnounceAsync($"Selected {value.AccessibleName}", AnnouncementPriority.Low, AnnouncementKind.Selection);
             }
         }
     }
@@ -146,13 +158,19 @@ public sealed class MainWindowViewModel : ObservableObject
         TeamTalkServerProfile? profile = connectionDialogService.ShowConnectDialog(profiles);
         if (profile is null)
         {
-            await announcements.AnnounceAsync(new ScreenReaderAnnouncement("Connect canceled", AnnouncementPriority.Low, IncludeBraille: false));
+            await AnnounceAsync("Connect canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
             return;
         }
 
         activeProfile = profile;
         await SaveRecentProfileAsync(profiles, profile);
-        await announcements.AnnounceAsync(new ScreenReaderAnnouncement($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, Interrupt: true));
+        await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        await ConnectToProfileAsync(profile);
+    }
+
+    public async Task ConnectToProfileAsync(TeamTalkServerProfile profile)
+    {
+        activeProfile = profile;
         await teamTalkSession.ConnectAsync(profile);
         BuildConnectedTree();
         RaiseCommandStateChanged();
@@ -164,7 +182,7 @@ public sealed class MainWindowViewModel : ObservableObject
         activeProfile = null;
         BuildDisconnectedTree();
         ChatMessages.Clear();
-        await announcements.AnnounceAsync(new ScreenReaderAnnouncement("Disconnected", AnnouncementPriority.High, Interrupt: true));
+        await AnnounceAsync("Disconnected", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         RaiseCommandStateChanged();
     }
 
@@ -178,21 +196,35 @@ public sealed class MainWindowViewModel : ObservableObject
 
         MessageText = string.Empty;
         await teamTalkSession.SendChannelMessageAsync(text);
-        await announcements.AnnounceAsync(new ScreenReaderAnnouncement($"Sent message: {text}", AnnouncementPriority.Low, IncludeBraille: false));
+        await AnnounceAsync($"Sent message: {text}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
     }
 
     private void TogglePushToTalk()
     {
         pushToTalkEnabled = !pushToTalkEnabled;
         string state = pushToTalkEnabled ? "enabled" : "disabled";
-        _ = announcements.AnnounceAsync(new ScreenReaderAnnouncement($"Push to talk {state}", AnnouncementPriority.Normal));
+        _ = AnnounceAsync($"Push to talk {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
     }
 
     private void ToggleVoiceActivation()
     {
         voiceActivationEnabled = !voiceActivationEnabled;
         string state = voiceActivationEnabled ? "enabled" : "disabled";
-        _ = announcements.AnnounceAsync(new ScreenReaderAnnouncement($"Voice activation {state}", AnnouncementPriority.Normal));
+        _ = AnnounceAsync($"Voice activation {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
+    }
+
+    private async Task ShowPreferencesAsync()
+    {
+        AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(settings);
+        if (updatedSettings is null)
+        {
+            return;
+        }
+
+        settings = updatedSettings;
+        themeService.UseTheme(settings.Theme);
+        await settingsStore.SaveAsync(settings);
+        await AnnounceAsync("Preferences saved", AnnouncementPriority.Normal, AnnouncementKind.System);
     }
 
     private void SimulateUserJoined()
@@ -240,7 +272,10 @@ public sealed class MainWindowViewModel : ObservableObject
         string announcement = message.IsSystem
             ? message.Text
             : $"{message.Sender}: {message.Text}";
-        _ = announcements.AnnounceAsync(new ScreenReaderAnnouncement(announcement, message.IsPrivate ? AnnouncementPriority.High : AnnouncementPriority.Normal));
+        _ = AnnounceAsync(
+            announcement,
+            message.IsPrivate ? AnnouncementPriority.High : AnnouncementPriority.Normal,
+            message.IsPrivate ? AnnouncementKind.PrivateMessage : AnnouncementKind.ChannelMessage);
     }
 
     private void OnUserJoined(object? sender, UserSummary user)
@@ -251,12 +286,12 @@ public sealed class MainWindowViewModel : ObservableObject
             channel?.Children.Add(new ChannelTreeItemViewModel(user.Nickname, ChannelTreeItemKind.User));
         });
 
-        _ = announcements.AnnounceAsync(new ScreenReaderAnnouncement($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal));
+        _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
     }
 
     private void OnUserLeft(object? sender, UserSummary user)
     {
-        _ = announcements.AnnounceAsync(new ScreenReaderAnnouncement($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal));
+        _ = AnnounceAsync($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
     }
 
     private void OnAnnouncementRaised(object? sender, ScreenReaderAnnouncement announcement)
@@ -304,6 +339,45 @@ public sealed class MainWindowViewModel : ObservableObject
 
         updatedProfiles.Insert(0, selectedProfile);
         await profileStore.SaveAsync(updatedProfiles);
+    }
+
+    private async Task SetThemeAsync(AppTheme theme)
+    {
+        settings = settings with { Theme = theme };
+        themeService.UseTheme(theme);
+        await settingsStore.SaveAsync(settings);
+        await AnnounceAsync($"{theme} theme selected", AnnouncementPriority.Normal, AnnouncementKind.System);
+    }
+
+    private Task AnnounceAsync(
+        string text,
+        AnnouncementPriority priority,
+        AnnouncementKind kind,
+        bool interrupt = false,
+        bool? includeBraille = null)
+    {
+        if (!ShouldAnnounce(kind))
+        {
+            return Task.CompletedTask;
+        }
+
+        return announcements.AnnounceAsync(new ScreenReaderAnnouncement(
+            text,
+            priority,
+            interrupt,
+            includeBraille ?? settings.SendAnnouncementsToBraille)).AsTask();
+    }
+
+    private bool ShouldAnnounce(AnnouncementKind kind)
+    {
+        return kind switch
+        {
+            AnnouncementKind.ChannelMessage => settings.AnnounceChannelMessages,
+            AnnouncementKind.PrivateMessage => settings.AnnouncePrivateMessages,
+            AnnouncementKind.UserJoinLeave => settings.AnnounceUserJoinLeave,
+            AnnouncementKind.Selection => settings.AnnounceSelectionChanges,
+            _ => true
+        };
     }
 
     private static string GetChannelName(string? channelPath)

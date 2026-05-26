@@ -4,6 +4,7 @@ using TeamTalkNg.App.Services;
 using TeamTalkNg.App.ViewModels;
 using TeamTalkNg.Core.Accessibility;
 using TeamTalkNg.Core.TeamTalk;
+using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
 
 namespace TeamTalkNg.App;
 
@@ -22,21 +23,38 @@ public partial class App : Application
         announcementService = new QueuedAnnouncementService(screenReaderOutput);
         ITeamTalkSession teamTalkSession = new MockTeamTalkSession();
         IThemeService themeService = new ThemeService();
+        IAppSettingsStore settingsStore = new JsonAppSettingsStore();
+        AppSettings appSettings = settingsStore.LoadAsync().GetAwaiter().GetResult();
+        themeService.UseTheme(appSettings.Theme);
+
         IServerProfileStore profileStore = new JsonServerProfileStore();
         IConnectionDialogService connectionDialogService = new ConnectionDialogService();
+        IPreferencesDialogService preferencesDialogService = new PreferencesDialogService();
 
         var viewModel = new MainWindowViewModel(
             teamTalkSession,
             announcementService,
             themeService,
             profileStore,
-            connectionDialogService);
+            connectionDialogService,
+            settingsStore,
+            preferencesDialogService,
+            appSettings);
         var window = new MainWindow
         {
             DataContext = viewModel
         };
 
         window.Show();
+
+        if (TryReadStartupConnectionTarget(e.Args, out TeamTalkServerProfile startupProfile, out string startupError))
+        {
+            _ = viewModel.ConnectToProfileAsync(startupProfile);
+        }
+        else if (!string.IsNullOrEmpty(startupError))
+        {
+            _ = announcementService.AnnounceAsync(new ScreenReaderAnnouncement(startupError, AnnouncementPriority.High, Interrupt: true));
+        }
     }
 
     protected override async void OnExit(ExitEventArgs e)
@@ -47,5 +65,17 @@ public partial class App : Application
         }
 
         base.OnExit(e);
+    }
+
+    private static bool TryReadStartupConnectionTarget(string[] args, out TeamTalkServerProfile profile, out string error)
+    {
+        profile = new TeamTalkServerProfile();
+        error = string.Empty;
+
+        string? target = args.FirstOrDefault(argument =>
+            argument.StartsWith("tt://", StringComparison.OrdinalIgnoreCase)
+            || argument.EndsWith(".tt", StringComparison.OrdinalIgnoreCase));
+
+        return target is not null && TeamTalkConnectionTargetParser.TryParse(target, out profile, out error);
     }
 }

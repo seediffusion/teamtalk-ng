@@ -4,6 +4,17 @@ namespace TeamTalkNg.App.Services;
 
 public sealed class ThemeService : IThemeService
 {
+    public void UseTheme(AppTheme theme)
+    {
+        if (theme == AppTheme.Dark)
+        {
+            UseDarkTheme();
+            return;
+        }
+
+        UseLightTheme();
+    }
+
     public void UseLightTheme()
     {
         ApplyTheme("Themes/Light.xaml");
