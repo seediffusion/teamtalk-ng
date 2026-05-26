@@ -1,0 +1,236 @@
+<Window x:Class="TeamTalkNg.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:a11y="clr-namespace:TeamTalkNg.App.Accessibility"
+        xmlns:vm="clr-namespace:TeamTalkNg.App.ViewModels"
+        Title="{Binding WindowTitle}"
+        Width="1180"
+        Height="760"
+        MinWidth="920"
+        MinHeight="600"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}">
+  <Window.InputBindings>
+    <KeyBinding Key="F2" Command="{Binding ConnectCommand}" />
+  </Window.InputBindings>
+
+  <Window.Resources>
+    <HierarchicalDataTemplate DataType="{x:Type vm:ChannelTreeItemViewModel}" ItemsSource="{Binding Children}">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="{Binding Icon}" Margin="0,0,6,0" />
+        <TextBlock Text="{Binding AccessibleName}" />
+      </StackPanel>
+    </HierarchicalDataTemplate>
+  </Window.Resources>
+
+  <DockPanel>
+    <Menu DockPanel.Dock="Top"
+          Background="{DynamicResource PanelBackgroundBrush}"
+          Foreground="{DynamicResource TextBrush}">
+      <MenuItem Header="_Client">
+        <MenuItem Header="_Connect" Command="{Binding ConnectCommand}" InputGestureText="F2" />
+        <MenuItem Header="_Disconnect" Command="{Binding DisconnectCommand}" />
+        <Separator />
+        <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
+      </MenuItem>
+      <MenuItem Header="_Me">
+        <MenuItem Header="Enable _Push To Talk" Command="{Binding TogglePushToTalkCommand}" IsCheckable="True" />
+        <MenuItem Header="Enable _Voice Activation" Command="{Binding ToggleVoiceActivationCommand}" IsCheckable="True" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="_Light Theme" Command="{Binding UseLightThemeCommand}" />
+        <MenuItem Header="_Dark Theme" Command="{Binding UseDarkThemeCommand}" />
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="_About TeamTalk NG" Command="{Binding AboutCommand}" />
+      </MenuItem>
+    </Menu>
+
+    <ToolBarTray DockPanel.Dock="Top" Background="{DynamicResource PanelBackgroundBrush}">
+      <ToolBar Background="{DynamicResource PanelBackgroundBrush}">
+        <Button Command="{Binding ConnectCommand}" AutomationProperties.Name="Connect to server">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Connect" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding TogglePushToTalkCommand}" AutomationProperties.Name="Enable or disable push to talk">
+          <TextBlock Text="Push To Talk" />
+        </Button>
+        <Button Command="{Binding ToggleVoiceActivationCommand}" AutomationProperties.Name="Enable or disable voice activation">
+          <TextBlock Text="Voice Activation" />
+        </Button>
+        <Separator />
+        <Button Command="{Binding SimulateUserJoinedCommand}" AutomationProperties.Name="Simulate a user joining the channel">
+          <TextBlock Text="Simulate Join" />
+        </Button>
+      </ToolBar>
+    </ToolBarTray>
+
+    <StatusBar DockPanel.Dock="Bottom"
+               Background="{DynamicResource PanelBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}">
+      <StatusBarItem>
+        <TextBlock Text="{Binding ConnectionStatusText}" />
+      </StatusBarItem>
+      <Separator />
+      <StatusBarItem>
+        <TextBlock Text="{Binding LiveAnnouncement}"
+                   a11y:LiveRegion.Text="{Binding LiveAnnouncement}"
+                   AutomationProperties.LiveSetting="Polite"
+                   AutomationProperties.Name="Latest TeamTalk announcement" />
+      </StatusBarItem>
+    </StatusBar>
+
+    <Grid Margin="12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="320" MinWidth="260" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="*" MinWidth="420" />
+      </Grid.ColumnDefinitions>
+
+      <Grid Grid.Column="0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Header="Channels and users"
+                  Foreground="{DynamicResource TextBrush}"
+                  BorderBrush="{DynamicResource BorderBrush}">
+          <TreeView ItemsSource="{Binding Channels}"
+                    SelectedItemChanged="ChannelsTree_OnSelectedItemChanged"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    Foreground="{DynamicResource TextBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    AutomationProperties.Name="Channels and users" />
+        </GroupBox>
+
+        <GroupBox Grid.Row="1"
+                  Header="Volume"
+                  Margin="0,12,0,0"
+                  Foreground="{DynamicResource TextBrush}"
+                  BorderBrush="{DynamicResource BorderBrush}">
+          <Grid Margin="8">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Input" VerticalAlignment="Center" Margin="0,0,8,8" />
+            <Slider Grid.Column="1"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="{Binding InputVolume}"
+                    Margin="0,0,0,8"
+                    AutomationProperties.Name="Microphone input volume" />
+
+            <TextBlock Grid.Row="1" Text="Output" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <Slider Grid.Row="1"
+                    Grid.Column="1"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="{Binding OutputVolume}"
+                    AutomationProperties.Name="Speaker output volume" />
+          </Grid>
+        </GroupBox>
+      </Grid>
+
+      <GridSplitter Grid.Column="1"
+                    Width="8"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource SplitterBrush}"
+                    AutomationProperties.Name="Resize channel list" />
+
+      <TabControl Grid.Column="2"
+                  Background="{DynamicResource WindowBackgroundBrush}"
+                  Foreground="{DynamicResource TextBrush}"
+                  AutomationProperties.Name="TeamTalk activity tabs">
+        <TabItem Header="Chat">
+          <Grid Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <ListView ItemsSource="{Binding ChatMessages}"
+                      Background="{DynamicResource ControlBackgroundBrush}"
+                      Foreground="{DynamicResource TextBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      AutomationProperties.Name="Channel chat history">
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="Time" DisplayMemberBinding="{Binding Time}" Width="90" />
+                  <GridViewColumn Header="From" DisplayMemberBinding="{Binding Sender}" Width="150" />
+                  <GridViewColumn Header="Message" DisplayMemberBinding="{Binding Text}" Width="520" />
+                </GridView>
+              </ListView.View>
+            </ListView>
+
+            <DockPanel Grid.Row="1" Margin="0,10,0,0">
+              <Button DockPanel.Dock="Right"
+                      Content="Send"
+                      Command="{Binding SendMessageCommand}"
+                      MinWidth="92"
+                      Margin="8,0,0,0"
+                      AutomationProperties.Name="Send channel message" />
+              <TextBox Text="{Binding MessageText, UpdateSourceTrigger=PropertyChanged}"
+                       MinHeight="34"
+                       VerticalContentAlignment="Center"
+                       Background="{DynamicResource ControlBackgroundBrush}"
+                       Foreground="{DynamicResource TextBrush}"
+                       BorderBrush="{DynamicResource BorderBrush}"
+                       AutomationProperties.Name="Channel message" />
+            </DockPanel>
+          </Grid>
+        </TabItem>
+
+        <TabItem Header="Video">
+          <Border Margin="0,10,0,0"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  Background="{DynamicResource ControlBackgroundBrush}">
+            <TextBlock Text="No active video streams"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       AutomationProperties.Name="No active video streams" />
+          </Border>
+        </TabItem>
+
+        <TabItem Header="Desktops">
+          <Border Margin="0,10,0,0"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  Background="{DynamicResource ControlBackgroundBrush}">
+            <TextBlock Text="No shared desktops"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       AutomationProperties.Name="No shared desktops" />
+          </Border>
+        </TabItem>
+
+        <TabItem Header="Files">
+          <ListView Margin="0,10,0,0"
+                    ItemsSource="{Binding Files}"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    Foreground="{DynamicResource TextBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    AutomationProperties.Name="Channel files">
+            <ListView.View>
+              <GridView>
+                <GridViewColumn Header="Name" DisplayMemberBinding="{Binding Name}" Width="320" />
+                <GridViewColumn Header="Size" DisplayMemberBinding="{Binding Size}" Width="120" />
+                <GridViewColumn Header="Owner" DisplayMemberBinding="{Binding Owner}" Width="160" />
+              </GridView>
+            </ListView.View>
+          </ListView>
+        </TabItem>
+      </TabControl>
+    </Grid>
+  </DockPanel>
+</Window>

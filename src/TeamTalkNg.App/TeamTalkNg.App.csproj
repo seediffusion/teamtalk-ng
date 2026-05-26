@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TeamTalkNg.Accessibility\TeamTalkNg.Accessibility.csproj" />
+    <ProjectReference Include="..\TeamTalkNg.Core\TeamTalkNg.Core.csproj" />
+  </ItemGroup>
+</Project>

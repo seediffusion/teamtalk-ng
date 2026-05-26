@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/TeamTalkNg.Accessibility/TeamTalkNg.Accessibility.csproj" />
+  <Project Path="src/TeamTalkNg.App/TeamTalkNg.App.csproj" />
+  <Project Path="src/TeamTalkNg.Core/TeamTalkNg.Core.csproj" />
+</Solution>
