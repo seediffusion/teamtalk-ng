@@ -17,5 +17,9 @@ public interface ITeamTalkSession
 
     Task JoinChannelAsync(string channelPath, string password = "", CancellationToken cancellationToken = default);
 
+    Task CreateChannelAsync(ChannelCreationRequest request, CancellationToken cancellationToken = default);
+
+    Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default);
+
     Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default);
 }

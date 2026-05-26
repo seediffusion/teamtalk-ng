@@ -46,6 +46,19 @@ internal enum TextMsgType
     Custom = 4
 }
 
+[Flags]
+internal enum ChannelType : uint
+{
+    Default = 0x0000,
+    Permanent = 0x0001,
+    SoloTransmit = 0x0002,
+    Classroom = 0x0004,
+    OperatorReceiveOnly = 0x0008,
+    NoVoiceActivation = 0x0010,
+    NoRecording = 0x0020,
+    Hidden = 0x0040
+}
+
 internal enum Codec
 {
     NoCodec = 0,
@@ -177,6 +190,30 @@ internal unsafe struct NativeChannel
         fixed (char* value = Name)
         {
             return NativeConstants.ReadString(value);
+        }
+    }
+
+    public void WriteName(string value)
+    {
+        fixed (char* target = Name)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WriteTopic(string value)
+    {
+        fixed (char* target = Topic)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WritePassword(string value)
+    {
+        fixed (char* target = Password)
+        {
+            NativeConstants.WriteString(target, value);
         }
     }
 }

@@ -42,6 +42,11 @@
         <MenuItem Header="Enable _Push To Talk" Command="{Binding TogglePushToTalkCommand}" IsCheckable="True" />
         <MenuItem Header="Enable _Voice Activation" Command="{Binding ToggleVoiceActivationCommand}" IsCheckable="True" />
       </MenuItem>
+      <MenuItem Header="_Channels">
+        <MenuItem Header="_Join Selected Channel" Command="{Binding JoinSelectedChannelCommand}" />
+        <MenuItem Header="_Create Channel" Command="{Binding CreateChannelCommand}" />
+        <MenuItem Header="_Delete Selected Channel" Command="{Binding DeleteSelectedChannelCommand}" />
+      </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="_Light Theme" Command="{Binding UseLightThemeCommand}" />
         <MenuItem Header="_Dark Theme" Command="{Binding UseDarkThemeCommand}" />

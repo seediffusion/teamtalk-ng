@@ -18,6 +18,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IConnectionTargetDialogService connectionTargetDialogService;
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
+    private readonly IChannelDialogService channelDialogService;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
@@ -39,6 +40,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IConnectionTargetDialogService connectionTargetDialogService,
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
+        IChannelDialogService channelDialogService,
         AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
@@ -49,11 +51,15 @@ public sealed class MainWindowViewModel : ObservableObject
         this.connectionTargetDialogService = connectionTargetDialogService;
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
+        this.channelDialogService = channelDialogService;
         this.settings = settings;
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
+        JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
+        CreateChannelCommand = new AsyncRelayCommand(CreateChannelAsync, CanCreateChannel);
+        DeleteSelectedChannelCommand = new AsyncRelayCommand(DeleteSelectedChannelAsync, CanDeleteSelectedChannel);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new RelayCommand(TogglePushToTalk);
         ToggleVoiceActivationCommand = new RelayCommand(ToggleVoiceActivation);
@@ -89,6 +95,12 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand OpenConnectionTargetCommand { get; }
 
     public ICommand DisconnectCommand { get; }
+
+    public ICommand JoinSelectedChannelCommand { get; }
+
+    public ICommand CreateChannelCommand { get; }
+
+    public ICommand DeleteSelectedChannelCommand { get; }
 
     public ICommand SendMessageCommand { get; }
 
@@ -159,6 +171,8 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 _ = AnnounceAsync($"Selected {value.AccessibleName}", AnnouncementPriority.Low, AnnouncementKind.Selection);
             }
+
+            RaiseChannelCommandStateChanged();
         }
     }
 
@@ -254,6 +268,60 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private async Task CreateChannelAsync()
+    {
+        string parentPath = SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel } channel
+            ? channel.Path
+            : "/";
+
+        ChannelCreationRequest? request = channelDialogService.ShowCreateChannelDialog(parentPath);
+        if (request is null)
+        {
+            await AnnounceAsync("Create channel canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.CreateChannelAsync(request);
+            await AnnounceAsync($"Creating channel {request.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task DeleteSelectedChannelAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.Channel } channel)
+        {
+            return;
+        }
+
+        MessageBoxResult result = MessageBox.Show(
+            $"Delete channel {channel.Name}?",
+            "Delete Channel",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes)
+        {
+            await AnnounceAsync("Delete channel canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.RemoveChannelAsync(channel.Path);
+            await AnnounceAsync($"Deleting channel {channel.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
     private void TogglePushToTalk()
     {
         pushToTalkEnabled = !pushToTalkEnabled;
@@ -314,6 +382,7 @@ public sealed class MainWindowViewModel : ObservableObject
             };
 
             RaiseCommandStateChanged();
+            RaiseChannelCommandStateChanged();
         });
     }
 
@@ -635,5 +704,43 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             openTarget.RaiseCanExecuteChanged();
         }
+
+        RaiseChannelCommandStateChanged();
+    }
+
+    private void RaiseChannelCommandStateChanged()
+    {
+        if (JoinSelectedChannelCommand is AsyncRelayCommand join)
+        {
+            join.RaiseCanExecuteChanged();
+        }
+
+        if (CreateChannelCommand is AsyncRelayCommand create)
+        {
+            create.RaiseCanExecuteChanged();
+        }
+
+        if (DeleteSelectedChannelCommand is AsyncRelayCommand delete)
+        {
+            delete.RaiseCanExecuteChanged();
+        }
+    }
+
+    private bool CanJoinSelectedChannel()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel }
+            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+    }
+
+    private bool CanCreateChannel()
+    {
+        return (SelectedChannelItem is null or { Kind: ChannelTreeItemKind.Server or ChannelTreeItemKind.Channel })
+            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+    }
+
+    private bool CanDeleteSelectedChannel()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel, Path: not "/" }
+            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
     }
 }

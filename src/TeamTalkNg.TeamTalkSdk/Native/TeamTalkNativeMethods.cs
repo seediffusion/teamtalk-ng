@@ -43,6 +43,12 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoJoinChannelByID", CharSet = CharSet.Unicode)]
     internal static extern int DoJoinChannelById(IntPtr instance, int channelId, string password);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoMakeChannel")]
+    internal static extern int DoMakeChannel(IntPtr instance, ref NativeChannel channel);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoRemoveChannel")]
+    internal static extern int DoRemoveChannel(IntPtr instance, int channelId);
+
     [DllImport(LibraryName, EntryPoint = "TT_DoTextMessage")]
     internal static extern int DoTextMessage(IntPtr instance, ref NativeTextMessage textMessage);
 
@@ -55,6 +61,13 @@ internal static partial class TeamTalkNativeMethods
 
     [DllImport(LibraryName, EntryPoint = "TT_GetMyChannelID")]
     internal static extern int GetMyChannelId(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_GetRootChannelID")]
+    internal static extern int GetRootChannelId(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_GetChannel")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetChannel(IntPtr instance, int channelId, out NativeChannel channel);
 
     [DllImport(LibraryName, EntryPoint = "TT_DBG_SIZEOF")]
     internal static extern int DebugSizeOf(TTType type);

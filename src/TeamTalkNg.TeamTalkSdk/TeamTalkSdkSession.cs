@@ -106,6 +106,91 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task CreateChannelAsync(ChannelCreationRequest request, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before creating a channel.");
+        }
+
+        string channelName = request.Name.Trim();
+        if (string.IsNullOrWhiteSpace(channelName) || channelName.Contains('/', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Channel names cannot be empty or contain slashes.");
+        }
+
+        string parentPath = string.IsNullOrWhiteSpace(request.ParentPath) ? "/" : request.ParentPath;
+        int parentId = ResolveChannelId(parentPath);
+        if (parentId <= 0)
+        {
+            throw new InvalidOperationException($"Parent channel {parentPath} was not found.");
+        }
+
+        NativeChannel channel = CreateDefaultChannel(parentId);
+        channel.WriteName(channelName);
+        channel.WriteTopic(request.Topic);
+        channel.WritePassword(request.Password);
+        channel.HasPassword = string.IsNullOrEmpty(request.Password) ? 0 : 1;
+        channel.MaxUsers = Math.Max(0, request.MaxUsers);
+        channel.ChannelType = request.IsPermanent
+            ? (uint)ChannelType.Permanent
+            : (uint)ChannelType.Default;
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoMakeChannel(instance, ref channel);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage($"TeamTalk SDK did not accept the create channel command for {channelName}.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before deleting a channel.");
+        }
+
+        int channelId = ResolveChannelId(channelPath);
+        if (channelId <= 0)
+        {
+            throw new InvalidOperationException($"Channel {channelPath} was not found.");
+        }
+
+        int rootChannelId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            rootChannelId = TeamTalkNativeMethods.GetRootChannelId(instance);
+        }
+
+        if (channelId == rootChannelId)
+        {
+            throw new InvalidOperationException("The root channel cannot be deleted.");
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoRemoveChannel(instance, channelId);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage($"TeamTalk SDK did not accept the delete command for {channelPath}.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
@@ -354,12 +439,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     {
         string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
 
-        int channelId;
-        lock (stateLock)
-        {
-            EnsureConnectedInstance();
-            channelId = TeamTalkNativeMethods.GetChannelIdFromPath(instance, normalizedPath);
-        }
+        int channelId = ResolveChannelId(normalizedPath);
 
         if (channelId <= 0)
         {
@@ -378,6 +458,49 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             RaiseSystemMessage($"TeamTalk SDK did not accept the join command for {normalizedPath}.");
         }
+    }
+
+    private int ResolveChannelId(string channelPath)
+    {
+        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            return normalizedPath == "/"
+                ? TeamTalkNativeMethods.GetRootChannelId(instance)
+                : TeamTalkNativeMethods.GetChannelIdFromPath(instance, normalizedPath);
+        }
+    }
+
+    private NativeChannel CreateDefaultChannel(int parentId)
+    {
+        NativeChannel channel = default;
+        channel.ParentId = parentId;
+        channel.MaxUsers = 0;
+
+        lock (stateLock)
+        {
+            if (TeamTalkNativeMethods.GetChannel(instance, parentId, out NativeChannel parentChannel) != 0)
+            {
+                channel.AudioCodec = parentChannel.AudioCodec;
+                channel.AudioConfig = parentChannel.AudioConfig;
+                if (channel.AudioCodec.Codec != Codec.NoCodec)
+                {
+                    return channel;
+                }
+            }
+        }
+
+        channel.AudioCodec.Codec = Codec.Opus;
+        channel.AudioCodec.Value.Opus.SampleRate = 48000;
+        channel.AudioCodec.Value.Opus.Channels = 1;
+        channel.AudioCodec.Value.Opus.Application = 2048;
+        channel.AudioCodec.Value.Opus.Complexity = 5;
+        channel.AudioCodec.Value.Opus.BitRate = 32000;
+        channel.AudioCodec.Value.Opus.Vbr = 1;
+        channel.AudioCodec.Value.Opus.TransmitIntervalMilliseconds = 20;
+        channel.AudioCodec.Value.Opus.FrameSizeMilliseconds = 20;
+        return channel;
     }
 
     private void DispatchUserJoined(NativeUser user)
@@ -437,7 +560,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             channelPath,
             UserCount: 0,
             IsProtected: channel.HasPassword != 0,
-            IsPermanent: true));
+            IsPermanent: (channel.ChannelType & (uint)ChannelType.Permanent) != 0));
     }
 
     private UserSummary CreateUserSummary(NativeUser user, int channelId)

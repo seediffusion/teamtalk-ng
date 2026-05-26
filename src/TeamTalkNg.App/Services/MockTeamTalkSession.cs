@@ -63,6 +63,51 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task CreateChannelAsync(ChannelCreationRequest request, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before creating a channel.");
+        }
+
+        string channelName = request.Name.Trim();
+        if (string.IsNullOrWhiteSpace(channelName) || channelName.Contains('/', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Channel names cannot be empty or contain slashes.");
+        }
+
+        string parentPath = string.IsNullOrWhiteSpace(request.ParentPath) || request.ParentPath == "/"
+            ? string.Empty
+            : request.ParentPath.TrimEnd('/');
+        string path = $"{parentPath}/{channelName}";
+        ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(
+            Math.Abs(path.GetHashCode()),
+            channelName,
+            path,
+            UserCount: 0,
+            IsProtected: !string.IsNullOrEmpty(request.Password),
+            request.IsPermanent));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Created channel {channelName}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before deleting a channel.");
+        }
+
+        if (string.IsNullOrWhiteSpace(channelPath) || channelPath == "/")
+        {
+            throw new InvalidOperationException("The root channel cannot be deleted.");
+        }
+
+        ChannelRemoved?.Invoke(this, Math.Abs(channelPath.GetHashCode()));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Deleted channel {GetChannelName(channelPath)}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default)
     {
         string sender = activeProfile?.Nickname ?? "You";
