@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using TeamTalkNg.App.ViewModels;
@@ -84,7 +85,7 @@ public partial class MainWindow : Window
 
     private void FocusToolbarButton(FocusNavigationDirection direction)
     {
-        List<Button> buttons = GetToolbarButtons()
+        List<ButtonBase> buttons = GetToolbarButtons()
             .Where(button => button.IsEnabled && button.Focusable)
             .ToList();
 
@@ -101,9 +102,9 @@ public partial class MainWindow : Window
         buttons[nextIndex].Focus();
     }
 
-    private IEnumerable<Button> GetToolbarButtons()
+    private IEnumerable<ButtonBase> GetToolbarButtons()
     {
-        return Descendants<Button>(MainToolBar)
+        return Descendants<ButtonBase>(MainToolBar)
             .Where(button => Equals(button.Tag, "ToolbarButton"));
     }
 

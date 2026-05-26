@@ -115,6 +115,36 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SetVoiceTransmissionAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before transmitting voice.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            enabled ? "Voice transmission enabled." : "Voice transmission disabled.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task SetVoiceActivationAsync(bool enabled, int level = 50, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before enabling voice activation.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            enabled ? "Voice activation enabled." : "Voice activation disabled.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public void SimulateUserJoined()
     {
         UserJoined?.Invoke(this, new UserSummary(44, "Morgan", "morgan", "/Lobby", IsTalking: false, IsAway: false, IsOperator: false));

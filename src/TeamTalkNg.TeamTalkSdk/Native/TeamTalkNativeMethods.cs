@@ -17,6 +17,38 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int GetMessage(IntPtr instance, IntPtr message, ref int waitMilliseconds);
 
+    [DllImport(LibraryName, EntryPoint = "TT_GetDefaultSoundDevices")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetDefaultSoundDevices(out int inputDeviceId, out int outputDeviceId);
+
+    [DllImport(LibraryName, EntryPoint = "TT_InitSoundInputDevice")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int InitSoundInputDevice(IntPtr instance, int inputDeviceId);
+
+    [DllImport(LibraryName, EntryPoint = "TT_InitSoundOutputDevice")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int InitSoundOutputDevice(IntPtr instance, int outputDeviceId);
+
+    [DllImport(LibraryName, EntryPoint = "TT_CloseSoundInputDevice")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int CloseSoundInputDevice(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_CloseSoundOutputDevice")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int CloseSoundOutputDevice(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_EnableVoiceTransmission")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int EnableVoiceTransmission(IntPtr instance, [MarshalAs(UnmanagedType.I4)] int enabled);
+
+    [DllImport(LibraryName, EntryPoint = "TT_EnableVoiceActivation")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int EnableVoiceActivation(IntPtr instance, [MarshalAs(UnmanagedType.I4)] int enabled);
+
+    [DllImport(LibraryName, EntryPoint = "TT_SetVoiceActivationLevel")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int SetVoiceActivationLevel(IntPtr instance, int level);
+
     [DllImport(LibraryName, EntryPoint = "TT_Connect", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int Connect(

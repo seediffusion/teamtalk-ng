@@ -39,8 +39,14 @@
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
       </MenuItem>
       <MenuItem Header="_Me">
-        <MenuItem Header="Enable _Push To Talk" Command="{Binding TogglePushToTalkCommand}" IsCheckable="True" />
-        <MenuItem Header="Enable _Voice Activation" Command="{Binding ToggleVoiceActivationCommand}" IsCheckable="True" />
+        <MenuItem Header="Enable _Push To Talk"
+                  Command="{Binding TogglePushToTalkCommand}"
+                  IsCheckable="True"
+                  IsChecked="{Binding IsPushToTalkEnabled, Mode=OneWay}" />
+        <MenuItem Header="Enable _Voice Activation"
+                  Command="{Binding ToggleVoiceActivationCommand}"
+                  IsCheckable="True"
+                  IsChecked="{Binding IsVoiceActivationEnabled, Mode=OneWay}" />
       </MenuItem>
       <MenuItem Header="_Channels">
         <MenuItem Header="_Join Selected Channel" Command="{Binding JoinSelectedChannelCommand}" />
@@ -82,20 +88,22 @@
             <TextBlock Text="Connect" />
           </StackPanel>
         </Button>
-        <Button Command="{Binding TogglePushToTalkCommand}"
-                Tag="ToolbarButton"
-                Focusable="True"
-                IsTabStop="False"
-                AutomationProperties.Name="Enable or disable push to talk">
+        <ToggleButton Command="{Binding TogglePushToTalkCommand}"
+                      IsChecked="{Binding IsPushToTalkEnabled, Mode=OneWay}"
+                      Tag="ToolbarButton"
+                      Focusable="True"
+                      IsTabStop="False"
+                      AutomationProperties.Name="Push to talk">
           <TextBlock Text="Push To Talk" />
-        </Button>
-        <Button Command="{Binding ToggleVoiceActivationCommand}"
-                Tag="ToolbarButton"
-                Focusable="True"
-                IsTabStop="False"
-                AutomationProperties.Name="Enable or disable voice activation">
+        </ToggleButton>
+        <ToggleButton Command="{Binding ToggleVoiceActivationCommand}"
+                      IsChecked="{Binding IsVoiceActivationEnabled, Mode=OneWay}"
+                      Tag="ToolbarButton"
+                      Focusable="True"
+                      IsTabStop="False"
+                      AutomationProperties.Name="Voice activation">
           <TextBlock Text="Voice Activation" />
-        </Button>
+        </ToggleButton>
         <Separator />
         <Button Command="{Binding SimulateUserJoinedCommand}"
                 Tag="ToolbarButton"

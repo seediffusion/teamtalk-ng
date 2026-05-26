@@ -61,8 +61,8 @@ public sealed class MainWindowViewModel : ObservableObject
         CreateChannelCommand = new AsyncRelayCommand(CreateChannelAsync, CanCreateChannel);
         DeleteSelectedChannelCommand = new AsyncRelayCommand(DeleteSelectedChannelAsync, CanDeleteSelectedChannel);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
-        TogglePushToTalkCommand = new RelayCommand(TogglePushToTalk);
-        ToggleVoiceActivationCommand = new RelayCommand(ToggleVoiceActivation);
+        TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
+        ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
         SimulateUserJoinedCommand = new RelayCommand(SimulateUserJoined);
         UseLightThemeCommand = new AsyncRelayCommand(() => SetThemeAsync(AppTheme.Light));
         UseDarkThemeCommand = new AsyncRelayCommand(() => SetThemeAsync(AppTheme.Dark));
@@ -162,6 +162,18 @@ public sealed class MainWindowViewModel : ObservableObject
         set => SetProperty(ref outputVolume, value);
     }
 
+    public bool IsPushToTalkEnabled
+    {
+        get => pushToTalkEnabled;
+        private set => SetProperty(ref pushToTalkEnabled, value);
+    }
+
+    public bool IsVoiceActivationEnabled
+    {
+        get => voiceActivationEnabled;
+        private set => SetProperty(ref voiceActivationEnabled, value);
+    }
+
     public ChannelTreeItemViewModel? SelectedChannelItem
     {
         get => selectedChannelItem;
@@ -190,6 +202,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            OnPropertyChanged(nameof(IsPushToTalkEnabled));
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
     }
@@ -264,6 +277,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            OnPropertyChanged(nameof(IsVoiceActivationEnabled));
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
     }
@@ -322,18 +336,46 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void TogglePushToTalk()
+    private async Task TogglePushToTalkAsync()
     {
-        pushToTalkEnabled = !pushToTalkEnabled;
-        string state = pushToTalkEnabled ? "enabled" : "disabled";
-        _ = AnnounceAsync($"Push to talk {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        bool target = !IsPushToTalkEnabled;
+        try
+        {
+            await teamTalkSession.SetVoiceTransmissionAsync(target);
+            IsPushToTalkEnabled = target;
+            if (target)
+            {
+                IsVoiceActivationEnabled = false;
+            }
+
+            string state = target ? "enabled" : "disabled";
+            await AnnounceAsync($"Push to talk {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
     }
 
-    private void ToggleVoiceActivation()
+    private async Task ToggleVoiceActivationAsync()
     {
-        voiceActivationEnabled = !voiceActivationEnabled;
-        string state = voiceActivationEnabled ? "enabled" : "disabled";
-        _ = AnnounceAsync($"Voice activation {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        bool target = !IsVoiceActivationEnabled;
+        try
+        {
+            await teamTalkSession.SetVoiceActivationAsync(target);
+            IsVoiceActivationEnabled = target;
+            if (target)
+            {
+                IsPushToTalkEnabled = false;
+            }
+
+            string state = target ? "enabled" : "disabled";
+            await AnnounceAsync($"Voice activation {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
     }
 
     private async Task ShowPreferencesAsync()
@@ -380,6 +422,12 @@ public sealed class MainWindowViewModel : ObservableObject
                 ConnectionStatus.InChannel => activeProfile?.ChannelPath is { Length: > 0 } channel ? $"In {channel}" : "In channel",
                 _ => status.ToString()
             };
+
+            if (status != ConnectionStatus.InChannel)
+            {
+                IsPushToTalkEnabled = false;
+                IsVoiceActivationEnabled = false;
+            }
 
             RaiseCommandStateChanged();
             RaiseChannelCommandStateChanged();
@@ -705,6 +753,16 @@ public sealed class MainWindowViewModel : ObservableObject
             openTarget.RaiseCanExecuteChanged();
         }
 
+        if (TogglePushToTalkCommand is AsyncRelayCommand pushToTalk)
+        {
+            pushToTalk.RaiseCanExecuteChanged();
+        }
+
+        if (ToggleVoiceActivationCommand is AsyncRelayCommand voiceActivation)
+        {
+            voiceActivation.RaiseCanExecuteChanged();
+        }
+
         RaiseChannelCommandStateChanged();
     }
 
@@ -729,18 +787,23 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanJoinSelectedChannel()
     {
         return SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel }
-            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+            && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
     }
 
     private bool CanCreateChannel()
     {
         return (SelectedChannelItem is null or { Kind: ChannelTreeItemKind.Server or ChannelTreeItemKind.Channel })
-            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+            && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
     }
 
     private bool CanDeleteSelectedChannel()
     {
         return SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel, Path: not "/" }
-            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+            && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
+    }
+
+    private bool CanUseVoiceControls()
+    {
+        return teamTalkSession.Status == ConnectionStatus.InChannel;
     }
 }

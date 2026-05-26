@@ -22,4 +22,8 @@ public interface ITeamTalkSession
     Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default);
 
     Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default);
+
+    Task SetVoiceTransmissionAsync(bool enabled, CancellationToken cancellationToken = default);
+
+    Task SetVoiceActivationAsync(bool enabled, int level = 50, CancellationToken cancellationToken = default);
 }

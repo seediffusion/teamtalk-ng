@@ -177,6 +177,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesChannelRemoved();
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
+        RejectsVoiceControlsBeforeJoiningChannel();
         Console.WriteLine("TeamTalk NG SDK dispatch tests passed.");
     }
 
@@ -333,6 +334,14 @@ internal static unsafe class SdkDispatchTests
         AssertEqual(ConnectionStatus.LoggedIn, session.Status);
     }
 
+    private static void RejectsVoiceControlsBeforeJoiningChannel()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.SetVoiceTransmissionAsync(true).GetAwaiter().GetResult());
+        AssertThrows(() => session.SetVoiceActivationAsync(true).GetAwaiter().GetResult());
+    }
+
     private static NativeUser CreateUser(int id, string username, string nickname, int channelId)
     {
         NativeUser user = default;
@@ -362,5 +371,19 @@ internal static unsafe class SdkDispatchTests
         {
             throw new InvalidOperationException($"Expected {expected}, got {actual}.");
         }
+    }
+
+    private static void AssertThrows(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Expected InvalidOperationException.");
     }
 }

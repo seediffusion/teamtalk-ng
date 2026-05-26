@@ -18,6 +18,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int currentChannelId;
     private int myUserId;
     private int messageBufferSize;
+    private bool audioDevicesInitialized;
+    private bool voiceTransmissionEnabled;
+    private bool voiceActivationEnabled;
 
     public TeamTalkSdkSession(TeamTalkSdkOptions options)
     {
@@ -50,6 +53,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             activeProfile = profile;
             currentChannelId = 0;
             myUserId = 0;
+            audioDevicesInitialized = false;
+            voiceTransmissionEnabled = false;
+            voiceActivationEnabled = false;
         }
 
         SetStatus(ConnectionStatus.Connecting);
@@ -87,6 +93,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             if (instance != IntPtr.Zero)
             {
+                StopVoiceInput();
+                CloseSoundDevices();
                 TeamTalkNativeMethods.Disconnect(instance);
             }
         }
@@ -191,6 +199,84 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task SetVoiceTransmissionAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before transmitting voice.");
+        }
+
+        EnsureAudioDevicesInitialized();
+
+        int success;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (enabled && voiceActivationEnabled)
+            {
+                TeamTalkNativeMethods.EnableVoiceActivation(instance, 0);
+                voiceActivationEnabled = false;
+            }
+
+            success = TeamTalkNativeMethods.EnableVoiceTransmission(instance, enabled ? 1 : 0);
+            if (success != 0)
+            {
+                voiceTransmissionEnabled = enabled;
+            }
+        }
+
+        if (success == 0)
+        {
+            throw new InvalidOperationException(enabled
+                ? "TeamTalk could not start voice transmission."
+                : "TeamTalk could not stop voice transmission.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task SetVoiceActivationAsync(bool enabled, int level = 50, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before enabling voice activation.");
+        }
+
+        EnsureAudioDevicesInitialized();
+
+        int clampedLevel = Math.Clamp(level, 0, 100);
+        int success;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (enabled && voiceTransmissionEnabled)
+            {
+                TeamTalkNativeMethods.EnableVoiceTransmission(instance, 0);
+                voiceTransmissionEnabled = false;
+            }
+
+            if (enabled && TeamTalkNativeMethods.SetVoiceActivationLevel(instance, clampedLevel) == 0)
+            {
+                throw new InvalidOperationException("TeamTalk could not set the voice activation level.");
+            }
+
+            success = TeamTalkNativeMethods.EnableVoiceActivation(instance, enabled ? 1 : 0);
+            if (success != 0)
+            {
+                voiceActivationEnabled = enabled;
+            }
+        }
+
+        if (success == 0)
+        {
+            throw new InvalidOperationException(enabled
+                ? "TeamTalk could not enable voice activation."
+                : "TeamTalk could not disable voice activation.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
@@ -271,6 +357,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 return;
             }
 
+            StopVoiceInput();
+            CloseSoundDevices();
             TeamTalkNativeMethods.CloseTeamTalk(instance);
             instance = IntPtr.Zero;
         }
@@ -363,6 +451,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.CommandMyselfLoggedIn:
                 myUserId = message.Source;
                 SetStatus(ConnectionStatus.LoggedIn);
+                InitializeDefaultAudioDevices();
                 JoinConfiguredChannel();
                 break;
             case ClientEvent.CommandMyselfLoggedOut:
@@ -501,6 +590,78 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         channel.AudioCodec.Value.Opus.TransmitIntervalMilliseconds = 20;
         channel.AudioCodec.Value.Opus.FrameSizeMilliseconds = 20;
         return channel;
+    }
+
+    private void InitializeDefaultAudioDevices()
+    {
+        if (instance == IntPtr.Zero || audioDevicesInitialized)
+        {
+            return;
+        }
+
+        if (TeamTalkNativeMethods.GetDefaultSoundDevices(out int inputDeviceId, out int outputDeviceId) == 0)
+        {
+            RaiseSystemMessage("TeamTalk could not find default audio devices. Voice features are unavailable.");
+            return;
+        }
+
+        int inputReady;
+        int outputReady;
+        lock (stateLock)
+        {
+            if (instance == IntPtr.Zero)
+            {
+                return;
+            }
+
+            inputReady = TeamTalkNativeMethods.InitSoundInputDevice(instance, inputDeviceId);
+            outputReady = TeamTalkNativeMethods.InitSoundOutputDevice(instance, outputDeviceId);
+            audioDevicesInitialized = inputReady != 0 && outputReady != 0;
+        }
+
+        if (!audioDevicesInitialized)
+        {
+            CloseSoundDevices();
+            RaiseSystemMessage("TeamTalk could not initialize the default microphone and speaker. Voice features are unavailable.");
+        }
+    }
+
+    private void EnsureAudioDevicesInitialized()
+    {
+        if (!audioDevicesInitialized)
+        {
+            InitializeDefaultAudioDevices();
+        }
+
+        if (!audioDevicesInitialized)
+        {
+            throw new InvalidOperationException("Audio devices are not ready.");
+        }
+    }
+
+    private void StopVoiceInput()
+    {
+        if (instance == IntPtr.Zero)
+        {
+            return;
+        }
+
+        TeamTalkNativeMethods.EnableVoiceTransmission(instance, 0);
+        TeamTalkNativeMethods.EnableVoiceActivation(instance, 0);
+        voiceTransmissionEnabled = false;
+        voiceActivationEnabled = false;
+    }
+
+    private void CloseSoundDevices()
+    {
+        if (instance == IntPtr.Zero)
+        {
+            return;
+        }
+
+        TeamTalkNativeMethods.CloseSoundInputDevice(instance);
+        TeamTalkNativeMethods.CloseSoundOutputDevice(instance);
+        audioDevicesInitialized = false;
     }
 
     private void DispatchUserJoined(NativeUser user)
