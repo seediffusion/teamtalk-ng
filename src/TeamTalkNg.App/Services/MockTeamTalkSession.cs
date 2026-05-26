@@ -36,6 +36,21 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before changing status.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            status.IsAway ? "Status set to away." : "Status set to available.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         activeProfile = profile;

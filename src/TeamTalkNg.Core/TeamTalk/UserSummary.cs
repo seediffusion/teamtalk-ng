@@ -7,4 +7,5 @@ public sealed record UserSummary(
     string ChannelPath,
     bool IsTalking,
     bool IsAway,
-    bool IsOperator);
+    bool IsOperator,
+    string StatusMessage = "");

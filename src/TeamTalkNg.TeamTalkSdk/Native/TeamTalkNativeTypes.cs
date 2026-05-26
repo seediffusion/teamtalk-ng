@@ -69,6 +69,12 @@ internal static class SoundLevel
     public const int GainMax = 32000;
 }
 
+internal static class StatusMode
+{
+    public const int Available = 0x00000000;
+    public const int Away = 0x00000001;
+}
+
 [Flags]
 internal enum ChannelType : uint
 {
@@ -359,6 +365,14 @@ internal unsafe struct NativeUser
     public string ReadNickname()
     {
         fixed (char* value = Nickname)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadStatusMessage()
+    {
+        fixed (char* value = StatusMessage)
         {
             return NativeConstants.ReadString(value);
         }

@@ -194,6 +194,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         RejectsVoiceControlsBeforeJoiningChannel();
+        RejectsStatusChangeBeforeLogin();
         StoresAudioVolumeBeforeNativeInstanceExists();
         Console.WriteLine("TeamTalk NG SDK dispatch tests passed.");
     }
@@ -304,6 +305,7 @@ internal static unsafe class SdkDispatchTests
         NativeUser user = CreateUser(42, "alex", "Alex", channelId: 12);
         user.UserState = 0x00000001;
         user.StatusMode = 0x00000001;
+        WriteString(user.StatusMessage, "Stepped away");
 
         session.DispatchMessageForTest(new TeamTalkMessage(
             ClientEvent.CommandUserUpdate,
@@ -320,6 +322,7 @@ internal static unsafe class SdkDispatchTests
         AssertEqual(42, updated!.Id);
         Assert(updated.IsTalking, "Expected user update to preserve talking state.");
         Assert(updated.IsAway, "Expected user update to preserve away state.");
+        AssertEqual("Stepped away", updated.StatusMessage);
     }
 
     private static void DispatchesConnectionLost()
@@ -413,6 +416,13 @@ internal static unsafe class SdkDispatchTests
 
         AssertThrows(() => session.SetVoiceTransmissionAsync(true).GetAwaiter().GetResult());
         AssertThrows(() => session.SetVoiceActivationAsync(true).GetAwaiter().GetResult());
+    }
+
+    private static void RejectsStatusChangeBeforeLogin()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.SetUserStatusAsync(new UserStatusRequest(IsAway: true, "Away")).GetAwaiter().GetResult());
     }
 
     private static void StoresAudioVolumeBeforeNativeInstanceExists()

@@ -1,0 +1,64 @@
+<Window x:Class="TeamTalkNg.App.StatusDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Set Status"
+        Width="460"
+        Height="240"
+        MinWidth="420"
+        MinHeight="220"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="140" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <CheckBox Grid.Column="1"
+                IsChecked="{Binding IsAway}"
+                Content="Away"
+                Margin="0,0,0,10"
+                AutomationProperties.Name="Away status" />
+
+      <Label Grid.Row="1" Target="{Binding ElementName=StatusMessageBox}" Content="Status message" />
+      <TextBox x:Name="StatusMessageBox"
+               Grid.Row="1"
+               Grid.Column="1"
+               Text="{Binding StatusMessage, UpdateSourceTrigger=PropertyChanged}"
+               Background="{DynamicResource ControlBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}"
+               BorderBrush="{DynamicResource BorderBrush}"
+               AutomationProperties.Name="Status message" />
+    </Grid>
+
+    <DockPanel Grid.Row="1"
+               Margin="0,16,0,0"
+               LastChildFill="False">
+      <Button DockPanel.Dock="Right"
+              Content="Cancel"
+              Command="{Binding CancelCommand}"
+              IsCancel="True"
+              MinWidth="96"
+              Margin="8,0,0,0"
+              AutomationProperties.Name="Cancel status change" />
+      <Button DockPanel.Dock="Right"
+              Content="Save"
+              Command="{Binding SaveCommand}"
+              IsDefault="True"
+              MinWidth="96"
+              AutomationProperties.Name="Save status" />
+    </DockPanel>
+  </Grid>
+</Window>

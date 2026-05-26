@@ -39,6 +39,8 @@
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
       </MenuItem>
       <MenuItem Header="_Me">
+        <MenuItem Header="Set _Status" Command="{Binding SetStatusCommand}" />
+        <Separator />
         <MenuItem Header="Enable _Push To Talk"
                   Command="{Binding TogglePushToTalkCommand}"
                   IsCheckable="True"

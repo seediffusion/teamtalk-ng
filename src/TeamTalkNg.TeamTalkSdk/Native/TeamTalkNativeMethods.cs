@@ -88,6 +88,9 @@ internal static partial class TeamTalkNativeMethods
         string password,
         string clientName);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoChangeStatus", CharSet = CharSet.Unicode)]
+    internal static extern int DoChangeStatus(IntPtr instance, int statusMode, string statusMessage);
+
     [DllImport(LibraryName, EntryPoint = "TT_DoJoinChannelByID", CharSet = CharSet.Unicode)]
     internal static extern int DoJoinChannelById(IntPtr instance, int channelId, string password);
 

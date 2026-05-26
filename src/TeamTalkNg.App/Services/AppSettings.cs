@@ -23,4 +23,6 @@ public sealed record AppSettings
     public int InputVolume { get; init; } = 50;
 
     public int OutputVolume { get; init; } = 50;
+
+    public string StatusMessage { get; init; } = string.Empty;
 }

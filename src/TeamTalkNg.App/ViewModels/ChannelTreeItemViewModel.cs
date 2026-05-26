@@ -7,6 +7,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     private string name;
     private bool isTalking;
     private bool isAway;
+    private string statusMessage = string.Empty;
     private int userCount;
 
     public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
@@ -83,6 +84,19 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         }
     }
 
+    public string StatusMessage
+    {
+        get => statusMessage;
+        set
+        {
+            if (SetProperty(ref statusMessage, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(AccessibleHelpText));
+            }
+        }
+    }
+
     public string Icon => Kind switch
     {
         ChannelTreeItemKind.Server => "Server",
@@ -99,8 +113,9 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         {
             string type = Kind.ToString().ToLowerInvariant();
             string state = IsTalking ? ", transmitting" : IsAway ? ", away" : string.Empty;
+            string message = string.IsNullOrWhiteSpace(StatusMessage) ? string.Empty : $", status: {StatusMessage}";
             string count = Kind == ChannelTreeItemKind.Channel ? $", {UserCount} users" : string.Empty;
-            return $"{Name}, {type}{count}{state}";
+            return $"{Name}, {type}{count}{state}{message}";
         }
     }
 
@@ -108,8 +123,11 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     {
         ChannelTreeItemKind.Server => "TeamTalk server",
         ChannelTreeItemKind.Channel => "TeamTalk channel",
+        ChannelTreeItemKind.User when IsTalking && !string.IsNullOrWhiteSpace(StatusMessage) => $"TeamTalk user, currently transmitting, status: {StatusMessage}",
         ChannelTreeItemKind.User when IsTalking => "TeamTalk user, currently transmitting",
+        ChannelTreeItemKind.User when IsAway && !string.IsNullOrWhiteSpace(StatusMessage) => $"TeamTalk user, away, status: {StatusMessage}",
         ChannelTreeItemKind.User when IsAway => "TeamTalk user, away",
+        ChannelTreeItemKind.User when !string.IsNullOrWhiteSpace(StatusMessage) => $"TeamTalk user, status: {StatusMessage}",
         ChannelTreeItemKind.User => "TeamTalk user",
         _ => string.Empty
     };

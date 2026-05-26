@@ -90,6 +90,29 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before changing status.");
+        }
+
+        int statusMode = status.IsAway ? StatusMode.Away : StatusMode.Available;
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoChangeStatus(instance, statusMode, status.Message);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the status command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);
@@ -957,7 +980,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             GetChannelPath(channelId),
             isTalking,
             isAway,
-            isOperator);
+            isOperator,
+            user.ReadStatusMessage());
     }
 
     private string GetChannelPath(int channelId)
