@@ -48,6 +48,21 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task JoinChannelAsync(string channelPath, string password = "", CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before joining a channel.");
+        }
+
+        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+        string channelName = GetChannelName(normalizedPath);
+        ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(2, channelName, normalizedPath, 1, IsProtected: false, IsPermanent: true));
+        UserJoined?.Invoke(this, new UserSummary(1, activeProfile?.Nickname ?? "You", activeProfile?.Username ?? string.Empty, normalizedPath, IsTalking: false, IsAway: false, IsOperator: true));
+        SetStatus(ConnectionStatus.InChannel);
+        return Task.CompletedTask;
+    }
+
     public Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default)
     {
         string sender = activeProfile?.Nickname ?? "You";

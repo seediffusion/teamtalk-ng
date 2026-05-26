@@ -22,6 +22,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ChannelsTree_OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await ActivateSelectedTreeItemAsync();
+    }
+
+    private async void ChannelsTree_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        await ActivateSelectedTreeItemAsync();
+    }
+
+    private async Task ActivateSelectedTreeItemAsync()
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            await viewModel.ActivateSelectedTreeItemAsync();
+        }
+    }
+
     private void MainToolBar_OnGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         if (ReferenceEquals(e.NewFocus, MainToolBar))

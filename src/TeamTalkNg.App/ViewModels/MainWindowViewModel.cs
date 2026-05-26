@@ -162,6 +162,24 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    public async Task ActivateSelectedTreeItemAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.Channel } channel)
+        {
+            return;
+        }
+
+        try
+        {
+            await AnnounceAsync($"Joining {channel.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+            await teamTalkSession.JoinChannelAsync(channel.Path);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
     private async Task ConnectAsync()
     {
         IReadOnlyList<TeamTalkServerProfile> profiles = await profileStore.LoadAsync();
@@ -225,8 +243,15 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         MessageText = string.Empty;
-        await teamTalkSession.SendChannelMessageAsync(text);
-        await AnnounceAsync($"Sent message: {text}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+        try
+        {
+            await teamTalkSession.SendChannelMessageAsync(text);
+            await AnnounceAsync($"Sent message: {text}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
     }
 
     private void TogglePushToTalk()
@@ -368,10 +393,10 @@ public sealed class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            ChannelTreeItemViewModel? channel = serverTreeItem.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel && item.Id == channelId);
+            ChannelTreeItemViewModel? channel = FindChannelById(channelId);
             if (channel is not null)
             {
-                serverTreeItem.Children.Remove(channel);
+                RemoveTreeItem(channel);
             }
         });
     }
@@ -403,7 +428,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private ChannelTreeItemViewModel EnsureChannel(string? channelPath, int id)
     {
-        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+        string normalizedPath = NormalizeChannelPath(channelPath);
         serverTreeItem ??= Channels.FirstOrDefault();
         if (serverTreeItem is null)
         {
@@ -414,19 +439,118 @@ public sealed class MainWindowViewModel : ObservableObject
         ChannelTreeItemViewModel? existing = FindChannelByPath(normalizedPath);
         if (existing is not null)
         {
+            if (id > 0 && existing.Id == 0)
+            {
+                existing.Id = id;
+            }
+
             return existing;
         }
 
-        var channel = new ChannelTreeItemViewModel(GetChannelName(normalizedPath), ChannelTreeItemKind.Channel, id, normalizedPath);
-        serverTreeItem.Children.Add(channel);
-        return channel;
+        ChannelTreeItemViewModel parent = serverTreeItem;
+        string currentPath = string.Empty;
+        foreach (string segment in normalizedPath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            currentPath += "/" + segment;
+            ChannelTreeItemViewModel? child = parent.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel
+                && string.Equals(item.Path, currentPath, StringComparison.OrdinalIgnoreCase));
+            if (child is null)
+            {
+                child = new ChannelTreeItemViewModel(segment, ChannelTreeItemKind.Channel, currentPath == normalizedPath ? id : 0, currentPath);
+                parent.Children.Add(child);
+            }
+            else if (currentPath == normalizedPath && id > 0 && child.Id == 0)
+            {
+                child.Id = id;
+            }
+
+            parent = child;
+        }
+
+        if (normalizedPath == "/")
+        {
+            ChannelTreeItemViewModel? rootChannel = serverTreeItem.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel && item.Path == "/");
+            if (rootChannel is null)
+            {
+                rootChannel = new ChannelTreeItemViewModel("Root", ChannelTreeItemKind.Channel, id, "/");
+                serverTreeItem.Children.Add(rootChannel);
+            }
+
+            return rootChannel;
+        }
+
+        return parent;
     }
 
     private ChannelTreeItemViewModel? FindChannelByPath(string? channelPath)
     {
-        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
-        return serverTreeItem?.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel
+        string normalizedPath = NormalizeChannelPath(channelPath);
+        return Descendants(serverTreeItem).FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel
             && string.Equals(item.Path, normalizedPath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private ChannelTreeItemViewModel? FindChannelById(int channelId)
+    {
+        return channelId <= 0
+            ? null
+            : Descendants(serverTreeItem).FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel && item.Id == channelId);
+    }
+
+    private bool RemoveTreeItem(ChannelTreeItemViewModel item)
+    {
+        if (serverTreeItem is null)
+        {
+            return false;
+        }
+
+        return RemoveTreeItem(serverTreeItem.Children, item);
+    }
+
+    private static bool RemoveTreeItem(IList<ChannelTreeItemViewModel> collection, ChannelTreeItemViewModel item)
+    {
+        if (collection.Remove(item))
+        {
+            return true;
+        }
+
+        foreach (ChannelTreeItemViewModel child in collection)
+        {
+            if (RemoveTreeItem(child.Children, item))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<ChannelTreeItemViewModel> Descendants(ChannelTreeItemViewModel? root)
+    {
+        if (root is null)
+        {
+            yield break;
+        }
+
+        foreach (ChannelTreeItemViewModel child in root.Children)
+        {
+            yield return child;
+
+            foreach (ChannelTreeItemViewModel descendant in Descendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static string NormalizeChannelPath(string? channelPath)
+    {
+        if (string.IsNullOrWhiteSpace(channelPath) || channelPath == "/")
+        {
+            return "/";
+        }
+
+        string trimmed = channelPath.Trim();
+        return "/" + trimmed.Trim('/');
     }
 
     private async Task SaveRecentProfileAsync(IReadOnlyList<TeamTalkServerProfile> profiles, TeamTalkServerProfile selectedProfile)

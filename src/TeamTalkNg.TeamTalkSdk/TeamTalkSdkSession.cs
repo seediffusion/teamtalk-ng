@@ -95,6 +95,17 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         SetStatus(ConnectionStatus.Disconnected);
     }
 
+    public Task JoinChannelAsync(string channelPath, string password = "", CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before joining a channel.");
+        }
+
+        JoinChannel(channelPath, password);
+        return Task.CompletedTask;
+    }
+
     public Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
@@ -336,16 +347,23 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             return;
         }
 
+        JoinChannel(channelPath, profile?.ChannelPassword ?? string.Empty);
+    }
+
+    private void JoinChannel(string channelPath, string password)
+    {
+        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+
         int channelId;
         lock (stateLock)
         {
             EnsureConnectedInstance();
-            channelId = TeamTalkNativeMethods.GetChannelIdFromPath(instance, channelPath);
+            channelId = TeamTalkNativeMethods.GetChannelIdFromPath(instance, normalizedPath);
         }
 
         if (channelId <= 0)
         {
-            RaiseSystemMessage($"Logged in, but channel {channelPath} was not found.");
+            RaiseSystemMessage($"Channel {normalizedPath} was not found.");
             return;
         }
 
@@ -353,12 +371,12 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         lock (stateLock)
         {
             EnsureConnectedInstance();
-            commandId = TeamTalkNativeMethods.DoJoinChannelById(instance, channelId, profile?.ChannelPassword ?? string.Empty);
+            commandId = TeamTalkNativeMethods.DoJoinChannelById(instance, channelId, password);
         }
 
         if (commandId <= 0)
         {
-            RaiseSystemMessage($"TeamTalk SDK did not accept the join command for {channelPath}.");
+            RaiseSystemMessage($"TeamTalk SDK did not accept the join command for {normalizedPath}.");
         }
     }
 

@@ -16,7 +16,13 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         Path = path;
     }
 
-    public int Id { get; }
+    private int id;
+
+    public int Id
+    {
+        get => id;
+        set => SetProperty(ref id, value);
+    }
 
     public string Path { get; }
 

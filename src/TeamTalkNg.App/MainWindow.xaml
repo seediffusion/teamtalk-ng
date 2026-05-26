@@ -136,6 +136,8 @@
           <TreeView x:Name="ChannelsTree"
                     ItemsSource="{Binding Channels}"
                     SelectedItemChanged="ChannelsTree_OnSelectedItemChanged"
+                    KeyDown="ChannelsTree_OnKeyDown"
+                    MouseDoubleClick="ChannelsTree_OnMouseDoubleClick"
                     Background="{DynamicResource ControlBackgroundBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
