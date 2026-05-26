@@ -186,6 +186,7 @@ internal static unsafe class SdkDispatchTests
     public static void RunAll()
     {
         DispatchesChannelTextMessage();
+        DispatchesDirectTextMessage();
         DispatchesUserJoinedAndLeft();
         DispatchesChannelAddedOrUpdated();
         DispatchesChannelRemoved();
@@ -223,6 +224,35 @@ internal static unsafe class SdkDispatchTests
         Assert(received is not null, "Expected channel message event.");
         AssertEqual("alex", received!.Sender);
         AssertEqual("hello from sdk", received.Text);
+    }
+
+    private static void DispatchesDirectTextMessage()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        ChatMessage? received = null;
+        session.ChannelMessageReceived += (_, message) => received = message;
+
+        NativeTextMessage textMessage = default;
+        textMessage.MessageType = TextMsgType.User;
+        textMessage.FromUserId = 7;
+        WriteString(textMessage.FromUsername, "alex");
+        textMessage.WriteMessage("hello directly");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserTextMessage,
+            Source: 0,
+            TTType.TextMessage,
+            default,
+            textMessage,
+            default,
+            default,
+            0,
+            0));
+
+        Assert(received is not null, "Expected direct message event.");
+        Assert(received!.IsDirect, "Expected message to be marked as direct.");
+        AssertEqual("Direct from alex", received.Sender);
+        AssertEqual("hello directly", received.Text);
     }
 
     private static void DispatchesUserJoinedAndLeft()

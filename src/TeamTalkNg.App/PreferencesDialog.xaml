@@ -113,10 +113,10 @@
                     IsChecked="{Binding AnnounceChannelMessages}"
                     Margin="0,0,0,10"
                     AutomationProperties.Name="Announce channel messages" />
-          <CheckBox Content="Announce private messages"
-                    IsChecked="{Binding AnnouncePrivateMessages}"
+          <CheckBox Content="Announce direct messages"
+                    IsChecked="{Binding AnnounceDirectMessages}"
                     Margin="0,0,0,10"
-                    AutomationProperties.Name="Announce private messages" />
+                    AutomationProperties.Name="Announce direct messages" />
           <CheckBox Content="Announce users joining and leaving"
                     IsChecked="{Binding AnnounceUserJoinLeave}"
                     Margin="0,0,0,10"

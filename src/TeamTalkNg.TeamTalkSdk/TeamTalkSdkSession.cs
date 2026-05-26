@@ -355,6 +355,46 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task SendDirectMessageAsync(int userId, string text, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be connected before sending a direct message.");
+        }
+
+        if (userId <= 0)
+        {
+            throw new InvalidOperationException("Select a user before sending a direct message.");
+        }
+
+        NativeTextMessage message = default;
+        message.MessageType = TextMsgType.User;
+        message.ToUserId = userId;
+        message.WriteMessage(text);
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoTextMessage(instance, ref message);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the direct message command.");
+        }
+        else
+        {
+            ChannelMessageReceived?.Invoke(this, new ChatMessage(
+                DateTimeOffset.Now,
+                $"Direct to User {userId}",
+                text,
+                IsDirect: true));
+        }
+
+        return Task.CompletedTask;
+    }
+
     public void Dispose()
     {
         StopPollingAsync().GetAwaiter().GetResult();
@@ -842,21 +882,27 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
     private void DispatchTextMessage(NativeTextMessage textMessage)
     {
-        if (textMessage.MessageType != TextMsgType.Channel)
-        {
-            return;
-        }
-
         string sender = textMessage.ReadFromUsername();
         if (string.IsNullOrWhiteSpace(sender))
         {
             sender = $"User {textMessage.FromUserId}";
         }
 
-        ChannelMessageReceived?.Invoke(this, new ChatMessage(
-            DateTimeOffset.Now,
-            sender,
-            textMessage.ReadMessage()));
+        if (textMessage.MessageType == TextMsgType.Channel)
+        {
+            ChannelMessageReceived?.Invoke(this, new ChatMessage(
+                DateTimeOffset.Now,
+                sender,
+                textMessage.ReadMessage()));
+        }
+        else if (textMessage.MessageType == TextMsgType.User)
+        {
+            ChannelMessageReceived?.Invoke(this, new ChatMessage(
+                DateTimeOffset.Now,
+                $"Direct from {sender}",
+                textMessage.ReadMessage(),
+                IsDirect: true));
+        }
     }
 
     private void DispatchChannelAddedOrUpdated(NativeChannel channel)

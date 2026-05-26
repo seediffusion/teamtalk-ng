@@ -4,7 +4,7 @@ public enum AnnouncementKind
 {
     System,
     ChannelMessage,
-    PrivateMessage,
+    DirectMessage,
     UserJoinLeave,
     Selection
 }

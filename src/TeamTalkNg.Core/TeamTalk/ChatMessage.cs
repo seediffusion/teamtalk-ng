@@ -4,5 +4,5 @@ public sealed record ChatMessage(
     DateTimeOffset Timestamp,
     string Sender,
     string Text,
-    bool IsPrivate = false,
+    bool IsDirect = false,
     bool IsSystem = false);

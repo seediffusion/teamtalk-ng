@@ -6,7 +6,7 @@ public sealed record AppSettings
 
     public bool AnnounceChannelMessages { get; init; } = true;
 
-    public bool AnnouncePrivateMessages { get; init; } = true;
+    public bool AnnounceDirectMessages { get; init; } = true;
 
     public bool AnnounceUserJoinLeave { get; init; } = true;
 

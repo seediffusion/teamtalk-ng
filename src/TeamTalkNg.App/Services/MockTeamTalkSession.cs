@@ -135,6 +135,21 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SendDirectMessageAsync(int userId, string text, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be connected before sending a direct message.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            $"Direct to User {userId}",
+            text,
+            IsDirect: true));
+        return Task.CompletedTask;
+    }
+
     public Task SetVoiceTransmissionAsync(bool enabled, CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel)

@@ -19,6 +19,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
     private readonly IChannelDialogService channelDialogService;
+    private readonly IDirectMessageDialogService directMessageDialogService;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
@@ -41,6 +42,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
         IChannelDialogService channelDialogService,
+        IDirectMessageDialogService directMessageDialogService,
         AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
@@ -52,6 +54,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
         this.channelDialogService = channelDialogService;
+        this.directMessageDialogService = directMessageDialogService;
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
@@ -62,6 +65,7 @@ public sealed class MainWindowViewModel : ObservableObject
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
         CreateChannelCommand = new AsyncRelayCommand(CreateChannelAsync, CanCreateChannel);
         DeleteSelectedChannelCommand = new AsyncRelayCommand(DeleteSelectedChannelAsync, CanDeleteSelectedChannel);
+        SendDirectMessageCommand = new AsyncRelayCommand(SendDirectMessageAsync, CanSendDirectMessage);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
@@ -103,6 +107,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand CreateChannelCommand { get; }
 
     public ICommand DeleteSelectedChannelCommand { get; }
+
+    public ICommand SendDirectMessageCommand { get; }
 
     public ICommand SendMessageCommand { get; }
 
@@ -352,6 +358,31 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private async Task SendDirectMessageAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        string? message = directMessageDialogService.ShowDirectMessageDialog(user.Name);
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            await AnnounceAsync("Direct message canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.SendDirectMessageAsync(user.Id, message);
+            await AnnounceAsync($"Sent direct message to {user.Name}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
     private async Task TogglePushToTalkAsync()
     {
         bool target = !IsPushToTalkEnabled;
@@ -486,8 +517,8 @@ public sealed class MainWindowViewModel : ObservableObject
             : $"{message.Sender}: {message.Text}";
         _ = AnnounceAsync(
             announcement,
-            message.IsPrivate ? AnnouncementPriority.High : AnnouncementPriority.Normal,
-            message.IsPrivate ? AnnouncementKind.PrivateMessage : AnnouncementKind.ChannelMessage);
+            message.IsDirect ? AnnouncementPriority.High : AnnouncementPriority.Normal,
+            message.IsDirect ? AnnouncementKind.DirectMessage : AnnouncementKind.ChannelMessage);
     }
 
     private void OnUserJoined(object? sender, UserSummary user)
@@ -757,7 +788,7 @@ public sealed class MainWindowViewModel : ObservableObject
         return kind switch
         {
             AnnouncementKind.ChannelMessage => settings.AnnounceChannelMessages,
-            AnnouncementKind.PrivateMessage => settings.AnnouncePrivateMessages,
+            AnnouncementKind.DirectMessage => settings.AnnounceDirectMessages,
             AnnouncementKind.UserJoinLeave => settings.AnnounceUserJoinLeave,
             AnnouncementKind.Selection => settings.AnnounceSelectionChanges,
             _ => true
@@ -822,6 +853,11 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             delete.RaiseCanExecuteChanged();
         }
+
+        if (SendDirectMessageCommand is AsyncRelayCommand directMessage)
+        {
+            directMessage.RaiseCanExecuteChanged();
+        }
     }
 
     private bool CanJoinSelectedChannel()
@@ -845,5 +881,11 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanUseVoiceControls()
     {
         return teamTalkSession.Status == ConnectionStatus.InChannel;
+    }
+
+    private bool CanSendDirectMessage()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.User }
+            && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
     }
 }

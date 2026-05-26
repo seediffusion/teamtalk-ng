@@ -53,6 +53,9 @@
         <MenuItem Header="_Create Channel" Command="{Binding CreateChannelCommand}" />
         <MenuItem Header="_Delete Selected Channel" Command="{Binding DeleteSelectedChannelCommand}" />
       </MenuItem>
+      <MenuItem Header="_Messages">
+        <MenuItem Header="Send _Direct Message" Command="{Binding SendDirectMessageCommand}" />
+      </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="_Light Theme" Command="{Binding UseLightThemeCommand}" />
         <MenuItem Header="_Dark Theme" Command="{Binding UseDarkThemeCommand}" />

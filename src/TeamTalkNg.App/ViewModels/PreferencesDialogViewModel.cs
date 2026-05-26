@@ -9,7 +9,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
 {
     private AppTheme selectedTheme;
     private bool announceChannelMessages;
-    private bool announcePrivateMessages;
+    private bool announceDirectMessages;
     private bool announceUserJoinLeave;
     private bool announceSelectionChanges;
     private bool sendAnnouncementsToBraille;
@@ -41,7 +41,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
 
         selectedTheme = settings.Theme;
         announceChannelMessages = settings.AnnounceChannelMessages;
-        announcePrivateMessages = settings.AnnouncePrivateMessages;
+        announceDirectMessages = settings.AnnounceDirectMessages;
         announceUserJoinLeave = settings.AnnounceUserJoinLeave;
         announceSelectionChanges = settings.AnnounceSelectionChanges;
         sendAnnouncementsToBraille = settings.SendAnnouncementsToBraille;
@@ -77,10 +77,10 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref announceChannelMessages, value);
     }
 
-    public bool AnnouncePrivateMessages
+    public bool AnnounceDirectMessages
     {
-        get => announcePrivateMessages;
-        set => SetProperty(ref announcePrivateMessages, value);
+        get => announceDirectMessages;
+        set => SetProperty(ref announceDirectMessages, value);
     }
 
     public bool AnnounceUserJoinLeave
@@ -125,7 +125,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         {
             Theme = SelectedTheme,
             AnnounceChannelMessages = AnnounceChannelMessages,
-            AnnouncePrivateMessages = AnnouncePrivateMessages,
+            AnnounceDirectMessages = AnnounceDirectMessages,
             AnnounceUserJoinLeave = AnnounceUserJoinLeave,
             AnnounceSelectionChanges = AnnounceSelectionChanges,
             SendAnnouncementsToBraille = SendAnnouncementsToBraille,
