@@ -37,6 +37,7 @@ public partial class App : Application
             IDirectMessageDialogService directMessageDialogService = new DirectMessageDialogService();
             IStatusDialogService statusDialogService = new StatusDialogService();
             IJoinChannelDialogService joinChannelDialogService = new JoinChannelDialogService();
+            INicknameDialogService nicknameDialogService = new NicknameDialogService();
 
             var viewModel = new MainWindowViewModel(
                 teamTalkSession,
@@ -51,6 +52,7 @@ public partial class App : Application
                 directMessageDialogService,
                 statusDialogService,
                 joinChannelDialogService,
+                nicknameDialogService,
                 appSettings);
             var window = new MainWindow
             {

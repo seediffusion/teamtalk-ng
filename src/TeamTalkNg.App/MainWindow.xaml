@@ -39,6 +39,7 @@
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
       </MenuItem>
       <MenuItem Header="_Me">
+        <MenuItem Header="Change _Nickname" Command="{Binding ChangeNicknameCommand}" />
         <MenuItem Header="Set _Status" Command="{Binding SetStatusCommand}" />
         <Separator />
         <MenuItem Header="Enable _Push To Talk"

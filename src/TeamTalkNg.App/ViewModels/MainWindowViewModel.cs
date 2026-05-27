@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IDirectMessageDialogService directMessageDialogService;
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
+    private readonly INicknameDialogService nicknameDialogService;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
@@ -31,6 +32,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool pushToTalkEnabled;
     private bool voiceActivationEnabled;
     private bool isAway;
+    private string currentNickname = Environment.UserName;
     private TeamTalkServerProfile? activeProfile;
     private AppSettings settings;
     private ChannelTreeItemViewModel? serverTreeItem;
@@ -48,6 +50,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IDirectMessageDialogService directMessageDialogService,
         IStatusDialogService statusDialogService,
         IJoinChannelDialogService joinChannelDialogService,
+        INicknameDialogService nicknameDialogService,
         AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
@@ -62,6 +65,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.directMessageDialogService = directMessageDialogService;
         this.statusDialogService = statusDialogService;
         this.joinChannelDialogService = joinChannelDialogService;
+        this.nicknameDialogService = nicknameDialogService;
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
@@ -76,6 +80,7 @@ public sealed class MainWindowViewModel : ObservableObject
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
+        ChangeNicknameCommand = new AsyncRelayCommand(ChangeNicknameAsync, CanSetProfileState);
         SetStatusCommand = new AsyncRelayCommand(SetStatusAsync, CanSetStatus);
         SimulateUserJoinedCommand = new RelayCommand(SimulateUserJoined);
         UseLightThemeCommand = new AsyncRelayCommand(() => SetThemeAsync(AppTheme.Light));
@@ -126,6 +131,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand ToggleVoiceActivationCommand { get; }
 
     public ICommand SetStatusCommand { get; }
+
+    public ICommand ChangeNicknameCommand { get; }
 
     public ICommand SimulateUserJoinedCommand { get; }
 
@@ -268,6 +275,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         activeProfile = profile;
+        currentNickname = string.IsNullOrWhiteSpace(profile.Nickname) ? Environment.UserName : profile.Nickname;
         await SaveRecentProfileAsync(profiles, profile);
         await ConnectToProfileAsync(profile);
     }
@@ -275,6 +283,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public async Task ConnectToProfileAsync(TeamTalkServerProfile profile)
     {
         activeProfile = profile;
+        currentNickname = string.IsNullOrWhiteSpace(profile.Nickname) ? Environment.UserName : profile.Nickname;
         await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         BuildConnectingTree(profile);
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
@@ -471,6 +480,28 @@ public sealed class MainWindowViewModel : ObservableObject
             settings = settings with { StatusMessage = request.Message };
             await settingsStore.SaveAsync(settings);
             await AnnounceAsync(request.IsAway ? "Status set to away" : "Status set to available", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task ChangeNicknameAsync()
+    {
+        string? nickname = nicknameDialogService.ShowNicknameDialog(currentNickname);
+        if (string.IsNullOrWhiteSpace(nickname))
+        {
+            await AnnounceAsync("Nickname change canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.SetNicknameAsync(nickname);
+            currentNickname = nickname.Trim();
+            activeProfile = activeProfile is null ? null : activeProfile with { Nickname = currentNickname };
+            await AnnounceAsync($"Nickname changed to {currentNickname}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
         {
@@ -922,6 +953,11 @@ public sealed class MainWindowViewModel : ObservableObject
             status.RaiseCanExecuteChanged();
         }
 
+        if (ChangeNicknameCommand is AsyncRelayCommand nickname)
+        {
+            nickname.RaiseCanExecuteChanged();
+        }
+
         RaiseChannelCommandStateChanged();
     }
 
@@ -972,6 +1008,11 @@ public sealed class MainWindowViewModel : ObservableObject
     }
 
     private bool CanSetStatus()
+    {
+        return CanSetProfileState();
+    }
+
+    private bool CanSetProfileState()
     {
         return teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
     }

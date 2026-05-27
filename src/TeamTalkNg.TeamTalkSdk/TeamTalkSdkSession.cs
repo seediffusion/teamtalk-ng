@@ -113,6 +113,34 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before changing nickname.");
+        }
+
+        string trimmedNickname = nickname.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedNickname))
+        {
+            throw new InvalidOperationException("Nickname cannot be empty.");
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoChangeNickname(instance, trimmedNickname);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the nickname command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);

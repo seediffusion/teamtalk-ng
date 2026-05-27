@@ -20,6 +20,8 @@ public interface ITeamTalkSession
 
     Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default);
 
+    Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default);
+
     Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default);
 
     Task DisconnectAsync(CancellationToken cancellationToken = default);

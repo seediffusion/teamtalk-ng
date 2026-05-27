@@ -51,6 +51,25 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before changing nickname.");
+        }
+
+        string trimmedNickname = nickname.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedNickname))
+        {
+            throw new InvalidOperationException("Nickname cannot be empty.");
+        }
+
+        activeProfile = activeProfile is null ? null : activeProfile with { Nickname = trimmedNickname };
+        UserUpdated?.Invoke(this, new UserSummary(1, trimmedNickname, activeProfile?.Username ?? string.Empty, activeProfile?.ChannelPath ?? "/", IsTalking: false, IsAway: false, IsOperator: true));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Nickname changed to {trimmedNickname}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         activeProfile = profile;
