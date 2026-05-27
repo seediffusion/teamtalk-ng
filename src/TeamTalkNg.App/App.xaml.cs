@@ -34,6 +34,7 @@ public partial class App : Application
             IConnectionTargetDialogService connectionTargetDialogService = new ConnectionTargetDialogService();
             IPreferencesDialogService preferencesDialogService = new PreferencesDialogService();
             IChannelDialogService channelDialogService = new ChannelDialogService();
+            IChannelInformationDialogService channelInformationDialogService = new ChannelInformationDialogService();
             IDirectMessageDialogService directMessageDialogService = new DirectMessageDialogService();
             IStatusDialogService statusDialogService = new StatusDialogService();
             IJoinChannelDialogService joinChannelDialogService = new JoinChannelDialogService();
@@ -49,6 +50,7 @@ public partial class App : Application
                 settingsStore,
                 preferencesDialogService,
                 channelDialogService,
+                channelInformationDialogService,
                 directMessageDialogService,
                 statusDialogService,
                 joinChannelDialogService,

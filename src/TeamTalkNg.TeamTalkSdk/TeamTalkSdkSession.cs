@@ -980,7 +980,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             channelPath,
             UserCount: 0,
             IsProtected: channel.HasPassword != 0,
-            IsPermanent: (channel.ChannelType & (uint)ChannelType.Permanent) != 0));
+            IsPermanent: (channel.ChannelType & (uint)ChannelType.Permanent) != 0,
+            Topic: channel.ReadTopic()));
     }
 
     private UserSummary CreateUserSummary(NativeUser user, int channelId)

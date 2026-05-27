@@ -6,4 +6,5 @@ public sealed record ChannelSummary(
     string Path,
     int UserCount,
     bool IsProtected,
-    bool IsPermanent);
+    bool IsPermanent,
+    string Topic = "");

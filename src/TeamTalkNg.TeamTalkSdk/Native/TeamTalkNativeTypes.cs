@@ -248,6 +248,14 @@ internal unsafe struct NativeChannel
         }
     }
 
+    public string ReadTopic()
+    {
+        fixed (char* value = Topic)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
     public void WriteName(string value)
     {
         fixed (char* target = Name)

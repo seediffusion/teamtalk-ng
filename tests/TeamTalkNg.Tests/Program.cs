@@ -358,6 +358,7 @@ internal static unsafe class SdkDispatchTests
         channel.HasPassword = 1;
         channel.ChannelType = (uint)ChannelType.Permanent;
         WriteString(channel.Name, "Lobby");
+        WriteString(channel.Topic, "General conversation");
 
         session.DispatchMessageForTest(new TeamTalkMessage(
             ClientEvent.CommandChannelNew,
@@ -373,6 +374,7 @@ internal static unsafe class SdkDispatchTests
         Assert(received is not null, "Expected channel event.");
         AssertEqual(22, received!.Id);
         AssertEqual("Lobby", received.Name);
+        AssertEqual("General conversation", received.Topic);
         Assert(received.IsProtected, "Expected channel to preserve password-protected state.");
         Assert(received.IsPermanent, "Expected channel to preserve permanent state.");
     }

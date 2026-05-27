@@ -10,6 +10,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     private bool isProtected;
     private bool isPermanent;
     private string statusMessage = string.Empty;
+    private string topic = string.Empty;
     private int userCount;
 
     public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
@@ -97,6 +98,12 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
                 OnPropertyChanged(nameof(AccessibleHelpText));
             }
         }
+    }
+
+    public string Topic
+    {
+        get => topic;
+        set => SetProperty(ref topic, value);
     }
 
     public bool IsProtected

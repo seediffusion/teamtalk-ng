@@ -1,0 +1,101 @@
+<Window x:Class="TeamTalkNg.App.ChannelInformationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Channel Information"
+        Width="520"
+        Height="360"
+        MinWidth="460"
+        MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="120" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Label Target="{Binding ElementName=NameBox}" Content="Name" />
+      <TextBox x:Name="NameBox"
+               Grid.Column="1"
+               Text="{Binding Name}"
+               IsReadOnly="True"
+               Background="{DynamicResource ControlBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}"
+               BorderBrush="{DynamicResource BorderBrush}"
+               AutomationProperties.Name="Channel name" />
+
+      <Label Grid.Row="1" Target="{Binding ElementName=PathBox}" Content="Path" />
+      <TextBox x:Name="PathBox"
+               Grid.Row="1"
+               Grid.Column="1"
+               Text="{Binding Path}"
+               IsReadOnly="True"
+               Background="{DynamicResource ControlBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}"
+               BorderBrush="{DynamicResource BorderBrush}"
+               AutomationProperties.Name="Channel path" />
+
+      <Label Grid.Row="2" Target="{Binding ElementName=TopicBox}" Content="Topic" />
+      <TextBox x:Name="TopicBox"
+               Grid.Row="2"
+               Grid.Column="1"
+               Text="{Binding Topic}"
+               IsReadOnly="True"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               VerticalScrollBarVisibility="Auto"
+               Background="{DynamicResource ControlBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}"
+               BorderBrush="{DynamicResource BorderBrush}"
+               AutomationProperties.Name="Channel topic" />
+
+      <Label Grid.Row="3" Target="{Binding ElementName=ProtectedBox}" Content="Protected" />
+      <TextBox x:Name="ProtectedBox"
+               Grid.Row="3"
+               Grid.Column="1"
+               Text="{Binding Protected}"
+               IsReadOnly="True"
+               Background="{DynamicResource ControlBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}"
+               BorderBrush="{DynamicResource BorderBrush}"
+               AutomationProperties.Name="Channel is password protected" />
+
+      <Label Grid.Row="4" Target="{Binding ElementName=UserCountBox}" Content="Users" />
+      <TextBox x:Name="UserCountBox"
+               Grid.Row="4"
+               Grid.Column="1"
+               Text="{Binding UserCount}"
+               IsReadOnly="True"
+               Background="{DynamicResource ControlBackgroundBrush}"
+               Foreground="{DynamicResource TextBrush}"
+               BorderBrush="{DynamicResource BorderBrush}"
+               AutomationProperties.Name="Users in channel" />
+    </Grid>
+
+    <DockPanel Grid.Row="1"
+               Margin="0,16,0,0"
+               LastChildFill="False">
+      <Button DockPanel.Dock="Right"
+              Content="OK"
+              Command="{Binding CloseCommand}"
+              IsDefault="True"
+              IsCancel="True"
+              MinWidth="96"
+              AutomationProperties.Name="Close channel information" />
+    </DockPanel>
+  </Grid>
+</Window>

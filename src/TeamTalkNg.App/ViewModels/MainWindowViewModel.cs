@@ -19,6 +19,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
     private readonly IChannelDialogService channelDialogService;
+    private readonly IChannelInformationDialogService channelInformationDialogService;
     private readonly IDirectMessageDialogService directMessageDialogService;
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
@@ -47,6 +48,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
         IChannelDialogService channelDialogService,
+        IChannelInformationDialogService channelInformationDialogService,
         IDirectMessageDialogService directMessageDialogService,
         IStatusDialogService statusDialogService,
         IJoinChannelDialogService joinChannelDialogService,
@@ -62,6 +64,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
         this.channelDialogService = channelDialogService;
+        this.channelInformationDialogService = channelInformationDialogService;
         this.directMessageDialogService = directMessageDialogService;
         this.statusDialogService = statusDialogService;
         this.joinChannelDialogService = joinChannelDialogService;
@@ -74,6 +77,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
+        ChannelInformationCommand = new RelayCommand(ShowChannelInformation, CanShowChannelInformation);
         CreateChannelCommand = new AsyncRelayCommand(CreateChannelAsync, CanCreateChannel);
         DeleteSelectedChannelCommand = new AsyncRelayCommand(DeleteSelectedChannelAsync, CanDeleteSelectedChannel);
         SendDirectMessageCommand = new AsyncRelayCommand(SendDirectMessageAsync, CanSendDirectMessage);
@@ -117,6 +121,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand DisconnectCommand { get; }
 
     public ICommand JoinSelectedChannelCommand { get; }
+
+    public ICommand ChannelInformationCommand { get; }
 
     public ICommand CreateChannelCommand { get; }
 
@@ -364,6 +370,14 @@ public sealed class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private void ShowChannelInformation()
+    {
+        if (SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel } channel)
+        {
+            channelInformationDialogService.ShowChannelInformationDialog(channel);
         }
     }
 
@@ -673,6 +687,7 @@ public sealed class MainWindowViewModel : ObservableObject
             item.Name = channel.Name;
             item.IsProtected = channel.IsProtected;
             item.IsPermanent = channel.IsPermanent;
+            item.Topic = channel.Topic;
             item.UserCount = channel.UserCount > 0 ? channel.UserCount : item.Children.Count(child => child.Kind == ChannelTreeItemKind.User);
         });
     }
@@ -968,6 +983,11 @@ public sealed class MainWindowViewModel : ObservableObject
             join.RaiseCanExecuteChanged();
         }
 
+        if (ChannelInformationCommand is RelayCommand information)
+        {
+            information.RaiseCanExecuteChanged();
+        }
+
         if (CreateChannelCommand is AsyncRelayCommand create)
         {
             create.RaiseCanExecuteChanged();
@@ -994,6 +1014,11 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         return (SelectedChannelItem is null or { Kind: ChannelTreeItemKind.Server or ChannelTreeItemKind.Channel })
             && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
+    }
+
+    private bool CanShowChannelInformation()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel };
     }
 
     private bool CanDeleteSelectedChannel()

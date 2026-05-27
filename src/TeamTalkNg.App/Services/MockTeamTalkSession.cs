@@ -141,7 +141,8 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             path,
             UserCount: 0,
             IsProtected: !string.IsNullOrEmpty(request.Password),
-            request.IsPermanent));
+            request.IsPermanent,
+            request.Topic));
         ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Created channel {channelName}.", IsSystem: true));
         return Task.CompletedTask;
     }
