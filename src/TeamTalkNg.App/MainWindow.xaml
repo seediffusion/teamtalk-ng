@@ -54,6 +54,7 @@
       <MenuItem Header="_Channels">
         <MenuItem Header="_Join Selected Channel" Command="{Binding JoinSelectedChannelCommand}" />
         <MenuItem Header="Channel _Information" Command="{Binding ChannelInformationCommand}" />
+        <MenuItem Header="Edit Channel _Topic" Command="{Binding EditChannelTopicCommand}" />
         <Separator />
         <MenuItem Header="_Create Channel" Command="{Binding CreateChannelCommand}" />
         <MenuItem Header="_Delete Selected Channel" Command="{Binding DeleteSelectedChannelCommand}" />

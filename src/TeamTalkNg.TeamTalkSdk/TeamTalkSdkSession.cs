@@ -262,6 +262,40 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task SetChannelTopicAsync(string channelPath, string topic, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before editing a channel topic.");
+        }
+
+        int channelId = ResolveChannelId(channelPath);
+        if (channelId <= 0)
+        {
+            throw new InvalidOperationException($"Channel {channelPath} was not found.");
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (TeamTalkNativeMethods.GetChannel(instance, channelId, out NativeChannel channel) == 0)
+            {
+                throw new InvalidOperationException($"Channel {channelPath} was not found.");
+            }
+
+            channel.WriteTopic(topic.Trim());
+            commandId = TeamTalkNativeMethods.DoUpdateChannel(instance, ref channel);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage($"TeamTalk SDK did not accept the topic update command for {channelPath}.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)

@@ -147,6 +147,26 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SetChannelTopicAsync(string channelPath, string topic, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before editing a channel topic.");
+        }
+
+        string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
+        ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(
+            Math.Abs(normalizedPath.GetHashCode()),
+            GetChannelName(normalizedPath),
+            normalizedPath,
+            UserCount: 1,
+            IsProtected: false,
+            IsPermanent: true,
+            Topic: topic.Trim()));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Updated topic for {GetChannelName(normalizedPath)}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)

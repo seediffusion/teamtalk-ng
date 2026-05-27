@@ -196,6 +196,7 @@ internal static unsafe class SdkDispatchTests
         RejectsVoiceControlsBeforeJoiningChannel();
         RejectsStatusChangeBeforeLogin();
         RejectsNicknameChangeBeforeLogin();
+        RejectsChannelTopicChangeBeforeLogin();
         StoresAudioVolumeBeforeNativeInstanceExists();
         Console.WriteLine("TeamTalk NG SDK dispatch tests passed.");
     }
@@ -437,6 +438,13 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
         AssertThrows(() => session.SetNicknameAsync("Alex").GetAwaiter().GetResult());
+    }
+
+    private static void RejectsChannelTopicChangeBeforeLogin()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.SetChannelTopicAsync("/Lobby", "New topic").GetAwaiter().GetResult());
     }
 
     private static void StoresAudioVolumeBeforeNativeInstanceExists()

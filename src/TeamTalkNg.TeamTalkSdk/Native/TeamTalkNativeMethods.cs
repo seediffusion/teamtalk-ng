@@ -100,6 +100,9 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoMakeChannel")]
     internal static extern int DoMakeChannel(IntPtr instance, ref NativeChannel channel);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoUpdateChannel")]
+    internal static extern int DoUpdateChannel(IntPtr instance, ref NativeChannel channel);
+
     [DllImport(LibraryName, EntryPoint = "TT_DoRemoveChannel")]
     internal static extern int DoRemoveChannel(IntPtr instance, int channelId);
 

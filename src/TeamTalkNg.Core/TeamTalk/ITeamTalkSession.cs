@@ -30,6 +30,8 @@ public interface ITeamTalkSession
 
     Task CreateChannelAsync(ChannelCreationRequest request, CancellationToken cancellationToken = default);
 
+    Task SetChannelTopicAsync(string channelPath, string topic, CancellationToken cancellationToken = default);
+
     Task RemoveChannelAsync(string channelPath, CancellationToken cancellationToken = default);
 
     Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default);
