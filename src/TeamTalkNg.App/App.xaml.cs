@@ -37,6 +37,7 @@ public partial class App : Application
             IChannelInformationDialogService channelInformationDialogService = new ChannelInformationDialogService();
             IChannelTopicDialogService channelTopicDialogService = new ChannelTopicDialogService();
             IDirectMessageDialogService directMessageDialogService = new DirectMessageDialogService();
+            IUserInformationDialogService userInformationDialogService = new UserInformationDialogService();
             IStatusDialogService statusDialogService = new StatusDialogService();
             IJoinChannelDialogService joinChannelDialogService = new JoinChannelDialogService();
             INicknameDialogService nicknameDialogService = new NicknameDialogService();
@@ -54,6 +55,7 @@ public partial class App : Application
                 channelInformationDialogService,
                 channelTopicDialogService,
                 directMessageDialogService,
+                userInformationDialogService,
                 statusDialogService,
                 joinChannelDialogService,
                 nicknameDialogService,

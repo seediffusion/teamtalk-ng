@@ -109,6 +109,12 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoTextMessage")]
     internal static extern int DoTextMessage(IntPtr instance, ref NativeTextMessage textMessage);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoKickUser")]
+    internal static extern int DoKickUser(IntPtr instance, int userId, int channelId);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoBanUser")]
+    internal static extern int DoBanUser(IntPtr instance, int userId, int channelId);
+
     [DllImport(LibraryName, EntryPoint = "TT_GetChannelIDFromPath", CharSet = CharSet.Unicode)]
     internal static extern int GetChannelIdFromPath(IntPtr instance, string channelPath);
 

@@ -206,6 +206,36 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task KickUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before kicking a user.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            fromServer ? $"Kicked user {userId} from the server." : $"Kicked user {userId} from {channelPath}.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task BanUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before banning a user.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            fromServer ? $"Banned user {userId} from the server." : $"Banned user {userId} from {channelPath}.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task SetVoiceTransmissionAsync(bool enabled, CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel)

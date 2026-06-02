@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IChannelInformationDialogService channelInformationDialogService;
     private readonly IChannelTopicDialogService channelTopicDialogService;
     private readonly IDirectMessageDialogService directMessageDialogService;
+    private readonly IUserInformationDialogService userInformationDialogService;
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
     private readonly INicknameDialogService nicknameDialogService;
@@ -52,6 +53,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IChannelInformationDialogService channelInformationDialogService,
         IChannelTopicDialogService channelTopicDialogService,
         IDirectMessageDialogService directMessageDialogService,
+        IUserInformationDialogService userInformationDialogService,
         IStatusDialogService statusDialogService,
         IJoinChannelDialogService joinChannelDialogService,
         INicknameDialogService nicknameDialogService,
@@ -69,6 +71,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.channelInformationDialogService = channelInformationDialogService;
         this.channelTopicDialogService = channelTopicDialogService;
         this.directMessageDialogService = directMessageDialogService;
+        this.userInformationDialogService = userInformationDialogService;
         this.statusDialogService = statusDialogService;
         this.joinChannelDialogService = joinChannelDialogService;
         this.nicknameDialogService = nicknameDialogService;
@@ -84,7 +87,11 @@ public sealed class MainWindowViewModel : ObservableObject
         EditChannelTopicCommand = new AsyncRelayCommand(EditChannelTopicAsync, CanEditChannelTopic);
         CreateChannelCommand = new AsyncRelayCommand(CreateChannelAsync, CanCreateChannel);
         DeleteSelectedChannelCommand = new AsyncRelayCommand(DeleteSelectedChannelAsync, CanDeleteSelectedChannel);
+        UserInformationCommand = new RelayCommand(ShowUserInformation, CanShowUserInformation);
         SendDirectMessageCommand = new AsyncRelayCommand(SendDirectMessageAsync, CanSendDirectMessage);
+        KickUserFromChannelCommand = new AsyncRelayCommand(KickUserFromChannelAsync, CanModerateSelectedUser);
+        KickUserFromServerCommand = new AsyncRelayCommand(KickUserFromServerAsync, CanModerateSelectedUser);
+        BanUserFromServerCommand = new AsyncRelayCommand(BanUserFromServerAsync, CanModerateSelectedUser);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
@@ -134,7 +141,15 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public ICommand DeleteSelectedChannelCommand { get; }
 
+    public ICommand UserInformationCommand { get; }
+
     public ICommand SendDirectMessageCommand { get; }
+
+    public ICommand KickUserFromChannelCommand { get; }
+
+    public ICommand KickUserFromServerCommand { get; }
+
+    public ICommand BanUserFromServerCommand { get; }
 
     public ICommand SendMessageCommand { get; }
 
@@ -443,6 +458,14 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private void ShowUserInformation()
+    {
+        if (SelectedChannelItem is { Kind: ChannelTreeItemKind.User } user)
+        {
+            userInformationDialogService.ShowUserInformationDialog(user);
+        }
+    }
+
     private async Task SendDirectMessageAsync()
     {
         if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
@@ -461,6 +484,78 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.SendDirectMessageAsync(user.Id, message);
             await AnnounceAsync($"Sent direct message to {user.Name}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task KickUserFromChannelAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        if (!ConfirmUserAction($"Kick {user.Name} from {GetChannelName(user.Path)}?", "Kick User"))
+        {
+            await AnnounceAsync("Kick user canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.KickUserAsync(user.Id, user.Path);
+            await AnnounceAsync($"Kick command sent for {user.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task KickUserFromServerAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        if (!ConfirmUserAction($"Kick {user.Name} from the server?", "Kick User"))
+        {
+            await AnnounceAsync("Kick user canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.KickUserAsync(user.Id, user.Path, fromServer: true);
+            await AnnounceAsync($"Server kick command sent for {user.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task BanUserFromServerAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        if (!ConfirmUserAction($"Ban {user.Name} from the server?", "Ban User"))
+        {
+            await AnnounceAsync("Ban user canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.BanUserAsync(user.Id, user.Path, fromServer: true);
+            await AnnounceAsync($"Server ban command sent for {user.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
         {
@@ -610,6 +705,16 @@ public sealed class MainWindowViewModel : ObservableObject
             MessageBoxImage.Information);
     }
 
+    private static bool ConfirmUserAction(string message, string title)
+    {
+        return MessageBox.Show(
+            message,
+            title,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No) == MessageBoxResult.Yes;
+    }
+
     private void OnConnectionStatusChanged(object? sender, ConnectionStatus status)
     {
         Application.Current.Dispatcher.Invoke(() =>
@@ -705,8 +810,10 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         existingUser.Name = user.Nickname;
+        existingUser.Username = user.Username;
         existingUser.IsTalking = user.IsTalking;
         existingUser.IsAway = user.IsAway;
+        existingUser.IsOperator = user.IsOperator;
         existingUser.StatusMessage = user.StatusMessage;
         channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
     }
@@ -1035,9 +1142,29 @@ public sealed class MainWindowViewModel : ObservableObject
             delete.RaiseCanExecuteChanged();
         }
 
+        if (UserInformationCommand is RelayCommand userInformation)
+        {
+            userInformation.RaiseCanExecuteChanged();
+        }
+
         if (SendDirectMessageCommand is AsyncRelayCommand directMessage)
         {
             directMessage.RaiseCanExecuteChanged();
+        }
+
+        if (KickUserFromChannelCommand is AsyncRelayCommand kickChannel)
+        {
+            kickChannel.RaiseCanExecuteChanged();
+        }
+
+        if (KickUserFromServerCommand is AsyncRelayCommand kickServer)
+        {
+            kickServer.RaiseCanExecuteChanged();
+        }
+
+        if (BanUserFromServerCommand is AsyncRelayCommand banServer)
+        {
+            banServer.RaiseCanExecuteChanged();
         }
     }
 
@@ -1086,6 +1213,17 @@ public sealed class MainWindowViewModel : ObservableObject
     }
 
     private bool CanSendDirectMessage()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.User }
+            && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
+    }
+
+    private bool CanShowUserInformation()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.User };
+    }
+
+    private bool CanModerateSelectedUser()
     {
         return SelectedChannelItem is { Kind: ChannelTreeItemKind.User }
             && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);

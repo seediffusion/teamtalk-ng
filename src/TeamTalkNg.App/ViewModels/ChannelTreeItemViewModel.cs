@@ -9,8 +9,10 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     private bool isAway;
     private bool isProtected;
     private bool isPermanent;
+    private bool isOperator;
     private string statusMessage = string.Empty;
     private string topic = string.Empty;
+    private string username = string.Empty;
     private int userCount;
 
     public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
@@ -104,6 +106,18 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     {
         get => topic;
         set => SetProperty(ref topic, value);
+    }
+
+    public string Username
+    {
+        get => username;
+        set => SetProperty(ref username, value);
+    }
+
+    public bool IsOperator
+    {
+        get => isOperator;
+        set => SetProperty(ref isOperator, value);
     }
 
     public bool IsProtected

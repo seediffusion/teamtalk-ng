@@ -481,6 +481,72 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task KickUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before kicking a user.");
+        }
+
+        if (userId <= 0)
+        {
+            throw new InvalidOperationException("Select a valid user before kicking.");
+        }
+
+        int channelId = fromServer ? 0 : ResolveChannelId(channelPath);
+        if (!fromServer && channelId <= 0)
+        {
+            throw new InvalidOperationException($"Channel {channelPath} was not found.");
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoKickUser(instance, userId, channelId);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the kick user command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task BanUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before banning a user.");
+        }
+
+        if (userId <= 0)
+        {
+            throw new InvalidOperationException("Select a valid user before banning.");
+        }
+
+        int channelId = fromServer ? 0 : ResolveChannelId(channelPath);
+        if (!fromServer && channelId <= 0)
+        {
+            throw new InvalidOperationException($"Channel {channelPath} was not found.");
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoBanUser(instance, userId, channelId);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the ban user command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public void Dispose()
     {
         StopPollingAsync().GetAwaiter().GetResult();
