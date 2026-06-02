@@ -142,6 +142,43 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task SetUserAudioSettingsAsync(UserAudioSettingsRequest request, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be connected before changing user audio settings.");
+        }
+
+        if (request.UserId <= 0)
+        {
+            throw new InvalidOperationException("Select a user before changing audio settings.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int voiceVolume = UserVolumePercentToTeamTalkLevel(request.VoiceVolumePercent);
+        int volumeReady;
+        int muteReady;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            volumeReady = TeamTalkNativeMethods.SetUserVolume(instance, request.UserId, StreamType.Voice, voiceVolume);
+            muteReady = TeamTalkNativeMethods.SetUserMute(instance, request.UserId, StreamType.Voice, request.IsVoiceMuted ? 1 : 0);
+        }
+
+        if (volumeReady == 0)
+        {
+            throw new InvalidOperationException("TeamTalk could not set the selected user's voice volume.");
+        }
+
+        if (muteReady == 0)
+        {
+            throw new InvalidOperationException("TeamTalk could not set the selected user's voice mute state.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<ServerInformationSummary> GetServerInformationAsync(CancellationToken cancellationToken = default)
     {
         if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
@@ -1288,6 +1325,22 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Math.Clamp(boostedLevel, 0, maxLevel);
     }
 
+    private static int UserVolumePercentToTeamTalkLevel(int percent)
+    {
+        int clampedPercent = Math.Clamp(percent, 0, 200);
+        return Math.Clamp(clampedPercent * 10, SoundLevel.VolumeMin, SoundLevel.VolumeMax);
+    }
+
+    private static int TeamTalkVolumeToUserPercent(int volume)
+    {
+        if (volume <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Clamp((int)Math.Round(volume / 10.0), 0, 200);
+    }
+
     private void DispatchUserJoined(NativeUser user)
     {
         UserSummary summary = CreateUserSummary(user, user.ChannelId);
@@ -1419,7 +1472,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             isTalking,
             isAway,
             isOperator,
-            user.ReadStatusMessage());
+            user.ReadStatusMessage(),
+            TeamTalkVolumeToUserPercent(user.VolumeVoice),
+            user.VolumeVoice == 0);
     }
 
     private string GetChannelPath(int channelId)

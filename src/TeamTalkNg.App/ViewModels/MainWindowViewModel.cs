@@ -26,6 +26,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IDirectMessageDialogService directMessageDialogService;
     private readonly IMoveUserDialogService moveUserDialogService;
     private readonly IUserInformationDialogService userInformationDialogService;
+    private readonly IUserAudioSettingsDialogService userAudioSettingsDialogService;
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
     private readonly INicknameDialogService nicknameDialogService;
@@ -62,6 +63,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IDirectMessageDialogService directMessageDialogService,
         IMoveUserDialogService moveUserDialogService,
         IUserInformationDialogService userInformationDialogService,
+        IUserAudioSettingsDialogService userAudioSettingsDialogService,
         IStatusDialogService statusDialogService,
         IJoinChannelDialogService joinChannelDialogService,
         INicknameDialogService nicknameDialogService,
@@ -83,6 +85,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.directMessageDialogService = directMessageDialogService;
         this.moveUserDialogService = moveUserDialogService;
         this.userInformationDialogService = userInformationDialogService;
+        this.userAudioSettingsDialogService = userAudioSettingsDialogService;
         this.statusDialogService = statusDialogService;
         this.joinChannelDialogService = joinChannelDialogService;
         this.nicknameDialogService = nicknameDialogService;
@@ -106,6 +109,7 @@ public sealed class MainWindowViewModel : ObservableObject
         KickUserFromChannelCommand = new AsyncRelayCommand(KickUserFromChannelAsync, CanModerateSelectedUser);
         KickUserFromServerCommand = new AsyncRelayCommand(KickUserFromServerAsync, CanModerateSelectedUser);
         BanUserFromServerCommand = new AsyncRelayCommand(BanUserFromServerAsync, CanModerateSelectedUser);
+        UserAudioSettingsCommand = new AsyncRelayCommand(ShowUserAudioSettingsAsync, CanChangeUserAudioSettings);
         UploadFileCommand = new AsyncRelayCommand(UploadFileAsync, CanManageFiles);
         DownloadFileCommand = new AsyncRelayCommand(DownloadFileAsync, CanUseSelectedFile);
         DeleteFileCommand = new AsyncRelayCommand(DeleteFileAsync, CanUseSelectedFile);
@@ -200,6 +204,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand KickUserFromServerCommand { get; }
 
     public ICommand BanUserFromServerCommand { get; }
+
+    public ICommand UserAudioSettingsCommand { get; }
 
     public ICommand UploadFileCommand { get; }
 
@@ -680,6 +686,36 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private async Task ShowUserAudioSettingsAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        UserAudioSettingsRequest? request = userAudioSettingsDialogService.ShowUserAudioSettingsDialog(user);
+        if (request is null)
+        {
+            await AnnounceAsync("User audio settings canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.SetUserAudioSettingsAsync(request);
+            user.VoiceVolumePercent = request.VoiceVolumePercent;
+            user.IsVoiceMuted = request.IsVoiceMuted;
+            string message = request.IsVoiceMuted
+                ? $"Muted voice for {user.Name}"
+                : $"Set voice volume for {user.Name} to {request.VoiceVolumePercent} percent";
+            await AnnounceAsync(message, AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
     private async Task SendDirectMessageAsync()
     {
         if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
@@ -1118,6 +1154,8 @@ public sealed class MainWindowViewModel : ObservableObject
         existingUser.IsAway = user.IsAway;
         existingUser.IsOperator = user.IsOperator;
         existingUser.StatusMessage = user.StatusMessage;
+        existingUser.VoiceVolumePercent = user.VoiceVolumePercent;
+        existingUser.IsVoiceMuted = user.IsVoiceMuted;
         channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
     }
 
@@ -1508,6 +1546,11 @@ public sealed class MainWindowViewModel : ObservableObject
             directMessage.RaiseCanExecuteChanged();
         }
 
+        if (UserAudioSettingsCommand is AsyncRelayCommand userAudioSettings)
+        {
+            userAudioSettings.RaiseCanExecuteChanged();
+        }
+
         if (MoveUserCommand is AsyncRelayCommand moveUser)
         {
             moveUser.RaiseCanExecuteChanged();
@@ -1608,6 +1651,12 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanShowUserInformation()
     {
         return SelectedChannelItem is { Kind: ChannelTreeItemKind.User };
+    }
+
+    private bool CanChangeUserAudioSettings()
+    {
+        return SelectedChannelItem is { Kind: ChannelTreeItemKind.User }
+            && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
     }
 
     private bool CanMoveSelectedUser()

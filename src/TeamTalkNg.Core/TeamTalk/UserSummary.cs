@@ -8,4 +8,6 @@ public sealed record UserSummary(
     bool IsTalking,
     bool IsAway,
     bool IsOperator,
-    string StatusMessage = "");
+    string StatusMessage = "",
+    int VoiceVolumePercent = 100,
+    bool IsVoiceMuted = false);

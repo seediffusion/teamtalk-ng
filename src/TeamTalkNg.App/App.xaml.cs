@@ -40,6 +40,7 @@ public partial class App : Application
             IDirectMessageDialogService directMessageDialogService = new DirectMessageDialogService();
             IMoveUserDialogService moveUserDialogService = new MoveUserDialogService();
             IUserInformationDialogService userInformationDialogService = new UserInformationDialogService();
+            IUserAudioSettingsDialogService userAudioSettingsDialogService = new UserAudioSettingsDialogService();
             IStatusDialogService statusDialogService = new StatusDialogService();
             IJoinChannelDialogService joinChannelDialogService = new JoinChannelDialogService();
             INicknameDialogService nicknameDialogService = new NicknameDialogService();
@@ -61,6 +62,7 @@ public partial class App : Application
                 directMessageDialogService,
                 moveUserDialogService,
                 userInformationDialogService,
+                userAudioSettingsDialogService,
                 statusDialogService,
                 joinChannelDialogService,
                 nicknameDialogService,

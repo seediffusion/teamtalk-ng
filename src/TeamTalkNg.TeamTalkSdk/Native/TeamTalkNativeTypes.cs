@@ -50,6 +50,15 @@ internal enum TextMsgType
     Custom = 4
 }
 
+internal enum StreamType
+{
+    None = 0,
+    Voice = 1,
+    VideoCapture = 2,
+    Desktop = 3,
+    MediaFile = 4
+}
+
 internal enum NativeFileTransferStatus
 {
     Closed = 0,

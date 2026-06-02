@@ -76,6 +76,28 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SetUserAudioSettingsAsync(UserAudioSettingsRequest request, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be connected before changing user audio settings.");
+        }
+
+        if (request.UserId <= 0)
+        {
+            throw new InvalidOperationException("Select a user before changing audio settings.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            request.IsVoiceMuted
+                ? $"Muted voice for user {request.UserId}."
+                : $"Set voice volume for user {request.UserId} to {request.VoiceVolumePercent} percent.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task<ServerInformationSummary> GetServerInformationAsync(CancellationToken cancellationToken = default)
     {
         if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))

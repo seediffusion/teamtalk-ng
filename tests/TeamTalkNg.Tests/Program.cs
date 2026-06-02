@@ -197,6 +197,7 @@ internal static unsafe class SdkDispatchTests
         RejectsVoiceControlsBeforeJoiningChannel();
         RejectsStatusChangeBeforeLogin();
         RejectsNicknameChangeBeforeLogin();
+        RejectsUserAudioSettingsBeforeLogin();
         RejectsServerInformationBeforeLogin();
         RejectsChannelFilesBeforeJoiningChannel();
         RejectsFileCommandsBeforeJoiningChannel();
@@ -313,6 +314,7 @@ internal static unsafe class SdkDispatchTests
         NativeUser user = CreateUser(42, "alex", "Alex", channelId: 12);
         user.UserState = 0x00000001;
         user.StatusMode = 0x00000001;
+        user.VolumeVoice = 1500;
         WriteString(user.StatusMessage, "Stepped away");
 
         session.DispatchMessageForTest(new TeamTalkMessage(
@@ -331,6 +333,8 @@ internal static unsafe class SdkDispatchTests
         Assert(updated.IsTalking, "Expected user update to preserve talking state.");
         Assert(updated.IsAway, "Expected user update to preserve away state.");
         AssertEqual("Stepped away", updated.StatusMessage);
+        AssertEqual(150, updated.VoiceVolumePercent);
+        Assert(!updated.IsVoiceMuted, "Expected non-zero voice volume to be unmuted.");
     }
 
     private static void DispatchesConnectionLost()
@@ -481,6 +485,13 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
         AssertThrows(() => session.SetNicknameAsync("Alex").GetAwaiter().GetResult());
+    }
+
+    private static void RejectsUserAudioSettingsBeforeLogin()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.SetUserAudioSettingsAsync(new UserAudioSettingsRequest(42, 100, IsVoiceMuted: false)).GetAwaiter().GetResult());
     }
 
     private static void RejectsServerInformationBeforeLogin()

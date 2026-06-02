@@ -14,6 +14,8 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     private string topic = string.Empty;
     private string username = string.Empty;
     private int userCount;
+    private int voiceVolumePercent = 100;
+    private bool isVoiceMuted;
 
     public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
     {
@@ -120,6 +122,25 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         set => SetProperty(ref isOperator, value);
     }
 
+    public int VoiceVolumePercent
+    {
+        get => voiceVolumePercent;
+        set => SetProperty(ref voiceVolumePercent, Math.Clamp(value, 0, 200));
+    }
+
+    public bool IsVoiceMuted
+    {
+        get => isVoiceMuted;
+        set
+        {
+            if (SetProperty(ref isVoiceMuted, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(AccessibleHelpText));
+            }
+        }
+    }
+
     public bool IsProtected
     {
         get => isProtected;
@@ -161,10 +182,11 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         {
             string type = Kind.ToString().ToLowerInvariant();
             string state = IsTalking ? ", transmitting" : IsAway ? ", away" : string.Empty;
+            string mute = Kind == ChannelTreeItemKind.User && IsVoiceMuted ? ", muted" : string.Empty;
             string message = string.IsNullOrWhiteSpace(StatusMessage) ? string.Empty : $", status: {StatusMessage}";
             string protection = Kind == ChannelTreeItemKind.Channel && IsProtected ? ", password protected" : string.Empty;
             string count = Kind == ChannelTreeItemKind.Channel ? $", {UserCount} users" : string.Empty;
-            return $"{Name}, {type}{count}{protection}{state}{message}";
+            return $"{Name}, {type}{count}{protection}{state}{mute}{message}";
         }
     }
 
@@ -178,6 +200,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         ChannelTreeItemKind.User when IsAway && !string.IsNullOrWhiteSpace(StatusMessage) => $"TeamTalk user, away, status: {StatusMessage}",
         ChannelTreeItemKind.User when IsAway => "TeamTalk user, away",
         ChannelTreeItemKind.User when !string.IsNullOrWhiteSpace(StatusMessage) => $"TeamTalk user, status: {StatusMessage}",
+        ChannelTreeItemKind.User when IsVoiceMuted => "TeamTalk user, locally muted",
         ChannelTreeItemKind.User => "TeamTalk user",
         _ => string.Empty
     };

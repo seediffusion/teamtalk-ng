@@ -65,6 +65,14 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int SetSoundOutputVolume(IntPtr instance, int volume);
 
+    [DllImport(LibraryName, EntryPoint = "TT_SetUserVolume")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int SetUserVolume(IntPtr instance, int userId, StreamType streamType, int volume);
+
+    [DllImport(LibraryName, EntryPoint = "TT_SetUserMute")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int SetUserMute(IntPtr instance, int userId, StreamType streamType, [MarshalAs(UnmanagedType.I4)] int muted);
+
     [DllImport(LibraryName, EntryPoint = "TT_Connect", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int Connect(

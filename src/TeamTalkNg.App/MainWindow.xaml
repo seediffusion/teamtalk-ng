@@ -73,6 +73,7 @@
       </MenuItem>
       <MenuItem Header="_Users">
         <MenuItem Header="User _Information" Command="{Binding UserInformationCommand}" />
+        <MenuItem Header="User _Audio Settings" Command="{Binding UserAudioSettingsCommand}" />
         <MenuItem Header="Send _Direct Message" Command="{Binding SendDirectMessageCommand}" />
         <Separator />
         <MenuItem Header="_Move To Channel" Command="{Binding MoveUserCommand}" />

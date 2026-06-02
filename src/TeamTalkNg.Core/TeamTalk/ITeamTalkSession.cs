@@ -23,6 +23,8 @@ public interface ITeamTalkSession
 
     Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default);
 
+    Task SetUserAudioSettingsAsync(UserAudioSettingsRequest request, CancellationToken cancellationToken = default);
+
     Task<ServerInformationSummary> GetServerInformationAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default);
