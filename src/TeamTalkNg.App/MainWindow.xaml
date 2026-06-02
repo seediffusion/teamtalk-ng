@@ -63,6 +63,7 @@
         <MenuItem Header="User _Information" Command="{Binding UserInformationCommand}" />
         <MenuItem Header="Send _Direct Message" Command="{Binding SendDirectMessageCommand}" />
         <Separator />
+        <MenuItem Header="_Move To Channel" Command="{Binding MoveUserCommand}" />
         <MenuItem Header="_Kick From Channel" Command="{Binding KickUserFromChannelCommand}" />
         <MenuItem Header="Kick From _Server" Command="{Binding KickUserFromServerCommand}" />
         <MenuItem Header="_Ban From Server" Command="{Binding BanUserFromServerCommand}" />

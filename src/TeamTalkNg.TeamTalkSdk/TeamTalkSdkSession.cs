@@ -481,6 +481,39 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task MoveUserAsync(int userId, string destinationChannelPath, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before moving a user.");
+        }
+
+        if (userId <= 0)
+        {
+            throw new InvalidOperationException("Select a valid user before moving.");
+        }
+
+        int destinationChannelId = ResolveChannelId(destinationChannelPath);
+        if (destinationChannelId <= 0)
+        {
+            throw new InvalidOperationException($"Channel {destinationChannelPath} was not found.");
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoMoveUser(instance, userId, destinationChannelId);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the move user command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task KickUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)

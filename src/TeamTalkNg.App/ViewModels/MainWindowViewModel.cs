@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IChannelInformationDialogService channelInformationDialogService;
     private readonly IChannelTopicDialogService channelTopicDialogService;
     private readonly IDirectMessageDialogService directMessageDialogService;
+    private readonly IMoveUserDialogService moveUserDialogService;
     private readonly IUserInformationDialogService userInformationDialogService;
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
@@ -53,6 +54,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IChannelInformationDialogService channelInformationDialogService,
         IChannelTopicDialogService channelTopicDialogService,
         IDirectMessageDialogService directMessageDialogService,
+        IMoveUserDialogService moveUserDialogService,
         IUserInformationDialogService userInformationDialogService,
         IStatusDialogService statusDialogService,
         IJoinChannelDialogService joinChannelDialogService,
@@ -71,6 +73,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.channelInformationDialogService = channelInformationDialogService;
         this.channelTopicDialogService = channelTopicDialogService;
         this.directMessageDialogService = directMessageDialogService;
+        this.moveUserDialogService = moveUserDialogService;
         this.userInformationDialogService = userInformationDialogService;
         this.statusDialogService = statusDialogService;
         this.joinChannelDialogService = joinChannelDialogService;
@@ -89,6 +92,7 @@ public sealed class MainWindowViewModel : ObservableObject
         DeleteSelectedChannelCommand = new AsyncRelayCommand(DeleteSelectedChannelAsync, CanDeleteSelectedChannel);
         UserInformationCommand = new RelayCommand(ShowUserInformation, CanShowUserInformation);
         SendDirectMessageCommand = new AsyncRelayCommand(SendDirectMessageAsync, CanSendDirectMessage);
+        MoveUserCommand = new AsyncRelayCommand(MoveUserAsync, CanMoveSelectedUser);
         KickUserFromChannelCommand = new AsyncRelayCommand(KickUserFromChannelAsync, CanModerateSelectedUser);
         KickUserFromServerCommand = new AsyncRelayCommand(KickUserFromServerAsync, CanModerateSelectedUser);
         BanUserFromServerCommand = new AsyncRelayCommand(BanUserFromServerAsync, CanModerateSelectedUser);
@@ -144,6 +148,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand UserInformationCommand { get; }
 
     public ICommand SendDirectMessageCommand { get; }
+
+    public ICommand MoveUserCommand { get; }
 
     public ICommand KickUserFromChannelCommand { get; }
 
@@ -484,6 +490,38 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.SendDirectMessageAsync(user.Id, message);
             await AnnounceAsync($"Sent direct message to {user.Name}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task MoveUserAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        IReadOnlyList<MoveUserDestinationViewModel> destinations = BuildMoveUserDestinations(user.Path);
+        if (destinations.Count == 0)
+        {
+            await AnnounceAsync("No destination channels are available.", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+            return;
+        }
+
+        string? destinationPath = moveUserDialogService.ShowMoveUserDialog(user.Name, destinations);
+        if (destinationPath is null)
+        {
+            await AnnounceAsync("Move user canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.MoveUserAsync(user.Id, destinationPath);
+            await AnnounceAsync($"Move command sent for {user.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
         {
@@ -962,6 +1000,17 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private IReadOnlyList<MoveUserDestinationViewModel> BuildMoveUserDestinations(string currentChannelPath)
+    {
+        string normalizedCurrentChannelPath = NormalizeChannelPath(currentChannelPath);
+        return Descendants(serverTreeItem)
+            .Where(item => item.Kind == ChannelTreeItemKind.Channel)
+            .Where(item => !string.Equals(NormalizeChannelPath(item.Path), normalizedCurrentChannelPath, StringComparison.OrdinalIgnoreCase))
+            .Select(item => new MoveUserDestinationViewModel(item.Name, NormalizeChannelPath(item.Path)))
+            .OrderBy(item => item.Path, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
     private static bool RemoveTreeItem(IList<ChannelTreeItemViewModel> collection, ChannelTreeItemViewModel item)
     {
         if (collection.Remove(item))
@@ -1152,6 +1201,11 @@ public sealed class MainWindowViewModel : ObservableObject
             directMessage.RaiseCanExecuteChanged();
         }
 
+        if (MoveUserCommand is AsyncRelayCommand moveUser)
+        {
+            moveUser.RaiseCanExecuteChanged();
+        }
+
         if (KickUserFromChannelCommand is AsyncRelayCommand kickChannel)
         {
             kickChannel.RaiseCanExecuteChanged();
@@ -1221,6 +1275,11 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanShowUserInformation()
     {
         return SelectedChannelItem is { Kind: ChannelTreeItemKind.User };
+    }
+
+    private bool CanMoveSelectedUser()
+    {
+        return CanModerateSelectedUser();
     }
 
     private bool CanModerateSelectedUser()

@@ -206,6 +206,28 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task MoveUserAsync(int userId, string destinationChannelPath, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be logged in before moving a user.");
+        }
+
+        string destination = string.IsNullOrWhiteSpace(destinationChannelPath) ? "/" : destinationChannelPath;
+        string oldChannel = activeProfile?.ChannelPath ?? "/";
+        string nickname = userId == 1 ? activeProfile?.Nickname ?? "You" : $"User {userId}";
+        string username = userId == 1 ? activeProfile?.Username ?? string.Empty : string.Empty;
+
+        UserLeft?.Invoke(this, new UserSummary(userId, nickname, username, oldChannel, IsTalking: false, IsAway: false, IsOperator: userId == 1));
+        UserJoined?.Invoke(this, new UserSummary(userId, nickname, username, destination, IsTalking: false, IsAway: false, IsOperator: userId == 1));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            $"Moved {nickname} to {destination}.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task KickUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)

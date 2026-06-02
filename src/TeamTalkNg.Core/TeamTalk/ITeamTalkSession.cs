@@ -38,6 +38,8 @@ public interface ITeamTalkSession
 
     Task SendDirectMessageAsync(int userId, string text, CancellationToken cancellationToken = default);
 
+    Task MoveUserAsync(int userId, string destinationChannelPath, CancellationToken cancellationToken = default);
+
     Task KickUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default);
 
     Task BanUserAsync(int userId, string channelPath, bool fromServer = false, CancellationToken cancellationToken = default);

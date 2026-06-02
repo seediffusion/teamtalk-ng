@@ -452,6 +452,7 @@ internal static unsafe class SdkDispatchTests
     {
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
+        AssertThrows(() => session.MoveUserAsync(42, "/Lobby").GetAwaiter().GetResult());
         AssertThrows(() => session.KickUserAsync(42, "/Lobby").GetAwaiter().GetResult());
         AssertThrows(() => session.BanUserAsync(42, "/Lobby", fromServer: true).GetAwaiter().GetResult());
     }
