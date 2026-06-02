@@ -9,6 +9,7 @@ public interface ITeamTalkSession
     event EventHandler<UserSummary>? UserJoined;
     event EventHandler<UserSummary>? UserUpdated;
     event EventHandler<UserSummary>? UserLeft;
+    event EventHandler<FileTransferSummary>? FileTransferUpdated;
 
     ConnectionStatus Status { get; }
 
@@ -31,6 +32,8 @@ public interface ITeamTalkSession
     Task DownloadFileAsync(int fileId, string localFilePath, CancellationToken cancellationToken = default);
 
     Task DeleteFileAsync(int fileId, CancellationToken cancellationToken = default);
+
+    Task CancelFileTransferAsync(int transferId, CancellationToken cancellationToken = default);
 
     Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default);
 

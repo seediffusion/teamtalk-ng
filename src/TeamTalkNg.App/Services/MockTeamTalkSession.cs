@@ -7,7 +7,9 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 {
     private TeamTalkServerProfile? activeProfile;
     private readonly List<ChannelFileSummary> files = [];
+    private readonly Dictionary<int, FileTransferSummary> activeTransfers = [];
     private int nextFileId = 1;
+    private int nextTransferId = 1;
 
     public event EventHandler<ConnectionStatus>? ConnectionStatusChanged;
     public event EventHandler<ChatMessage>? ChannelMessageReceived;
@@ -16,6 +18,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public event EventHandler<UserSummary>? UserJoined;
     public event EventHandler<UserSummary>? UserUpdated;
     public event EventHandler<UserSummary>? UserLeft;
+    public event EventHandler<FileTransferSummary>? FileTransferUpdated;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
@@ -116,6 +119,17 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         }
 
         var file = new FileInfo(localFilePath);
+        int transferId = nextTransferId++;
+        PublishTransfer(new FileTransferSummary(
+            transferId,
+            ChannelId: 1,
+            file.FullName,
+            file.Name,
+            file.Length,
+            TransferredBytes: 0,
+            IsDownload: false,
+            TeamTalkFileTransferStatus.Active));
+
         files.RemoveAll(item => string.Equals(item.Name, file.Name, StringComparison.OrdinalIgnoreCase));
         files.Add(new ChannelFileSummary(
             nextFileId++,
@@ -123,6 +137,15 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             file.Length,
             activeProfile?.Username ?? activeProfile?.Nickname ?? "You",
             DateTimeOffset.Now.ToString("g")));
+        PublishTransfer(new FileTransferSummary(
+            transferId,
+            ChannelId: 1,
+            file.FullName,
+            file.Name,
+            file.Length,
+            file.Length,
+            IsDownload: false,
+            TeamTalkFileTransferStatus.Finished));
         ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Upload command sent for {file.Name}.", IsSystem: true));
         return Task.CompletedTask;
     }
@@ -140,7 +163,26 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             throw new InvalidOperationException("Select a file before downloading.");
         }
 
+        int transferId = nextTransferId++;
+        PublishTransfer(new FileTransferSummary(
+            transferId,
+            ChannelId: 1,
+            localFilePath,
+            file.Name,
+            file.SizeBytes,
+            TransferredBytes: 0,
+            IsDownload: true,
+            TeamTalkFileTransferStatus.Active));
         File.WriteAllText(localFilePath, $"Mock TeamTalk NG download for {file.Name}.");
+        PublishTransfer(new FileTransferSummary(
+            transferId,
+            ChannelId: 1,
+            localFilePath,
+            file.Name,
+            file.SizeBytes,
+            file.SizeBytes,
+            IsDownload: true,
+            TeamTalkFileTransferStatus.Finished));
         ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Download command sent for {file.Name}.", IsSystem: true));
         return Task.CompletedTask;
     }
@@ -160,6 +202,23 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
         files.Remove(file);
         ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Deleted {file.Name}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task CancelFileTransferAsync(int transferId, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be connected before canceling a file transfer.");
+        }
+
+        if (!activeTransfers.TryGetValue(transferId, out FileTransferSummary? transfer))
+        {
+            throw new InvalidOperationException("Select an active transfer before canceling.");
+        }
+
+        PublishTransfer(transfer with { Status = TeamTalkFileTransferStatus.Closed });
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Canceled transfer for {transfer.RemoteFileName}.", IsSystem: true));
         return Task.CompletedTask;
     }
 
@@ -193,6 +252,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
         activeProfile = null;
         files.Clear();
+        activeTransfers.Clear();
         SetStatus(ConnectionStatus.Disconnected);
         return Task.CompletedTask;
     }
@@ -406,6 +466,20 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     {
         Status = status;
         ConnectionStatusChanged?.Invoke(this, status);
+    }
+
+    private void PublishTransfer(FileTransferSummary transfer)
+    {
+        if (transfer.Status == TeamTalkFileTransferStatus.Active)
+        {
+            activeTransfers[transfer.TransferId] = transfer;
+        }
+        else
+        {
+            activeTransfers.Remove(transfer.TransferId);
+        }
+
+        FileTransferUpdated?.Invoke(this, transfer);
     }
 
     private static string GetChannelName(string? channelPath)

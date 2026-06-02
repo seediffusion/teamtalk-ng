@@ -191,6 +191,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesUserUpdated();
         DispatchesChannelAddedOrUpdated();
         DispatchesChannelRemoved();
+        DispatchesFileTransferUpdate();
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         RejectsVoiceControlsBeforeJoiningChannel();
@@ -199,6 +200,7 @@ internal static unsafe class SdkDispatchTests
         RejectsServerInformationBeforeLogin();
         RejectsChannelFilesBeforeJoiningChannel();
         RejectsFileCommandsBeforeJoiningChannel();
+        RejectsCancelFileTransferBeforeConnection();
         RejectsChannelTopicChangeBeforeLogin();
         RejectsUserModerationBeforeLogin();
         StoresAudioVolumeBeforeNativeInstanceExists();
@@ -404,6 +406,43 @@ internal static unsafe class SdkDispatchTests
         AssertEqual(45, removedChannelId);
     }
 
+    private static void DispatchesFileTransferUpdate()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        FileTransferSummary? received = null;
+        session.FileTransferUpdated += (_, transfer) => received = transfer;
+
+        NativeFileTransfer fileTransfer = default;
+        fileTransfer.Status = NativeFileTransferStatus.Active;
+        fileTransfer.TransferId = 12;
+        fileTransfer.ChannelId = 34;
+        WriteString(fileTransfer.RemoteFileName, "notes.txt");
+        fileTransfer.FileSize = 1000;
+        fileTransfer.Transferred = 250;
+        fileTransfer.Inbound = 1;
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.FileTransfer,
+            Source: 12,
+            TTType.FileTransfer,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0,
+            fileTransfer));
+
+        Assert(received is not null, "Expected file transfer update event.");
+        AssertEqual(12, received!.TransferId);
+        AssertEqual(34, received.ChannelId);
+        AssertEqual("notes.txt", received.RemoteFileName);
+        AssertEqual(1000L, received.SizeBytes);
+        AssertEqual(250L, received.TransferredBytes);
+        Assert(received.IsDownload, "Expected inbound transfer to be a download.");
+        AssertEqual(TeamTalkFileTransferStatus.Active, received.Status);
+    }
+
     private static void DispatchesLoggedInStatusWithoutNativeInstance()
     {
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
@@ -465,6 +504,13 @@ internal static unsafe class SdkDispatchTests
         AssertThrows(() => session.UploadFileAsync("upload.txt").GetAwaiter().GetResult());
         AssertThrows(() => session.DownloadFileAsync(1, "download.txt").GetAwaiter().GetResult());
         AssertThrows(() => session.DeleteFileAsync(1).GetAwaiter().GetResult());
+    }
+
+    private static void RejectsCancelFileTransferBeforeConnection()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.CancelFileTransferAsync(1).GetAwaiter().GetResult());
     }
 
     private static void RejectsChannelTopicChangeBeforeLogin()

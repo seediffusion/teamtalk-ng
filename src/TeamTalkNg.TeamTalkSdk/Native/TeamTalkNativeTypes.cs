@@ -22,6 +22,7 @@ internal enum ClientEvent
     CommandChannelNew = 320,
     CommandChannelUpdate = 330,
     CommandChannelRemove = 340,
+    FileTransfer = 1040,
     InternalError = 1000
 }
 
@@ -30,6 +31,7 @@ internal enum TTType
     None = 0,
     Channel = 5,
     RemoteFile = 7,
+    FileTransfer = 8,
     TextMessage = 14,
     ServerProperties = 10,
     TTMessage = 16,
@@ -46,6 +48,14 @@ internal enum TextMsgType
     Channel = 2,
     Broadcast = 3,
     Custom = 4
+}
+
+internal enum NativeFileTransferStatus
+{
+    Closed = 0,
+    Error = 1,
+    Active = 2,
+    Finished = 3
 }
 
 internal enum SoundSystem
@@ -391,6 +401,35 @@ internal unsafe struct NativeRemoteFile
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeFileTransfer
+{
+    public NativeFileTransferStatus Status;
+    public int TransferId;
+    public int ChannelId;
+    public fixed char LocalFilePath[NativeConstants.StringLength];
+    public fixed char RemoteFileName[NativeConstants.StringLength];
+    public long FileSize;
+    public long Transferred;
+    public int Inbound;
+
+    public string ReadLocalFilePath()
+    {
+        fixed (char* value = LocalFilePath)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadRemoteFileName()
+    {
+        fixed (char* value = RemoteFileName)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct NativeTextMessage
 {
     public TextMsgType MessageType;
@@ -490,4 +529,5 @@ internal sealed record TeamTalkMessage(
     NativeClientErrorMsg ClientError,
     NativeChannel Channel,
     int BoolValue,
-    int IntValue);
+    int IntValue,
+    NativeFileTransfer FileTransfer = default);

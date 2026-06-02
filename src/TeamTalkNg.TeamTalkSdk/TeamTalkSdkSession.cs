@@ -38,6 +38,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     public event EventHandler<UserSummary>? UserJoined;
     public event EventHandler<UserSummary>? UserUpdated;
     public event EventHandler<UserSummary>? UserLeft;
+    public event EventHandler<FileTransferSummary>? FileTransferUpdated;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
@@ -329,6 +330,35 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         if (commandId <= 0)
         {
             RaiseSystemMessage("TeamTalk SDK did not accept the delete file command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task CancelFileTransferAsync(int transferId, CancellationToken cancellationToken = default)
+    {
+        if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
+        {
+            throw new InvalidOperationException("You must be connected before canceling a file transfer.");
+        }
+
+        if (transferId <= 0)
+        {
+            throw new InvalidOperationException("Select an active transfer before canceling.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int success;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            success = TeamTalkNativeMethods.CancelFileTransfer(instance, transferId);
+        }
+
+        if (success == 0)
+        {
+            throw new InvalidOperationException("TeamTalk could not cancel the selected file transfer.");
         }
 
         return Task.CompletedTask;
@@ -946,6 +976,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.CommandChannelRemove:
                 ChannelRemoved?.Invoke(this, message.Source);
                 break;
+            case ClientEvent.FileTransfer:
+                DispatchFileTransfer(message.FileTransfer);
+                break;
         }
     }
 
@@ -1305,6 +1338,39 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 $"Direct from {sender}",
                 textMessage.ReadMessage(),
                 IsDirect: true));
+        }
+    }
+
+    private void DispatchFileTransfer(NativeFileTransfer fileTransfer)
+    {
+        string remoteFileName = fileTransfer.ReadRemoteFileName();
+        if (string.IsNullOrWhiteSpace(remoteFileName))
+        {
+            string localPath = fileTransfer.ReadLocalFilePath();
+            remoteFileName = string.IsNullOrWhiteSpace(localPath)
+                ? $"Transfer {fileTransfer.TransferId}"
+                : Path.GetFileName(localPath);
+        }
+
+        var status = (TeamTalkFileTransferStatus)(int)fileTransfer.Status;
+        var summary = new FileTransferSummary(
+            fileTransfer.TransferId,
+            fileTransfer.ChannelId,
+            fileTransfer.ReadLocalFilePath(),
+            remoteFileName,
+            Math.Max(0, fileTransfer.FileSize),
+            Math.Max(0, fileTransfer.Transferred),
+            fileTransfer.Inbound != 0,
+            status);
+        FileTransferUpdated?.Invoke(this, summary);
+
+        if (status == TeamTalkFileTransferStatus.Finished)
+        {
+            RaiseSystemMessage($"{(summary.IsDownload ? "Downloaded" : "Uploaded")} {summary.RemoteFileName}.");
+        }
+        else if (status == TeamTalkFileTransferStatus.Error)
+        {
+            RaiseSystemMessage($"File transfer failed for {summary.RemoteFileName}.");
         }
     }
 

@@ -126,6 +126,10 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoDeleteFile")]
     internal static extern int DoDeleteFile(IntPtr instance, int channelId, int fileId);
 
+    [DllImport(LibraryName, EntryPoint = "TT_CancelFileTransfer")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int CancelFileTransfer(IntPtr instance, int transferId);
+
     [DllImport(LibraryName, EntryPoint = "TT_DoKickUser")]
     internal static extern int DoKickUser(IntPtr instance, int userId, int channelId);
 
