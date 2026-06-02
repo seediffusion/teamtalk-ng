@@ -117,6 +117,15 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoTextMessage")]
     internal static extern int DoTextMessage(IntPtr instance, ref NativeTextMessage textMessage);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoSendFile", CharSet = CharSet.Unicode)]
+    internal static extern int DoSendFile(IntPtr instance, int channelId, string localFilePath);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoRecvFile", CharSet = CharSet.Unicode)]
+    internal static extern int DoRecvFile(IntPtr instance, int channelId, int fileId, string localFilePath);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoDeleteFile")]
+    internal static extern int DoDeleteFile(IntPtr instance, int channelId, int fileId);
+
     [DllImport(LibraryName, EntryPoint = "TT_DoKickUser")]
     internal static extern int DoKickUser(IntPtr instance, int userId, int channelId);
 

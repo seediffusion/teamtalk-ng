@@ -43,6 +43,7 @@ public partial class App : Application
             IStatusDialogService statusDialogService = new StatusDialogService();
             IJoinChannelDialogService joinChannelDialogService = new JoinChannelDialogService();
             INicknameDialogService nicknameDialogService = new NicknameDialogService();
+            IFileDialogService fileDialogService = new FileDialogService();
 
             var viewModel = new MainWindowViewModel(
                 teamTalkSession,
@@ -63,6 +64,7 @@ public partial class App : Application
                 statusDialogService,
                 joinChannelDialogService,
                 nicknameDialogService,
+                fileDialogService,
                 appSettings);
             var window = new MainWindow
             {

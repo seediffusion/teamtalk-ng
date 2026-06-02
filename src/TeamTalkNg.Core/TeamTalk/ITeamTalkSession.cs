@@ -26,6 +26,12 @@ public interface ITeamTalkSession
 
     Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default);
 
+    Task UploadFileAsync(string localFilePath, CancellationToken cancellationToken = default);
+
+    Task DownloadFileAsync(int fileId, string localFilePath, CancellationToken cancellationToken = default);
+
+    Task DeleteFileAsync(int fileId, CancellationToken cancellationToken = default);
+
     Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default);
 
     Task DisconnectAsync(CancellationToken cancellationToken = default);

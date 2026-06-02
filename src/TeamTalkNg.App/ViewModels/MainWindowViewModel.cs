@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using TeamTalkNg.App.Services;
@@ -41,6 +42,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private TeamTalkServerProfile? activeProfile;
     private AppSettings settings;
     private ChannelTreeItemViewModel? serverTreeItem;
+    private FileTransferViewModel? selectedFile;
+    private readonly IFileDialogService fileDialogService;
 
     public MainWindowViewModel(
         ITeamTalkSession teamTalkSession,
@@ -61,6 +64,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IStatusDialogService statusDialogService,
         IJoinChannelDialogService joinChannelDialogService,
         INicknameDialogService nicknameDialogService,
+        IFileDialogService fileDialogService,
         AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
@@ -81,6 +85,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.statusDialogService = statusDialogService;
         this.joinChannelDialogService = joinChannelDialogService;
         this.nicknameDialogService = nicknameDialogService;
+        this.fileDialogService = fileDialogService;
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
@@ -100,6 +105,9 @@ public sealed class MainWindowViewModel : ObservableObject
         KickUserFromChannelCommand = new AsyncRelayCommand(KickUserFromChannelAsync, CanModerateSelectedUser);
         KickUserFromServerCommand = new AsyncRelayCommand(KickUserFromServerAsync, CanModerateSelectedUser);
         BanUserFromServerCommand = new AsyncRelayCommand(BanUserFromServerAsync, CanModerateSelectedUser);
+        UploadFileCommand = new AsyncRelayCommand(UploadFileAsync, CanManageFiles);
+        DownloadFileCommand = new AsyncRelayCommand(DownloadFileAsync, CanUseSelectedFile);
+        DeleteFileCommand = new AsyncRelayCommand(DeleteFileAsync, CanUseSelectedFile);
         RefreshFilesCommand = new AsyncRelayCommand(() => RefreshFilesAsync(), CanRefreshFiles);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
@@ -134,6 +142,18 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public ObservableCollection<FileTransferViewModel> Files { get; } = [];
 
+    public FileTransferViewModel? SelectedFile
+    {
+        get => selectedFile;
+        set
+        {
+            if (SetProperty(ref selectedFile, value))
+            {
+                RaiseFileCommandStateChanged();
+            }
+        }
+    }
+
     public ICommand ConnectCommand { get; }
 
     public ICommand OpenConnectionTargetCommand { get; }
@@ -163,6 +183,12 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand KickUserFromServerCommand { get; }
 
     public ICommand BanUserFromServerCommand { get; }
+
+    public ICommand UploadFileCommand { get; }
+
+    public ICommand DownloadFileCommand { get; }
+
+    public ICommand DeleteFileCommand { get; }
 
     public ICommand RefreshFilesCommand { get; }
 
@@ -412,6 +438,7 @@ public sealed class MainWindowViewModel : ObservableObject
             IReadOnlyList<ChannelFileSummary> files = await teamTalkSession.GetChannelFilesAsync();
             Application.Current.Dispatcher.Invoke(() =>
             {
+                SelectedFile = null;
                 Files.Clear();
                 foreach (FileTransferViewModel file in files
                     .OrderBy(file => file.Name, StringComparer.CurrentCultureIgnoreCase)
@@ -422,7 +449,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
                 if (Files.Count == 0)
                 {
-                    Files.Add(new FileTransferViewModel("No files in current channel", string.Empty, string.Empty));
+                    Files.Add(new FileTransferViewModel(0, "No files in current channel", string.Empty, string.Empty));
                 }
             });
 
@@ -441,6 +468,79 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
             }
+        }
+    }
+
+    private async Task UploadFileAsync()
+    {
+        string? path = fileDialogService.ShowUploadFileDialog();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            await AnnounceAsync("Upload file canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.UploadFileAsync(path);
+            await AnnounceAsync($"Upload command sent for {Path.GetFileName(path)}", AnnouncementPriority.Normal, AnnouncementKind.System);
+            await RefreshFilesAsync(announce: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task DownloadFileAsync()
+    {
+        if (SelectedFile is not { IsPlaceholder: false } file)
+        {
+            await AnnounceAsync("Select a file before downloading", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        string? path = fileDialogService.ShowDownloadFileDialog(file.Name);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            await AnnounceAsync("Download file canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.DownloadFileAsync(file.Id, path);
+            await AnnounceAsync($"Download command sent for {file.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task DeleteFileAsync()
+    {
+        if (SelectedFile is not { IsPlaceholder: false } file)
+        {
+            await AnnounceAsync("Select a file before deleting", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        if (!ConfirmUserAction($"Delete file {file.Name}?", "Delete File"))
+        {
+            await AnnounceAsync("Delete file canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.DeleteFileAsync(file.Id);
+            await AnnounceAsync($"Delete command sent for {file.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+            await RefreshFilesAsync(announce: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
     }
 
@@ -986,8 +1086,9 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void ShowFilesPlaceholder(string text)
     {
+        SelectedFile = null;
         Files.Clear();
-        Files.Add(new FileTransferViewModel(text, string.Empty, string.Empty));
+        Files.Add(new FileTransferViewModel(0, text, string.Empty, string.Empty));
     }
 
     private ChannelTreeItemViewModel EnsureChannel(string? channelPath, int id)
@@ -1225,10 +1326,7 @@ public sealed class MainWindowViewModel : ObservableObject
             serverInformation.RaiseCanExecuteChanged();
         }
 
-        if (RefreshFilesCommand is AsyncRelayCommand refreshFiles)
-        {
-            refreshFiles.RaiseCanExecuteChanged();
-        }
+        RaiseFileCommandStateChanged();
 
         if (TogglePushToTalkCommand is AsyncRelayCommand pushToTalk)
         {
@@ -1251,6 +1349,29 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         RaiseChannelCommandStateChanged();
+    }
+
+    private void RaiseFileCommandStateChanged()
+    {
+        if (UploadFileCommand is AsyncRelayCommand uploadFile)
+        {
+            uploadFile.RaiseCanExecuteChanged();
+        }
+
+        if (DownloadFileCommand is AsyncRelayCommand downloadFile)
+        {
+            downloadFile.RaiseCanExecuteChanged();
+        }
+
+        if (DeleteFileCommand is AsyncRelayCommand deleteFile)
+        {
+            deleteFile.RaiseCanExecuteChanged();
+        }
+
+        if (RefreshFilesCommand is AsyncRelayCommand refreshFiles)
+        {
+            refreshFiles.RaiseCanExecuteChanged();
+        }
     }
 
     private void RaiseChannelCommandStateChanged()
@@ -1325,6 +1446,16 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanRefreshFiles()
     {
         return teamTalkSession.Status == ConnectionStatus.InChannel;
+    }
+
+    private bool CanManageFiles()
+    {
+        return teamTalkSession.Status == ConnectionStatus.InChannel;
+    }
+
+    private bool CanUseSelectedFile()
+    {
+        return CanManageFiles() && SelectedFile is { IsPlaceholder: false };
     }
 
     private bool CanCreateChannel()

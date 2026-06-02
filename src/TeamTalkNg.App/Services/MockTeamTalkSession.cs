@@ -1,3 +1,4 @@
+using System.IO;
 using TeamTalkNg.Core.TeamTalk;
 
 namespace TeamTalkNg.App.Services;
@@ -5,6 +6,8 @@ namespace TeamTalkNg.App.Services;
 public sealed class MockTeamTalkSession : ITeamTalkSession
 {
     private TeamTalkServerProfile? activeProfile;
+    private readonly List<ChannelFileSummary> files = [];
+    private int nextFileId = 1;
 
     public event EventHandler<ConnectionStatus>? ConnectionStatusChanged;
     public event EventHandler<ChatMessage>? ChannelMessageReceived;
@@ -97,7 +100,67 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             throw new InvalidOperationException("You must be in a channel before viewing channel files.");
         }
 
-        return Task.FromResult<IReadOnlyList<ChannelFileSummary>>([]);
+        return Task.FromResult<IReadOnlyList<ChannelFileSummary>>(files.ToList());
+    }
+
+    public Task UploadFileAsync(string localFilePath, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before uploading files.");
+        }
+
+        if (!File.Exists(localFilePath))
+        {
+            throw new InvalidOperationException("The selected upload file was not found.");
+        }
+
+        var file = new FileInfo(localFilePath);
+        files.RemoveAll(item => string.Equals(item.Name, file.Name, StringComparison.OrdinalIgnoreCase));
+        files.Add(new ChannelFileSummary(
+            nextFileId++,
+            file.Name,
+            file.Length,
+            activeProfile?.Username ?? activeProfile?.Nickname ?? "You",
+            DateTimeOffset.Now.ToString("g")));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Upload command sent for {file.Name}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task DownloadFileAsync(int fileId, string localFilePath, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before downloading files.");
+        }
+
+        ChannelFileSummary? file = files.FirstOrDefault(item => item.Id == fileId);
+        if (file is null)
+        {
+            throw new InvalidOperationException("Select a file before downloading.");
+        }
+
+        File.WriteAllText(localFilePath, $"Mock TeamTalk NG download for {file.Name}.");
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Download command sent for {file.Name}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteFileAsync(int fileId, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before deleting files.");
+        }
+
+        ChannelFileSummary? file = files.FirstOrDefault(item => item.Id == fileId);
+        if (file is null)
+        {
+            throw new InvalidOperationException("Select a file before deleting.");
+        }
+
+        files.Remove(file);
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Deleted {file.Name}.", IsSystem: true));
+        return Task.CompletedTask;
     }
 
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
@@ -129,6 +192,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         }
 
         activeProfile = null;
+        files.Clear();
         SetStatus(ConnectionStatus.Disconnected);
         return Task.CompletedTask;
     }

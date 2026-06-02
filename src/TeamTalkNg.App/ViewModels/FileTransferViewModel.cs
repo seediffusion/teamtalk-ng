@@ -2,16 +2,19 @@ using TeamTalkNg.Core.TeamTalk;
 
 namespace TeamTalkNg.App.ViewModels;
 
-public sealed record FileTransferViewModel(string Name, string Size, string Owner, string UploadedAt = "")
+public sealed record FileTransferViewModel(int Id, string Name, string Size, string Owner, string UploadedAt = "")
 {
     public static FileTransferViewModel FromSummary(ChannelFileSummary file)
     {
         return new FileTransferViewModel(
+            file.Id,
             file.Name,
             FormatSize(file.SizeBytes),
             file.Owner,
             file.UploadedAt);
     }
+
+    public bool IsPlaceholder => Id <= 0;
 
     public string AccessibleName
     {

@@ -239,6 +239,101 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
     }
 
+    public Task UploadFileAsync(string localFilePath, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
+        {
+            throw new InvalidOperationException("You must be in a channel before uploading files.");
+        }
+
+        string path = RequireLocalPath(localFilePath, "Select a file to upload.");
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException("The selected upload file was not found.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoSendFile(instance, currentChannelId, path);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the upload file command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DownloadFileAsync(int fileId, string localFilePath, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
+        {
+            throw new InvalidOperationException("You must be in a channel before downloading files.");
+        }
+
+        if (fileId <= 0)
+        {
+            throw new InvalidOperationException("Select a file before downloading.");
+        }
+
+        string path = RequireLocalPath(localFilePath, "Select where to save the downloaded file.");
+        string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+        {
+            throw new InvalidOperationException("The selected download folder was not found.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoRecvFile(instance, currentChannelId, fileId, path);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the download file command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteFileAsync(int fileId, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
+        {
+            throw new InvalidOperationException("You must be in a channel before deleting files.");
+        }
+
+        if (fileId <= 0)
+        {
+            throw new InvalidOperationException("Select a file before deleting.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoDeleteFile(instance, currentChannelId, fileId);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the delete file command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);
@@ -935,6 +1030,23 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             return normalizedPath == "/"
                 ? TeamTalkNativeMethods.GetRootChannelId(instance)
                 : TeamTalkNativeMethods.GetChannelIdFromPath(instance, normalizedPath);
+        }
+    }
+
+    private static string RequireLocalPath(string localFilePath, string errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(localFilePath))
+        {
+            throw new InvalidOperationException(errorMessage);
+        }
+
+        try
+        {
+            return Path.GetFullPath(localFilePath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidOperationException("The selected file path is not valid.", ex);
         }
     }
 
