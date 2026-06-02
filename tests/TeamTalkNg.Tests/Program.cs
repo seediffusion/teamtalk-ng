@@ -197,6 +197,7 @@ internal static unsafe class SdkDispatchTests
         RejectsStatusChangeBeforeLogin();
         RejectsNicknameChangeBeforeLogin();
         RejectsServerInformationBeforeLogin();
+        RejectsChannelFilesBeforeJoiningChannel();
         RejectsChannelTopicChangeBeforeLogin();
         RejectsUserModerationBeforeLogin();
         StoresAudioVolumeBeforeNativeInstanceExists();
@@ -447,6 +448,13 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
         AssertThrows(() => session.GetServerInformationAsync().GetAwaiter().GetResult());
+    }
+
+    private static void RejectsChannelFilesBeforeJoiningChannel()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.GetChannelFilesAsync().GetAwaiter().GetResult());
     }
 
     private static void RejectsChannelTopicChangeBeforeLogin()

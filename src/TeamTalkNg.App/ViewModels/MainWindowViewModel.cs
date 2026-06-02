@@ -100,6 +100,7 @@ public sealed class MainWindowViewModel : ObservableObject
         KickUserFromChannelCommand = new AsyncRelayCommand(KickUserFromChannelAsync, CanModerateSelectedUser);
         KickUserFromServerCommand = new AsyncRelayCommand(KickUserFromServerAsync, CanModerateSelectedUser);
         BanUserFromServerCommand = new AsyncRelayCommand(BanUserFromServerAsync, CanModerateSelectedUser);
+        RefreshFilesCommand = new AsyncRelayCommand(() => RefreshFilesAsync(), CanRefreshFiles);
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
@@ -122,7 +123,7 @@ public sealed class MainWindowViewModel : ObservableObject
         teamTalkSession.UserLeft += OnUserLeft;
 
         BuildDisconnectedTree();
-        Files.Add(new FileTransferViewModel("No files in current channel", string.Empty, string.Empty));
+        ShowFilesPlaceholder("Join a channel to view files");
     }
 
     public string WindowTitle => $"TeamTalk NG - {ConnectionStatusText}";
@@ -162,6 +163,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand KickUserFromServerCommand { get; }
 
     public ICommand BanUserFromServerCommand { get; }
+
+    public ICommand RefreshFilesCommand { get; }
 
     public ICommand SendMessageCommand { get; }
 
@@ -357,6 +360,7 @@ public sealed class MainWindowViewModel : ObservableObject
         activeProfile = null;
         BuildDisconnectedTree();
         ChatMessages.Clear();
+        ShowFilesPlaceholder("Join a channel to view files");
         await AnnounceAsync("Disconnected", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         RaiseCommandStateChanged();
     }
@@ -392,6 +396,51 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(IsVoiceActivationEnabled));
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task RefreshFilesAsync(bool announce = true)
+    {
+        if (!CanRefreshFiles())
+        {
+            ShowFilesPlaceholder("Join a channel to view files");
+            return;
+        }
+
+        try
+        {
+            IReadOnlyList<ChannelFileSummary> files = await teamTalkSession.GetChannelFilesAsync();
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Files.Clear();
+                foreach (FileTransferViewModel file in files
+                    .OrderBy(file => file.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .Select(FileTransferViewModel.FromSummary))
+                {
+                    Files.Add(file);
+                }
+
+                if (Files.Count == 0)
+                {
+                    Files.Add(new FileTransferViewModel("No files in current channel", string.Empty, string.Empty));
+                }
+            });
+
+            if (announce)
+            {
+                string text = files.Count == 0
+                    ? "No files in current channel"
+                    : $"{files.Count} channel file{(files.Count == 1 ? string.Empty : "s")} listed";
+                await AnnounceAsync(text, AnnouncementPriority.Normal, AnnouncementKind.System, includeBraille: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFilesPlaceholder("Channel files unavailable");
+            if (announce)
+            {
+                await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+            }
         }
     }
 
@@ -790,6 +839,11 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 IsPushToTalkEnabled = false;
                 IsVoiceActivationEnabled = false;
+                ShowFilesPlaceholder("Join a channel to view files");
+            }
+            else
+            {
+                _ = RefreshFilesAsync(announce: false);
             }
 
             RaiseCommandStateChanged();
@@ -928,6 +982,12 @@ public sealed class MainWindowViewModel : ObservableObject
         Channels.Clear();
         serverTreeItem = new ChannelTreeItemViewModel(profile.DisplayName, ChannelTreeItemKind.Server);
         Channels.Add(serverTreeItem);
+    }
+
+    private void ShowFilesPlaceholder(string text)
+    {
+        Files.Clear();
+        Files.Add(new FileTransferViewModel(text, string.Empty, string.Empty));
     }
 
     private ChannelTreeItemViewModel EnsureChannel(string? channelPath, int id)
@@ -1165,6 +1225,11 @@ public sealed class MainWindowViewModel : ObservableObject
             serverInformation.RaiseCanExecuteChanged();
         }
 
+        if (RefreshFilesCommand is AsyncRelayCommand refreshFiles)
+        {
+            refreshFiles.RaiseCanExecuteChanged();
+        }
+
         if (TogglePushToTalkCommand is AsyncRelayCommand pushToTalk)
         {
             pushToTalk.RaiseCanExecuteChanged();
@@ -1255,6 +1320,11 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanShowServerInformation()
     {
         return teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+    }
+
+    private bool CanRefreshFiles()
+    {
+        return teamTalkSession.Status == ConnectionStatus.InChannel;
     }
 
     private bool CanCreateChannel()

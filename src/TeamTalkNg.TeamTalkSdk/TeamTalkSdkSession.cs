@@ -173,6 +173,72 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             properties.LoginDelayMilliseconds));
     }
 
+    public Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)
+        {
+            throw new InvalidOperationException("You must be in a channel before viewing channel files.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int count = 0;
+        int success;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            success = TeamTalkNativeMethods.GetChannelFiles(instance, currentChannelId, IntPtr.Zero, ref count);
+        }
+
+        if (success == 0 || count <= 0)
+        {
+            return Task.FromResult<IReadOnlyList<ChannelFileSummary>>([]);
+        }
+
+        int size = Marshal.SizeOf<NativeRemoteFile>();
+        IntPtr buffer = Marshal.AllocHGlobal(size * count);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            int fileCount = count;
+            lock (stateLock)
+            {
+                EnsureConnectedInstance();
+                success = TeamTalkNativeMethods.GetChannelFiles(instance, currentChannelId, buffer, ref fileCount);
+            }
+
+            if (success == 0)
+            {
+                throw new InvalidOperationException("TeamTalk could not read the channel file list.");
+            }
+
+            List<ChannelFileSummary> files = [];
+            for (int index = 0; index < fileCount; index++)
+            {
+                NativeRemoteFile file = Marshal.PtrToStructure<NativeRemoteFile>(IntPtr.Add(buffer, index * size));
+                string name = file.ReadFileName();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = $"File {file.FileId}";
+                }
+
+                files.Add(new ChannelFileSummary(
+                    file.FileId,
+                    name,
+                    Math.Max(0, file.FileSize),
+                    file.ReadUsername(),
+                    file.ReadUploadTime()));
+            }
+
+            return Task.FromResult<IReadOnlyList<ChannelFileSummary>>(files);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);

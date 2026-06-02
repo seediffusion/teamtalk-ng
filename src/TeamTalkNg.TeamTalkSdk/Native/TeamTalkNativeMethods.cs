@@ -98,6 +98,10 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int GetServerProperties(IntPtr instance, out NativeServerProperties serverProperties);
 
+    [DllImport(LibraryName, EntryPoint = "TT_GetChannelFiles")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetChannelFiles(IntPtr instance, int channelId, IntPtr remoteFiles, ref int fileCount);
+
     [DllImport(LibraryName, EntryPoint = "TT_DoJoinChannelByID", CharSet = CharSet.Unicode)]
     internal static extern int DoJoinChannelById(IntPtr instance, int channelId, string password);
 

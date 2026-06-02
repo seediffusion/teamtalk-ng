@@ -90,6 +90,16 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             LoginDelayMilliseconds: 0));
     }
 
+    public Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before viewing channel files.");
+        }
+
+        return Task.FromResult<IReadOnlyList<ChannelFileSummary>>([]);
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         activeProfile = profile;

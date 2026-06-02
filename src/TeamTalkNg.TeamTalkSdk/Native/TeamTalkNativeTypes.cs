@@ -29,6 +29,7 @@ internal enum TTType
 {
     None = 0,
     Channel = 5,
+    RemoteFile = 7,
     TextMessage = 14,
     ServerProperties = 10,
     TTMessage = 16,
@@ -348,6 +349,41 @@ internal unsafe struct NativeServerProperties
     public string ReadServerProtocolVersion()
     {
         fixed (char* value = ServerProtocolVersion)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeRemoteFile
+{
+    public int ChannelId;
+    public int FileId;
+    public fixed char FileName[NativeConstants.StringLength];
+    public long FileSize;
+    public fixed char Username[NativeConstants.StringLength];
+    public fixed char UploadTime[NativeConstants.StringLength];
+
+    public string ReadFileName()
+    {
+        fixed (char* value = FileName)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadUsername()
+    {
+        fixed (char* value = Username)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadUploadTime()
+    {
+        fixed (char* value = UploadTime)
         {
             return NativeConstants.ReadString(value);
         }
