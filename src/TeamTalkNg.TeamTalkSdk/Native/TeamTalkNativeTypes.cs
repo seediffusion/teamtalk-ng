@@ -30,6 +30,7 @@ internal enum TTType
     None = 0,
     Channel = 5,
     TextMessage = 14,
+    ServerProperties = 10,
     TTMessage = 16,
     User = 17,
     ClientErrorMsg = 28,
@@ -290,6 +291,63 @@ internal unsafe struct NativeClientErrorMsg
     public string ReadMessage()
     {
         fixed (char* value = ErrorMessage)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeServerProperties
+{
+    public fixed char ServerName[NativeConstants.StringLength];
+    public fixed char Motd[NativeConstants.StringLength];
+    public fixed char MotdRaw[NativeConstants.StringLength];
+    public int MaxUsers;
+    public int MaxLoginAttempts;
+    public int MaxLoginsPerIpAddress;
+    public int MaxVoiceTxPerSecond;
+    public int MaxVideoCaptureTxPerSecond;
+    public int MaxMediaFileTxPerSecond;
+    public int MaxDesktopTxPerSecond;
+    public int MaxTotalTxPerSecond;
+    public int AutoSave;
+    public int TcpPort;
+    public int UdpPort;
+    public int UserTimeout;
+    public fixed char ServerVersion[NativeConstants.StringLength];
+    public fixed char ServerProtocolVersion[NativeConstants.StringLength];
+    public int LoginDelayMilliseconds;
+    public fixed char AccessToken[NativeConstants.StringLength];
+    public uint ServerLogEvents;
+
+    public string ReadServerName()
+    {
+        fixed (char* value = ServerName)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadMotd()
+    {
+        fixed (char* value = Motd)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadServerVersion()
+    {
+        fixed (char* value = ServerVersion)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadServerProtocolVersion()
+    {
+        fixed (char* value = ServerProtocolVersion)
         {
             return NativeConstants.ReadString(value);
         }

@@ -16,6 +16,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IServerProfileStore profileStore;
     private readonly IConnectionDialogService connectionDialogService;
     private readonly IConnectionTargetDialogService connectionTargetDialogService;
+    private readonly IServerInformationDialogService serverInformationDialogService;
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
     private readonly IChannelDialogService channelDialogService;
@@ -48,6 +49,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IServerProfileStore profileStore,
         IConnectionDialogService connectionDialogService,
         IConnectionTargetDialogService connectionTargetDialogService,
+        IServerInformationDialogService serverInformationDialogService,
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
         IChannelDialogService channelDialogService,
@@ -67,6 +69,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.profileStore = profileStore;
         this.connectionDialogService = connectionDialogService;
         this.connectionTargetDialogService = connectionTargetDialogService;
+        this.serverInformationDialogService = serverInformationDialogService;
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
         this.channelDialogService = channelDialogService;
@@ -85,6 +88,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
+        ServerInformationCommand = new AsyncRelayCommand(ShowServerInformationAsync, CanShowServerInformation);
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
         ChannelInformationCommand = new RelayCommand(ShowChannelInformation, CanShowChannelInformation);
         EditChannelTopicCommand = new AsyncRelayCommand(EditChannelTopicAsync, CanEditChannelTopic);
@@ -134,6 +138,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand OpenConnectionTargetCommand { get; }
 
     public ICommand DisconnectCommand { get; }
+
+    public ICommand ServerInformationCommand { get; }
 
     public ICommand JoinSelectedChannelCommand { get; }
 
@@ -353,6 +359,19 @@ public sealed class MainWindowViewModel : ObservableObject
         ChatMessages.Clear();
         await AnnounceAsync("Disconnected", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         RaiseCommandStateChanged();
+    }
+
+    private async Task ShowServerInformationAsync()
+    {
+        try
+        {
+            ServerInformationSummary serverInformation = await teamTalkSession.GetServerInformationAsync();
+            serverInformationDialogService.ShowServerInformationDialog(serverInformation);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
     }
 
     private async Task SendMessageAsync()
@@ -1141,6 +1160,11 @@ public sealed class MainWindowViewModel : ObservableObject
             openTarget.RaiseCanExecuteChanged();
         }
 
+        if (ServerInformationCommand is AsyncRelayCommand serverInformation)
+        {
+            serverInformation.RaiseCanExecuteChanged();
+        }
+
         if (TogglePushToTalkCommand is AsyncRelayCommand pushToTalk)
         {
             pushToTalk.RaiseCanExecuteChanged();
@@ -1226,6 +1250,11 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         return SelectedChannelItem is { Kind: ChannelTreeItemKind.Channel }
             && (teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel);
+    }
+
+    private bool CanShowServerInformation()
+    {
+        return teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
     }
 
     private bool CanCreateChannel()

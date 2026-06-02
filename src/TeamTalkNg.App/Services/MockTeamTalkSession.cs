@@ -70,6 +70,26 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task<ServerInformationSummary> GetServerInformationAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing server information.");
+        }
+
+        TeamTalkServerProfile? profile = activeProfile;
+        return Task.FromResult(new ServerInformationSummary(
+            profile?.DisplayName ?? "Mock TeamTalk server",
+            "Mock server information for TeamTalk NG development.",
+            MaxUsers: 100,
+            profile?.TcpPort ?? 10333,
+            profile?.UdpPort ?? 10333,
+            UserTimeoutSeconds: 60,
+            ServerVersion: "Mock",
+            ProtocolVersion: "Mock",
+            LoginDelayMilliseconds: 0));
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         activeProfile = profile;

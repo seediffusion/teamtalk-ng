@@ -141,6 +141,38 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task<ServerInformationSummary> GetServerInformationAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing server information.");
+        }
+
+        NativeServerProperties properties;
+        int success;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            success = TeamTalkNativeMethods.GetServerProperties(instance, out properties);
+        }
+
+        if (success == 0)
+        {
+            throw new InvalidOperationException("TeamTalk server information is not available.");
+        }
+
+        return Task.FromResult(new ServerInformationSummary(
+            properties.ReadServerName(),
+            properties.ReadMotd(),
+            properties.MaxUsers,
+            properties.TcpPort,
+            properties.UdpPort,
+            properties.UserTimeout,
+            properties.ReadServerVersion(),
+            properties.ReadServerProtocolVersion(),
+            properties.LoginDelayMilliseconds));
+    }
+
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
         TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);

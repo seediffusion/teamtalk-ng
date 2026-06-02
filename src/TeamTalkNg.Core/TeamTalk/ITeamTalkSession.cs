@@ -22,6 +22,8 @@ public interface ITeamTalkSession
 
     Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default);
 
+    Task<ServerInformationSummary> GetServerInformationAsync(CancellationToken cancellationToken = default);
+
     Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default);
 
     Task DisconnectAsync(CancellationToken cancellationToken = default);

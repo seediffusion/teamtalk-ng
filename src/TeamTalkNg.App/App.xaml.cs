@@ -32,6 +32,7 @@ public partial class App : Application
             IServerProfileStore profileStore = new JsonServerProfileStore();
             IConnectionDialogService connectionDialogService = new ConnectionDialogService();
             IConnectionTargetDialogService connectionTargetDialogService = new ConnectionTargetDialogService();
+            IServerInformationDialogService serverInformationDialogService = new ServerInformationDialogService();
             IPreferencesDialogService preferencesDialogService = new PreferencesDialogService();
             IChannelDialogService channelDialogService = new ChannelDialogService();
             IChannelInformationDialogService channelInformationDialogService = new ChannelInformationDialogService();
@@ -50,6 +51,7 @@ public partial class App : Application
                 profileStore,
                 connectionDialogService,
                 connectionTargetDialogService,
+                serverInformationDialogService,
                 settingsStore,
                 preferencesDialogService,
                 channelDialogService,
