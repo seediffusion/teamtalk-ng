@@ -973,6 +973,8 @@ public sealed class MainWindowViewModel : ObservableObject
         themeService.UseTheme(settings.Theme);
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
         await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
+        IsPushToTalkEnabled = false;
+        IsVoiceActivationEnabled = false;
         await settingsStore.SaveAsync(settings);
         await AnnounceAsync("Preferences saved", AnnouncementPriority.Normal, AnnouncementKind.System);
     }

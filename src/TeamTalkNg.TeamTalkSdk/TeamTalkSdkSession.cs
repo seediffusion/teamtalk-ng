@@ -18,7 +18,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int currentChannelId;
     private int myUserId;
     private int messageBufferSize;
-    private bool audioDevicesInitialized;
+    private bool soundInputInitialized;
+    private bool soundOutputInitialized;
     private bool voiceTransmissionEnabled;
     private bool voiceActivationEnabled;
     private int? configuredInputDeviceId;
@@ -62,7 +63,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             configuredInputDeviceId = inputDeviceId;
             configuredOutputDeviceId = outputDeviceId;
 
-            if (instance != IntPtr.Zero && audioDevicesInitialized)
+            if (instance != IntPtr.Zero && (soundInputInitialized || soundOutputInitialized))
             {
                 StopVoiceInput();
                 CloseSoundDevices();
@@ -82,7 +83,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         configuredInputVolumePercent = Math.Clamp(inputVolumePercent, 0, 100);
         configuredOutputVolumePercent = Math.Clamp(outputVolumePercent, 0, 100);
 
-        if (instance == IntPtr.Zero || !audioDevicesInitialized)
+        if (instance == IntPtr.Zero || (!soundInputInitialized && !soundOutputInitialized))
         {
             return Task.CompletedTask;
         }
@@ -416,7 +417,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             activeProfile = profile;
             currentChannelId = 0;
             myUserId = 0;
-            audioDevicesInitialized = false;
+            soundInputInitialized = false;
+            soundOutputInitialized = false;
             voiceTransmissionEnabled = false;
             voiceActivationEnabled = false;
         }
@@ -603,7 +605,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             throw new InvalidOperationException("You must be in a channel before transmitting voice.");
         }
 
-        EnsureAudioDevicesInitialized();
+        EnsureSoundInputInitialized();
 
         int success;
         lock (stateLock)
@@ -639,7 +641,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             throw new InvalidOperationException("You must be in a channel before enabling voice activation.");
         }
 
-        EnsureAudioDevicesInitialized();
+        EnsureSoundInputInitialized();
 
         int clampedLevel = Math.Clamp(level, 0, 100);
         int success;
@@ -1153,7 +1155,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
     private void InitializeDefaultAudioDevices()
     {
-        if (instance == IntPtr.Zero || audioDevicesInitialized)
+        if (instance == IntPtr.Zero || (soundInputInitialized && soundOutputInitialized))
         {
             return;
         }
@@ -1167,8 +1169,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         inputDeviceId = configuredInputDeviceId ?? inputDeviceId;
         outputDeviceId = configuredOutputDeviceId ?? outputDeviceId;
 
-        int inputReady;
-        int outputReady;
+        int inputReady = soundInputInitialized ? 1 : 0;
+        int outputReady = soundOutputInitialized ? 1 : 0;
         lock (stateLock)
         {
             if (instance == IntPtr.Zero)
@@ -1176,31 +1178,42 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 return;
             }
 
-            inputReady = TeamTalkNativeMethods.InitSoundInputDevice(instance, inputDeviceId);
-            outputReady = TeamTalkNativeMethods.InitSoundOutputDevice(instance, outputDeviceId);
-            audioDevicesInitialized = inputReady != 0 && outputReady != 0;
+            if (!soundInputInitialized)
+            {
+                inputReady = TeamTalkNativeMethods.InitSoundInputDevice(instance, inputDeviceId);
+                soundInputInitialized = inputReady != 0;
+            }
+
+            if (!soundOutputInitialized)
+            {
+                outputReady = TeamTalkNativeMethods.InitSoundOutputDevice(instance, outputDeviceId);
+                soundOutputInitialized = outputReady != 0;
+            }
         }
 
-        if (!audioDevicesInitialized)
+        if (inputReady == 0)
         {
-            CloseSoundDevices();
-            RaiseSystemMessage("TeamTalk could not initialize the default microphone and speaker. Voice features are unavailable.");
-            return;
+            RaiseSystemMessage("TeamTalk could not initialize the microphone. Voice transmission is unavailable until an input device is selected.");
+        }
+
+        if (outputReady == 0)
+        {
+            RaiseSystemMessage("TeamTalk could not initialize the speaker. You may not hear channel audio until an output device is selected.");
         }
 
         ApplyConfiguredAudioVolume();
     }
 
-    private void EnsureAudioDevicesInitialized()
+    private void EnsureSoundInputInitialized()
     {
-        if (!audioDevicesInitialized)
+        if (!soundInputInitialized)
         {
             InitializeDefaultAudioDevices();
         }
 
-        if (!audioDevicesInitialized)
+        if (!soundInputInitialized)
         {
-            throw new InvalidOperationException("Audio devices are not ready.");
+            throw new InvalidOperationException("The microphone is not ready.");
         }
     }
 
@@ -1226,7 +1239,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
         TeamTalkNativeMethods.CloseSoundInputDevice(instance);
         TeamTalkNativeMethods.CloseSoundOutputDevice(instance);
-        audioDevicesInitialized = false;
+        soundInputInitialized = false;
+        soundOutputInitialized = false;
     }
 
     private static IReadOnlyList<AudioDeviceSummary> ReadAudioDevices()
@@ -1289,8 +1303,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         int inputGainLevel = PercentToTeamTalkSoundLevel(configuredInputVolumePercent, SoundLevel.GainDefault, SoundLevel.GainMax);
         int outputVolume = PercentToTeamTalkSoundLevel(configuredOutputVolumePercent, SoundLevel.VolumeDefault, SoundLevel.VolumeMax);
 
-        int inputReady;
-        int outputReady;
+        int inputReady = 1;
+        int outputReady = 1;
         lock (stateLock)
         {
             if (instance == IntPtr.Zero)
@@ -1298,8 +1312,15 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 return;
             }
 
-            inputReady = TeamTalkNativeMethods.SetSoundInputGainLevel(instance, inputGainLevel);
-            outputReady = TeamTalkNativeMethods.SetSoundOutputVolume(instance, outputVolume);
+            if (soundInputInitialized)
+            {
+                inputReady = TeamTalkNativeMethods.SetSoundInputGainLevel(instance, inputGainLevel);
+            }
+
+            if (soundOutputInitialized)
+            {
+                outputReady = TeamTalkNativeMethods.SetSoundOutputVolume(instance, outputVolume);
+            }
         }
 
         if (inputReady == 0)
@@ -1351,6 +1372,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             currentChannelId = user.ChannelId;
             SetStatus(ConnectionStatus.InChannel);
         }
+        else
+        {
+            EnsureVoiceSubscription(user);
+        }
     }
 
     private void DispatchUserLeft(NativeUser user, int previousChannelId)
@@ -1367,6 +1392,42 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private void DispatchUserUpdated(NativeUser user)
     {
         UserUpdated?.Invoke(this, CreateUserSummary(user, user.ChannelId));
+        EnsureVoiceSubscription(user);
+    }
+
+    private void EnsureVoiceSubscription(NativeUser user)
+    {
+        if (instance == IntPtr.Zero
+            || currentChannelId <= 0
+            || user.UserId <= 0
+            || user.UserId == myUserId
+            || user.ChannelId != currentChannelId
+            || (((Subscription)user.LocalSubscriptions) & Subscription.Voice) != 0)
+        {
+            return;
+        }
+
+        int commandId;
+        lock (stateLock)
+        {
+            if (instance == IntPtr.Zero)
+            {
+                return;
+            }
+
+            commandId = TeamTalkNativeMethods.DoSubscribe(instance, user.UserId, Subscription.Voice);
+        }
+
+        if (commandId <= 0)
+        {
+            string nickname = user.ReadNickname();
+            if (string.IsNullOrWhiteSpace(nickname))
+            {
+                nickname = user.ReadUsername();
+            }
+
+            RaiseSystemMessage($"TeamTalk could not subscribe to voice from {nickname}.");
+        }
     }
 
     private void DispatchTextMessage(NativeTextMessage textMessage)

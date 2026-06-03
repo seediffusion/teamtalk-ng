@@ -102,6 +102,12 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoChangeNickname", CharSet = CharSet.Unicode)]
     internal static extern int DoChangeNickname(IntPtr instance, string nickname);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoSubscribe")]
+    internal static extern int DoSubscribe(IntPtr instance, int userId, Subscription subscriptions);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoUnsubscribe")]
+    internal static extern int DoUnsubscribe(IntPtr instance, int userId, Subscription subscriptions);
+
     [DllImport(LibraryName, EntryPoint = "TT_GetServerProperties")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int GetServerProperties(IntPtr instance, out NativeServerProperties serverProperties);

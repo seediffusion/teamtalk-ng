@@ -59,6 +59,21 @@ internal enum StreamType
     MediaFile = 4
 }
 
+[Flags]
+internal enum Subscription : uint
+{
+    None = 0x00000000,
+    UserMessage = 0x00000001,
+    ChannelMessage = 0x00000002,
+    BroadcastMessage = 0x00000004,
+    CustomMessage = 0x00000008,
+    Voice = 0x00000010,
+    VideoCapture = 0x00000020,
+    Desktop = 0x00000040,
+    DesktopInput = 0x00000080,
+    MediaFile = 0x00000100
+}
+
 internal enum NativeFileTransferStatus
 {
     Closed = 0,
