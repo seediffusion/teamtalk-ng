@@ -8,12 +8,15 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 {
     private const string ClientName = "TeamTalk NG";
     private const int MessageWaitMilliseconds = 100;
+    private static readonly TimeSpan ConnectionProgressTimeout = TimeSpan.FromSeconds(20);
 
     private readonly TeamTalkSdkOptions options;
     private readonly Lock stateLock = new();
     private IntPtr instance;
     private CancellationTokenSource? pollingCancellation;
     private Task? pollingTask;
+    private int connectionAttemptId;
+    private int loginCommandId;
     private TeamTalkServerProfile? activeProfile;
     private int currentChannelId;
     private int myUserId;
@@ -417,15 +420,18 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             activeProfile = profile;
             currentChannelId = 0;
             myUserId = 0;
+            loginCommandId = 0;
             soundInputInitialized = false;
             soundOutputInitialized = false;
             voiceTransmissionEnabled = false;
             voiceActivationEnabled = false;
         }
 
+        int attemptId = Interlocked.Increment(ref connectionAttemptId);
         SetStatus(ConnectionStatus.Connecting);
         EnsureInstance();
         EnsureMessageBufferSize();
+        RaiseSystemMessage($"Connection attempt started for {profile.Host}:{profile.TcpPort}. Native library: {availability.NativeLibraryPath}.");
 
         int connected;
         lock (stateLock)
@@ -448,10 +454,12 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
         pollingCancellation = new CancellationTokenSource();
         pollingTask = Task.Run(() => PollMessagesAsync(pollingCancellation.Token), CancellationToken.None);
+        StartConnectionProgressWatchdog(attemptId, profile, availability.NativeLibraryPath);
     }
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
+        Interlocked.Increment(ref connectionAttemptId);
         await StopPollingAsync().ConfigureAwait(false);
 
         lock (stateLock)
@@ -961,10 +969,45 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            RaiseSystemMessage($"TeamTalk event polling stopped unexpectedly: {ex.Message}");
+            currentChannelId = 0;
+            myUserId = 0;
+            CloseInstance();
+            SetStatus(ConnectionStatus.Disconnected);
+        }
         finally
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private void StartConnectionProgressWatchdog(int attemptId, TeamTalkServerProfile profile, string? nativeLibraryPath)
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(ConnectionProgressTimeout).ConfigureAwait(false);
+            if (Volatile.Read(ref connectionAttemptId) != attemptId)
+            {
+                return;
+            }
+
+            if (Status is not (ConnectionStatus.Connecting or ConnectionStatus.Connected))
+            {
+                return;
+            }
+
+            string encryption = profile.IsEncrypted ? "enabled" : "disabled";
+            RaiseSystemMessage(
+                $"Connection to {profile.Host}:{profile.TcpPort} did not complete within {ConnectionProgressTimeout.TotalSeconds:0} seconds. " +
+                $"Check the host, TCP port, UDP port, and encryption setting. Encryption is currently {encryption}. " +
+                $"Native library: {nativeLibraryPath ?? "unknown"}.");
+            await DisconnectAsync().ConfigureAwait(false);
+        });
     }
 
     private void DispatchMessage(TeamTalkMessage message)
@@ -984,11 +1027,13 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 HandleDisconnected("Connection lost.");
                 break;
             case ClientEvent.CommandError:
-                RaiseSystemMessage(ReadErrorMessage(message));
+                HandleCommandError(message);
                 break;
             case ClientEvent.CommandMyselfLoggedIn:
                 myUserId = message.Source;
+                loginCommandId = 0;
                 SetStatus(ConnectionStatus.LoggedIn);
+                RaiseSystemMessage("Logged in to the TeamTalk server.");
                 InitializeDefaultAudioDevices();
                 JoinConfiguredChannel();
                 break;
@@ -1032,6 +1077,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
 
         SetStatus(ConnectionStatus.Connected);
+        RaiseSystemMessage("Connected to the TeamTalk server. Logging in.");
 
         string nickname = string.IsNullOrWhiteSpace(profile.Nickname)
             ? Environment.UserName
@@ -1052,6 +1098,11 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         if (commandId <= 0)
         {
             RaiseSystemMessage("TeamTalk SDK did not accept the login command.");
+        }
+        else
+        {
+            loginCommandId = commandId;
+            RaiseSystemMessage($"Login command sent for {nickname}.");
         }
     }
 
@@ -1571,8 +1622,21 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         RaiseSystemMessage(reason);
         currentChannelId = 0;
         myUserId = 0;
+        loginCommandId = 0;
         CloseInstance();
         SetStatus(ConnectionStatus.Disconnected);
+    }
+
+    private void HandleCommandError(TeamTalkMessage message)
+    {
+        string error = ReadErrorMessage(message);
+        if (loginCommandId > 0 && message.Source == loginCommandId)
+        {
+            HandleDisconnected($"Login failed: {error}");
+            return;
+        }
+
+        RaiseSystemMessage(error);
     }
 
     private void RaiseSystemMessage(string text)

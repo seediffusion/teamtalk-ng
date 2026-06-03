@@ -22,6 +22,10 @@ public sealed class ChatMessageViewModel
 
     public bool IsDirect { get; }
 
+    public string DisplayText => IsDirect
+        ? $"{Time} Direct {Sender}: {Text}"
+        : $"{Time} {Sender}: {Text}";
+
     public string AccessibleName => IsDirect
         ? $"{Time}, direct message, {Sender}: {Text}"
         : $"{Time}, {Sender}: {Text}";

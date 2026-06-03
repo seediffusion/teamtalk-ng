@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using TeamTalkNg.App.Services;
 using TeamTalkNg.Core.Accessibility;
@@ -392,10 +393,20 @@ public sealed class MainWindowViewModel : ObservableObject
         appliedInitialStatus = false;
         await AnnounceAsync($"Connecting to {effectiveProfile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         BuildConnectingTree(effectiveProfile);
-        await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
-        await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
-        await teamTalkSession.ConnectAsync(effectiveProfile);
-        RaiseCommandStateChanged();
+        try
+        {
+            await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+            await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
+            await teamTalkSession.ConnectAsync(effectiveProfile);
+            RaiseCommandStateChanged();
+        }
+        catch (Exception ex)
+        {
+            activeProfile = null;
+            BuildDisconnectedTree();
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+            RaiseCommandStateChanged();
+        }
     }
 
     private async Task OpenConnectionTargetAsync()
@@ -1075,7 +1086,7 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 ConnectionStatus.Disconnected => "Disconnected",
                 ConnectionStatus.Connecting => "Connecting",
-                ConnectionStatus.Connected => "Connected",
+                ConnectionStatus.Connected => "Connected; logging in",
                 ConnectionStatus.LoggedIn => "Logged in",
                 ConnectionStatus.InChannel => activeProfile?.ChannelPath is { Length: > 0 } channel ? $"In {channel}" : "In channel",
                 _ => status.ToString()
@@ -1270,6 +1281,11 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             if (announcement.UpdateLiveRegion)
             {
+                if (Keyboard.FocusedElement is TextBoxBase)
+                {
+                    return;
+                }
+
                 LiveAnnouncement = announcement.Text;
             }
         });

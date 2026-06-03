@@ -43,23 +43,15 @@ public sealed class JsonServerProfileStore : IServerProfileStore
             return [CreateDefaultProfile()];
         }
 
-        return profiles;
+        return profiles.Select(ApplyProfileDefaults).ToList();
     }
 
     public async Task SaveAsync(IReadOnlyList<TeamTalkServerProfile> profiles, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(profilePath)!);
 
-        TeamTalkServerProfile[] safeProfiles = profiles
-            .Select(profile => profile with
-            {
-                Password = string.Empty,
-                ChannelPassword = string.Empty
-            })
-            .ToArray();
-
         await using FileStream stream = File.Create(profilePath);
-        await JsonSerializer.SerializeAsync(stream, safeProfiles, JsonOptions, cancellationToken).ConfigureAwait(false);
+        await JsonSerializer.SerializeAsync(stream, profiles, JsonOptions, cancellationToken).ConfigureAwait(false);
     }
 
     private static TeamTalkServerProfile CreateDefaultProfile()
@@ -68,12 +60,29 @@ public sealed class JsonServerProfileStore : IServerProfileStore
         {
             DisplayName = "TeamTalk official server",
             Host = "tt5us.bearware.dk",
-            TcpPort = 10333,
-            UdpPort = 10333,
+            TcpPort = 10335,
+            UdpPort = 10335,
             Username = "guest",
-            Password = string.Empty,
+            Password = "guest",
             Nickname = Environment.UserName,
             ChannelPath = "/"
+        };
+    }
+
+    private static TeamTalkServerProfile ApplyProfileDefaults(TeamTalkServerProfile profile)
+    {
+        if (!string.Equals(profile.Host, "tt5us.bearware.dk", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(profile.Username, "guest", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(profile.Password))
+        {
+            return profile;
+        }
+
+        return profile with
+        {
+            Password = "guest",
+            TcpPort = profile.TcpPort == 10333 ? 10335 : profile.TcpPort,
+            UdpPort = profile.UdpPort == 10333 ? 10335 : profile.UdpPort
         };
     }
 }
