@@ -13,25 +13,28 @@ public static class TeamTalkNativeLibrary
     public static TeamTalkSdkAvailability Probe(TeamTalkSdkOptions options)
     {
         string? configuredPath = options.NativeLibraryPath;
+        configuredPath = string.IsNullOrWhiteSpace(configuredPath)
+            ? Environment.GetEnvironmentVariable("TEAMTALKNG_TEAMTALK5_DLL")
+            : configuredPath;
         if (!string.IsNullOrWhiteSpace(configuredPath))
         {
             return File.Exists(configuredPath)
                 ? TeamTalkSdkAvailability.Available(configuredPath)
-                : TeamTalkSdkAvailability.Unavailable($"Configured TeamTalk SDK library was not found: {configuredPath}");
+                : TeamTalkSdkAvailability.Unavailable($"Configured TeamTalk native library was not found: {configuredPath}");
         }
 
         string[] candidatePaths =
         [
             Path.Combine(AppContext.BaseDirectory, LibraryFileName),
-            Path.Combine(AppContext.BaseDirectory, "sdk", LibraryFileName),
             Path.Combine(Environment.CurrentDirectory, LibraryFileName),
-            Path.Combine(Environment.CurrentDirectory, "sdk", LibraryFileName)
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "TeamTalk5", LibraryFileName),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "TeamTalk5", LibraryFileName)
         ];
 
         string? foundPath = candidatePaths.FirstOrDefault(File.Exists);
         return foundPath is not null
             ? TeamTalkSdkAvailability.Available(foundPath)
-            : TeamTalkSdkAvailability.Unavailable($"{LibraryFileName} was not found beside the app or in the local sdk folder.");
+            : TeamTalkSdkAvailability.Unavailable($"{LibraryFileName} was not found beside the app or in the official TeamTalk installation folder.");
     }
 
     public static TeamTalkSdkAvailability ConfigureResolution(TeamTalkSdkOptions options)

@@ -14,7 +14,7 @@ This repository currently contains the first application skeleton:
 - Preferences for theme and screen-reader announcement behavior.
 - `tt://` URL and `.tt`/key-value connection target parsing for startup arguments.
 - In-app Open Connection Target flow for pasted `tt://` URLs or browsed `.tt` files.
-- TeamTalk SDK boundary project that probes for `TeamTalk5.dll`, resolves it from the app or `sdk` folder, polls SDK events, logs in, joins configured channels, dispatches user/text events, and falls back to the mock session while native files are absent.
+- TeamTalk native boundary project that probes for `TeamTalk5.dll`, resolves it from the app folder or the official TeamTalk installation, polls TeamTalk events, logs in, joins configured channels, dispatches user/text events, and falls back to the mock session while native files are absent.
 - Mock TeamTalk session service so UI and announcement flows can be exercised before the TeamTalk SDK adapter is connected.
 
 ## Accessibility Approach
@@ -32,15 +32,20 @@ The announcement service falls back to debug output when Prismatoid is not prese
 dotnet build TeamTalkNg.slnx
 ```
 
-## Local TeamTalk SDK Binary
+## Local TeamTalk Runtime Binary
 
-The native SDK DLL is not committed. Download the official TeamTalk 5 SDK Standard Edition for Windows x64 from BearWare and place `TeamTalk5.dll` in the ignored `sdk\` folder:
+The native TeamTalk DLL is not committed. For local testing, use the runtime DLL from an installed official TeamTalk client, or place `TeamTalk5.dll` directly beside `TeamTalkNg.App.exe`.
+
+The app looks for `TeamTalk5.dll` in this order:
 
 ```powershell
-sdk\TeamTalk5.dll
+TeamTalkNg.App.exe folder
+Current working folder
+C:\Program Files\TeamTalk5
+C:\Program Files (x86)\TeamTalk5
 ```
 
-When the DLL is present, the app and test projects copy it to their output `sdk\` folders during build. When it is absent, the app falls back to the mock TeamTalk session.
+You can also set `TEAMTALKNG_TEAMTALK5_DLL` to an explicit DLL path for local testing. Avoid using the downloadable TeamTalk 5 SDK package as the runtime source unless you have a BearWare SDK license, because SDK downloads are trial builds. When no suitable DLL is found, the app falls back to the mock TeamTalk session.
 
 ## Parser Smoke Tests
 

@@ -9,8 +9,4 @@
     <ProjectReference Include="..\..\src\TeamTalkNg.Core\TeamTalkNg.Core.csproj" />
     <ProjectReference Include="..\..\src\TeamTalkNg.TeamTalkSdk\TeamTalkNg.TeamTalkSdk.csproj" />
   </ItemGroup>
-
-  <ItemGroup Condition="Exists('..\..\sdk\TeamTalk5.dll')">
-    <Content Include="..\..\sdk\TeamTalk5.dll" Link="sdk\TeamTalk5.dll" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
 </Project>
