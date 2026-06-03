@@ -16,28 +16,22 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private int selectedInputDeviceId;
     private int selectedOutputDeviceId;
     private int voiceActivationLevel;
+    private string audioDeviceRefreshStatus = "Audio devices loaded";
+    private readonly Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices;
 
-    public PreferencesDialogViewModel(AppSettings settings, IReadOnlyList<AudioDeviceSummary> audioDevices)
+    public PreferencesDialogViewModel(
+        AppSettings settings,
+        IReadOnlyList<AudioDeviceSummary> audioDevices,
+        Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices)
     {
+        this.refreshAudioDevices = refreshAudioDevices;
         Themes =
         [
             new ThemeOptionViewModel(AppTheme.Light, "Light"),
             new ThemeOptionViewModel(AppTheme.Dark, "Dark")
         ];
-        InputDevices = [AudioDeviceOptionViewModel.DefaultInput];
-        OutputDevices = [AudioDeviceOptionViewModel.DefaultOutput];
-        foreach (AudioDeviceSummary device in audioDevices)
-        {
-            if (device.SupportsInput)
-            {
-                InputDevices.Add(AudioDeviceOptionViewModel.FromInputDevice(device));
-            }
-
-            if (device.SupportsOutput)
-            {
-                OutputDevices.Add(AudioDeviceOptionViewModel.FromOutputDevice(device));
-            }
-        }
+        InputDevices = [];
+        OutputDevices = [];
 
         selectedTheme = settings.Theme;
         announceChannelMessages = settings.AnnounceChannelMessages;
@@ -48,9 +42,11 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         selectedInputDeviceId = settings.AudioInputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         selectedOutputDeviceId = settings.AudioOutputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         voiceActivationLevel = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
+        ReplaceAudioDevices(audioDevices);
 
         SaveCommand = new RelayCommand(() => RequestClose?.Invoke(this, true));
         CancelCommand = new RelayCommand(() => RequestClose?.Invoke(this, false));
+        RefreshAudioDevicesCommand = new AsyncRelayCommand(RefreshAudioDevicesAsync);
     }
 
     public event EventHandler<bool>? RequestClose;
@@ -64,6 +60,14 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public ICommand SaveCommand { get; }
 
     public ICommand CancelCommand { get; }
+
+    public ICommand RefreshAudioDevicesCommand { get; }
+
+    public string AudioDeviceRefreshStatus
+    {
+        get => audioDeviceRefreshStatus;
+        private set => SetProperty(ref audioDeviceRefreshStatus, value);
+    }
 
     public AppTheme SelectedTheme
     {
@@ -133,5 +137,50 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             AudioOutputDeviceId = SelectedOutputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedOutputDeviceId,
             VoiceActivationLevel = VoiceActivationLevel
         };
+    }
+
+    private async Task RefreshAudioDevicesAsync()
+    {
+        try
+        {
+            IReadOnlyList<AudioDeviceSummary> devices = await refreshAudioDevices();
+            ReplaceAudioDevices(devices);
+            AudioDeviceRefreshStatus = "Audio devices refreshed";
+        }
+        catch (Exception ex)
+        {
+            AudioDeviceRefreshStatus = ex.Message;
+        }
+    }
+
+    private void ReplaceAudioDevices(IReadOnlyList<AudioDeviceSummary> audioDevices)
+    {
+        int previousInputId = SelectedInputDeviceId;
+        int previousOutputId = SelectedOutputDeviceId;
+
+        InputDevices.Clear();
+        OutputDevices.Clear();
+        InputDevices.Add(AudioDeviceOptionViewModel.DefaultInput);
+        OutputDevices.Add(AudioDeviceOptionViewModel.DefaultOutput);
+
+        foreach (AudioDeviceSummary device in audioDevices)
+        {
+            if (device.SupportsInput)
+            {
+                InputDevices.Add(AudioDeviceOptionViewModel.FromInputDevice(device));
+            }
+
+            if (device.SupportsOutput)
+            {
+                OutputDevices.Add(AudioDeviceOptionViewModel.FromOutputDevice(device));
+            }
+        }
+
+        SelectedInputDeviceId = InputDevices.Any(device => device.Id == previousInputId)
+            ? previousInputId
+            : AudioDeviceOptionViewModel.DefaultDeviceId;
+        SelectedOutputDeviceId = OutputDevices.Any(device => device.Id == previousOutputId)
+            ? previousOutputId
+            : AudioDeviceOptionViewModel.DefaultDeviceId;
     }
 }

@@ -97,6 +97,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
+        RefreshAudioDevicesCommand = new AsyncRelayCommand(RefreshAudioDevicesAsync);
         ServerInformationCommand = new AsyncRelayCommand(ShowServerInformationAsync, CanShowServerInformation);
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
         ChannelInformationCommand = new RelayCommand(ShowChannelInformation, CanShowChannelInformation);
@@ -181,6 +182,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand OpenConnectionTargetCommand { get; }
 
     public ICommand DisconnectCommand { get; }
+
+    public ICommand RefreshAudioDevicesCommand { get; }
 
     public ICommand ServerInformationCommand { get; }
 
@@ -427,6 +430,23 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             ServerInformationSummary serverInformation = await teamTalkSession.GetServerInformationAsync();
             serverInformationDialogService.ShowServerInformationDialog(serverInformation);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task RefreshAudioDevicesAsync()
+    {
+        try
+        {
+            await teamTalkSession.GetAudioDevicesAsync();
+            await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+            await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
+            IsPushToTalkEnabled = false;
+            IsVoiceActivationEnabled = false;
+            await AnnounceAsync("Audio devices refreshed", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
         {
@@ -963,7 +983,10 @@ public sealed class MainWindowViewModel : ObservableObject
     private async Task ShowPreferencesAsync()
     {
         IReadOnlyList<AudioDeviceSummary> audioDevices = await teamTalkSession.GetAudioDevicesAsync();
-        AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(settings, audioDevices);
+        AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(
+            settings,
+            audioDevices,
+            () => teamTalkSession.GetAudioDevicesAsync());
         if (updatedSettings is null)
         {
             return;

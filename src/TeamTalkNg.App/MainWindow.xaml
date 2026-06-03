@@ -38,6 +38,8 @@
         <MenuItem Header="_Open Connection Target" Command="{Binding OpenConnectionTargetCommand}" InputGestureText="Ctrl+O" />
         <MenuItem Header="_Disconnect" Command="{Binding DisconnectCommand}" />
         <Separator />
+        <MenuItem Header="_Refresh Audio Devices" Command="{Binding RefreshAudioDevicesCommand}" />
+        <Separator />
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
       </MenuItem>
       <MenuItem Header="_Server">

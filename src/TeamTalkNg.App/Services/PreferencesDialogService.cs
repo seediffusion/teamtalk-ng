@@ -6,9 +6,12 @@ namespace TeamTalkNg.App.Services;
 
 public sealed class PreferencesDialogService : IPreferencesDialogService
 {
-    public AppSettings? ShowPreferencesDialog(AppSettings currentSettings, IReadOnlyList<AudioDeviceSummary> audioDevices)
+    public AppSettings? ShowPreferencesDialog(
+        AppSettings currentSettings,
+        IReadOnlyList<AudioDeviceSummary> audioDevices,
+        Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices)
     {
-        var viewModel = new PreferencesDialogViewModel(currentSettings, audioDevices);
+        var viewModel = new PreferencesDialogViewModel(currentSettings, audioDevices, refreshAudioDevices);
         var dialog = new PreferencesDialog
         {
             Owner = Application.Current.MainWindow,

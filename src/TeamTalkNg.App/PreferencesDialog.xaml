@@ -62,6 +62,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
@@ -104,6 +105,23 @@
                   IsSnapToTickEnabled="True"
                   Value="{Binding VoiceActivationLevel}"
                   AutomationProperties.Name="Voice activation level" />
+
+          <StackPanel Grid.Row="3"
+                      Grid.Column="1"
+                      Orientation="Horizontal"
+                      Margin="0,14,0,0"
+                      KeyboardNavigation.TabNavigation="Continue">
+            <Button Content="Refresh Devices"
+                    Command="{Binding RefreshAudioDevicesCommand}"
+                    MinWidth="130"
+                    AutomationProperties.Name="Refresh audio devices" />
+            <TextBlock Text="{Binding AudioDeviceRefreshStatus}"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Audio device refresh status" />
+          </StackPanel>
         </Grid>
       </TabItem>
 
