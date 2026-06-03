@@ -13,6 +13,8 @@
   <Window.InputBindings>
     <KeyBinding Key="F2" Command="{Binding ConnectCommand}" />
     <KeyBinding Modifiers="Control" Key="O" Command="{Binding OpenConnectionTargetCommand}" />
+    <KeyBinding Modifiers="Control+Shift" Key="A" Command="{Binding ToggleVoiceActivationCommand}" />
+    <KeyBinding Modifiers="Control+Shift" Key="M" Command="{Binding ToggleSelectedUserMuteCommand}" />
   </Window.InputBindings>
 
   <Window.Resources>
@@ -51,6 +53,7 @@
                   IsChecked="{Binding IsPushToTalkEnabled, Mode=OneWay}" />
         <MenuItem Header="Enable _Voice Activation"
                   Command="{Binding ToggleVoiceActivationCommand}"
+                  InputGestureText="Ctrl+Shift+A"
                   IsCheckable="True"
                   IsChecked="{Binding IsVoiceActivationEnabled, Mode=OneWay}" />
       </MenuItem>
@@ -74,6 +77,7 @@
       <MenuItem Header="_Users">
         <MenuItem Header="User _Information" Command="{Binding UserInformationCommand}" />
         <MenuItem Header="User _Audio Settings" Command="{Binding UserAudioSettingsCommand}" />
+        <MenuItem Header="Toggle Local _Mute" Command="{Binding ToggleSelectedUserMuteCommand}" InputGestureText="Ctrl+Shift+M" />
         <MenuItem Header="Send _Direct Message" Command="{Binding SendDirectMessageCommand}" />
         <Separator />
         <MenuItem Header="_Move To Channel" Command="{Binding MoveUserCommand}" />

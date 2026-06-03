@@ -110,6 +110,7 @@ public sealed class MainWindowViewModel : ObservableObject
         KickUserFromServerCommand = new AsyncRelayCommand(KickUserFromServerAsync, CanModerateSelectedUser);
         BanUserFromServerCommand = new AsyncRelayCommand(BanUserFromServerAsync, CanModerateSelectedUser);
         UserAudioSettingsCommand = new AsyncRelayCommand(ShowUserAudioSettingsAsync, CanChangeUserAudioSettings);
+        ToggleSelectedUserMuteCommand = new AsyncRelayCommand(ToggleSelectedUserMuteAsync, CanChangeUserAudioSettings);
         UploadFileCommand = new AsyncRelayCommand(UploadFileAsync, CanManageFiles);
         DownloadFileCommand = new AsyncRelayCommand(DownloadFileAsync, CanUseSelectedFile);
         DeleteFileCommand = new AsyncRelayCommand(DeleteFileAsync, CanUseSelectedFile);
@@ -206,6 +207,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand BanUserFromServerCommand { get; }
 
     public ICommand UserAudioSettingsCommand { get; }
+
+    public ICommand ToggleSelectedUserMuteCommand { get; }
 
     public ICommand UploadFileCommand { get; }
 
@@ -708,6 +711,31 @@ public sealed class MainWindowViewModel : ObservableObject
             string message = request.IsVoiceMuted
                 ? $"Muted voice for {user.Name}"
                 : $"Set voice volume for {user.Name} to {request.VoiceVolumePercent} percent";
+            await AnnounceAsync(message, AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task ToggleSelectedUserMuteAsync()
+    {
+        if (SelectedChannelItem is not { Kind: ChannelTreeItemKind.User } user)
+        {
+            return;
+        }
+
+        bool targetMuted = !user.IsVoiceMuted;
+        var request = new UserAudioSettingsRequest(user.Id, user.VoiceVolumePercent, targetMuted);
+
+        try
+        {
+            await teamTalkSession.SetUserAudioSettingsAsync(request);
+            user.IsVoiceMuted = targetMuted;
+            string message = targetMuted
+                ? $"Muted voice for {user.Name}"
+                : $"Unmuted voice for {user.Name}";
             await AnnounceAsync(message, AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
@@ -1549,6 +1577,11 @@ public sealed class MainWindowViewModel : ObservableObject
         if (UserAudioSettingsCommand is AsyncRelayCommand userAudioSettings)
         {
             userAudioSettings.RaiseCanExecuteChanged();
+        }
+
+        if (ToggleSelectedUserMuteCommand is AsyncRelayCommand toggleSelectedUserMute)
+        {
+            toggleSelectedUserMute.RaiseCanExecuteChanged();
         }
 
         if (MoveUserCommand is AsyncRelayCommand moveUser)
