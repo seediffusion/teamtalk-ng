@@ -16,7 +16,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private int selectedInputDeviceId;
     private int selectedOutputDeviceId;
     private int voiceActivationLevel;
+    private string defaultNickname = Environment.UserName;
+    private bool isAway;
+    private string statusMessage = string.Empty;
     private string audioDeviceRefreshStatus = "Audio devices loaded";
+    private readonly int inputVolume;
+    private readonly int outputVolume;
     private readonly Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices;
 
     public PreferencesDialogViewModel(
@@ -25,6 +30,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices)
     {
         this.refreshAudioDevices = refreshAudioDevices;
+        inputVolume = settings.InputVolume;
+        outputVolume = settings.OutputVolume;
         Themes =
         [
             new ThemeOptionViewModel(AppTheme.Light, "Light"),
@@ -42,6 +49,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         selectedInputDeviceId = settings.AudioInputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         selectedOutputDeviceId = settings.AudioOutputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         voiceActivationLevel = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
+        defaultNickname = string.IsNullOrWhiteSpace(settings.DefaultNickname) ? Environment.UserName : settings.DefaultNickname;
+        isAway = settings.IsAway;
+        statusMessage = settings.StatusMessage;
         ReplaceAudioDevices(audioDevices);
 
         SaveCommand = new RelayCommand(() => RequestClose?.Invoke(this, true));
@@ -123,6 +133,24 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref voiceActivationLevel, Math.Clamp(value, 0, 100));
     }
 
+    public string DefaultNickname
+    {
+        get => defaultNickname;
+        set => SetProperty(ref defaultNickname, value);
+    }
+
+    public bool IsAway
+    {
+        get => isAway;
+        set => SetProperty(ref isAway, value);
+    }
+
+    public string StatusMessage
+    {
+        get => statusMessage;
+        set => SetProperty(ref statusMessage, value);
+    }
+
     public AppSettings ToSettings()
     {
         return new AppSettings
@@ -135,7 +163,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             SendAnnouncementsToBraille = SendAnnouncementsToBraille,
             AudioInputDeviceId = SelectedInputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedInputDeviceId,
             AudioOutputDeviceId = SelectedOutputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedOutputDeviceId,
-            VoiceActivationLevel = VoiceActivationLevel
+            VoiceActivationLevel = VoiceActivationLevel,
+            InputVolume = inputVolume,
+            OutputVolume = outputVolume,
+            DefaultNickname = string.IsNullOrWhiteSpace(DefaultNickname) ? Environment.UserName : DefaultNickname.Trim(),
+            IsAway = IsAway,
+            StatusMessage = StatusMessage.Trim()
         };
     }
 

@@ -157,7 +157,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             nextFileId++,
             file.Name,
             file.Length,
-            activeProfile?.Username ?? activeProfile?.Nickname ?? "You",
+            GetProfileText(activeProfile?.Username, GetSelfNickname()),
             DateTimeOffset.Now.ToString("g")));
         PublishTransfer(new FileTransferSummary(
             transferId,
@@ -246,7 +246,8 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
     public async Task ConnectAsync(TeamTalkServerProfile profile, CancellationToken cancellationToken = default)
     {
-        activeProfile = profile;
+        TeamTalkServerProfile profileWithIdentity = ApplyIdentityDefaults(profile);
+        activeProfile = profileWithIdentity;
         SetStatus(ConnectionStatus.Connecting);
         await Task.Delay(300, cancellationToken);
         SetStatus(ConnectionStatus.Connected);
@@ -254,14 +255,14 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         SetStatus(ConnectionStatus.LoggedIn);
         await Task.Delay(250, cancellationToken);
         SetStatus(ConnectionStatus.InChannel);
-        string channelPath = string.IsNullOrWhiteSpace(profile.ChannelPath) ? "/" : profile.ChannelPath;
+        string channelPath = string.IsNullOrWhiteSpace(profileWithIdentity.ChannelPath) ? "/" : profileWithIdentity.ChannelPath;
         ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(1, GetChannelName(channelPath), channelPath, 1, IsProtected: false, IsPermanent: true));
-        UserJoined?.Invoke(this, new UserSummary(1, profile.Nickname, profile.Username, channelPath, IsTalking: false, IsAway: false, IsOperator: true));
+        UserJoined?.Invoke(this, new UserSummary(1, GetSelfNickname(), profileWithIdentity.Username, channelPath, IsTalking: false, IsAway: false, IsOperator: true));
 
         ChannelMessageReceived?.Invoke(this, new ChatMessage(
             DateTimeOffset.Now,
             "Server",
-            $"Welcome to {profile.DisplayName}. This is mocked until the TeamTalk SDK adapter is connected.",
+            $"Welcome to {profileWithIdentity.DisplayName}. This is mocked until the TeamTalk SDK adapter is connected.",
             IsSystem: true));
     }
 
@@ -289,7 +290,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         string normalizedPath = string.IsNullOrWhiteSpace(channelPath) ? "/" : channelPath;
         string channelName = GetChannelName(normalizedPath);
         ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(2, channelName, normalizedPath, 1, IsProtected: false, IsPermanent: true));
-        UserJoined?.Invoke(this, new UserSummary(1, activeProfile?.Nickname ?? "You", activeProfile?.Username ?? string.Empty, normalizedPath, IsTalking: false, IsAway: false, IsOperator: true));
+        UserJoined?.Invoke(this, new UserSummary(1, GetSelfNickname(), activeProfile?.Username ?? string.Empty, normalizedPath, IsTalking: false, IsAway: false, IsOperator: true));
         SetStatus(ConnectionStatus.InChannel);
         return Task.CompletedTask;
     }
@@ -362,7 +363,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
     public Task SendChannelMessageAsync(string text, CancellationToken cancellationToken = default)
     {
-        string sender = activeProfile?.Nickname ?? "You";
+        string sender = GetSelfNickname();
         ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, sender, text));
         return Task.CompletedTask;
     }
@@ -391,7 +392,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
         string destination = string.IsNullOrWhiteSpace(destinationChannelPath) ? "/" : destinationChannelPath;
         string oldChannel = activeProfile?.ChannelPath ?? "/";
-        string nickname = userId == 1 ? activeProfile?.Nickname ?? "You" : $"User {userId}";
+        string nickname = userId == 1 ? GetSelfNickname() : $"User {userId}";
         string username = userId == 1 ? activeProfile?.Username ?? string.Empty : string.Empty;
 
         UserLeft?.Invoke(this, new UserSummary(userId, nickname, username, oldChannel, IsTalking: false, IsAway: false, IsOperator: userId == 1));
@@ -502,6 +503,26 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         }
 
         FileTransferUpdated?.Invoke(this, transfer);
+    }
+
+    private static TeamTalkServerProfile ApplyIdentityDefaults(TeamTalkServerProfile profile)
+    {
+        string nickname = string.IsNullOrWhiteSpace(profile.Nickname)
+            ? Environment.UserName
+            : profile.Nickname.Trim();
+        return profile with { Nickname = nickname };
+    }
+
+    private string GetSelfNickname()
+    {
+        return string.IsNullOrWhiteSpace(activeProfile?.Nickname)
+            ? Environment.UserName
+            : activeProfile.Nickname.Trim();
+    }
+
+    private static string GetProfileText(string? preferred, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(preferred) ? fallback : preferred;
     }
 
     private static string GetChannelName(string? channelPath)

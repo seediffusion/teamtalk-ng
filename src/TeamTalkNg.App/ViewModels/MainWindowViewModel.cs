@@ -40,6 +40,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool voiceActivationEnabled;
     private bool isAway;
     private string currentNickname = Environment.UserName;
+    private bool appliedInitialStatus;
     private TeamTalkServerProfile? activeProfile;
     private AppSettings settings;
     private ChannelTreeItemViewModel? serverTreeItem;
@@ -93,6 +94,8 @@ public sealed class MainWindowViewModel : ObservableObject
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
+        currentNickname = GetDefaultNickname();
+        isAway = settings.IsAway;
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
@@ -366,28 +369,32 @@ public sealed class MainWindowViewModel : ObservableObject
     private async Task ConnectAsync()
     {
         IReadOnlyList<TeamTalkServerProfile> profiles = await profileStore.LoadAsync();
-        TeamTalkServerProfile? profile = connectionDialogService.ShowConnectDialog(profiles);
+        IReadOnlyList<TeamTalkServerProfile> profilesWithIdentity = profiles.Select(ApplyIdentityDefaults).ToList();
+        TeamTalkServerProfile? profile = connectionDialogService.ShowConnectDialog(profilesWithIdentity);
         if (profile is null)
         {
             await AnnounceAsync("Connect canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
             return;
         }
 
-        activeProfile = profile;
-        currentNickname = string.IsNullOrWhiteSpace(profile.Nickname) ? Environment.UserName : profile.Nickname;
-        await SaveRecentProfileAsync(profiles, profile);
-        await ConnectToProfileAsync(profile);
+        TeamTalkServerProfile effectiveProfile = ApplyIdentityDefaults(profile);
+        activeProfile = effectiveProfile;
+        currentNickname = effectiveProfile.Nickname;
+        await SaveRecentProfileAsync(profilesWithIdentity, effectiveProfile);
+        await ConnectToProfileAsync(effectiveProfile);
     }
 
     public async Task ConnectToProfileAsync(TeamTalkServerProfile profile)
     {
-        activeProfile = profile;
-        currentNickname = string.IsNullOrWhiteSpace(profile.Nickname) ? Environment.UserName : profile.Nickname;
-        await AnnounceAsync($"Connecting to {profile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
-        BuildConnectingTree(profile);
+        TeamTalkServerProfile effectiveProfile = ApplyIdentityDefaults(profile);
+        activeProfile = effectiveProfile;
+        currentNickname = effectiveProfile.Nickname;
+        appliedInitialStatus = false;
+        await AnnounceAsync($"Connecting to {effectiveProfile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        BuildConnectingTree(effectiveProfile);
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
         await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
-        await teamTalkSession.ConnectAsync(profile);
+        await teamTalkSession.ConnectAsync(effectiveProfile);
         RaiseCommandStateChanged();
     }
 
@@ -406,15 +413,17 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         }
 
+        TeamTalkServerProfile effectiveProfile = ApplyIdentityDefaults(profile);
         IReadOnlyList<TeamTalkServerProfile> profiles = await profileStore.LoadAsync();
-        await SaveRecentProfileAsync(profiles, profile);
-        await ConnectToProfileAsync(profile);
+        await SaveRecentProfileAsync(profiles, effectiveProfile);
+        await ConnectToProfileAsync(effectiveProfile);
     }
 
     private async Task DisconnectAsync()
     {
         await teamTalkSession.DisconnectAsync();
         activeProfile = null;
+        appliedInitialStatus = false;
         BuildDisconnectedTree();
         ChatMessages.Clear();
         Transfers.Clear();
@@ -948,7 +957,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.SetUserStatusAsync(request);
             IsAway = request.IsAway;
-            settings = settings with { StatusMessage = request.Message };
+            settings = settings with { IsAway = request.IsAway, StatusMessage = request.Message };
             await settingsStore.SaveAsync(settings);
             await AnnounceAsync(request.IsAway ? "Status set to away" : "Status set to available", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
@@ -972,6 +981,8 @@ public sealed class MainWindowViewModel : ObservableObject
             await teamTalkSession.SetNicknameAsync(nickname);
             currentNickname = nickname.Trim();
             activeProfile = activeProfile is null ? null : activeProfile with { Nickname = currentNickname };
+            settings = settings with { DefaultNickname = currentNickname };
+            await settingsStore.SaveAsync(settings);
             await AnnounceAsync($"Nickname changed to {currentNickname}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
@@ -994,6 +1005,12 @@ public sealed class MainWindowViewModel : ObservableObject
 
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
+        if (teamTalkSession.Status == ConnectionStatus.Disconnected)
+        {
+            currentNickname = GetDefaultNickname();
+            IsAway = settings.IsAway;
+        }
+
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
         await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
         IsPushToTalkEnabled = false;
@@ -1078,6 +1095,11 @@ public sealed class MainWindowViewModel : ObservableObject
             RaiseCommandStateChanged();
             RaiseChannelCommandStateChanged();
         });
+
+        if (status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
+        {
+            _ = ApplyInitialStatusAsync();
+        }
     }
 
     private void OnChannelMessageReceived(object? sender, ChatMessage message)
@@ -1431,6 +1453,46 @@ public sealed class MainWindowViewModel : ObservableObject
 
         updatedProfiles.Insert(0, selectedProfile);
         await profileStore.SaveAsync(updatedProfiles);
+    }
+
+    private async Task ApplyInitialStatusAsync()
+    {
+        if (appliedInitialStatus || teamTalkSession.Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            return;
+        }
+
+        appliedInitialStatus = true;
+        if (!settings.IsAway && string.IsNullOrWhiteSpace(settings.StatusMessage))
+        {
+            return;
+        }
+
+        var request = new UserStatusRequest(settings.IsAway, settings.StatusMessage);
+        try
+        {
+            await teamTalkSession.SetUserStatusAsync(request);
+            Application.Current.Dispatcher.Invoke(() => IsAway = request.IsAway);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync($"Could not set startup status: {ex.Message}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private TeamTalkServerProfile ApplyIdentityDefaults(TeamTalkServerProfile profile)
+    {
+        string nickname = string.IsNullOrWhiteSpace(profile.Nickname)
+            ? GetDefaultNickname()
+            : profile.Nickname.Trim();
+        return profile with { Nickname = nickname };
+    }
+
+    private string GetDefaultNickname()
+    {
+        return string.IsNullOrWhiteSpace(settings.DefaultNickname)
+            ? Environment.UserName
+            : settings.DefaultNickname.Trim();
     }
 
     private async Task SetThemeAsync(AppTheme theme)

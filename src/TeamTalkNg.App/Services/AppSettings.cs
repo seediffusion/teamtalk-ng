@@ -24,5 +24,9 @@ public sealed record AppSettings
 
     public int OutputVolume { get; init; } = 50;
 
+    public string DefaultNickname { get; init; } = Environment.UserName;
+
+    public bool IsAway { get; init; }
+
     public string StatusMessage { get; init; } = string.Empty;
 }
