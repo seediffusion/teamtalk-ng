@@ -9,4 +9,9 @@ public sealed record VideoCaptureDeviceSummary(
     public string DisplayName => string.IsNullOrWhiteSpace(CaptureApi)
         ? Name
         : $"{Name} ({CaptureApi})";
+
+    public override string ToString()
+    {
+        return DisplayName;
+    }
 }

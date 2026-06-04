@@ -52,7 +52,13 @@
                     Background="{DynamicResource ControlBackgroundBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    AutomationProperties.Name="Application theme" />
+                    AutomationProperties.Name="Application theme">
+            <ComboBox.ItemContainerStyle>
+              <Style TargetType="{x:Type ComboBoxItem}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+              </Style>
+            </ComboBox.ItemContainerStyle>
+          </ComboBox>
         </Grid>
       </TabItem>
 
@@ -82,7 +88,13 @@
                     Background="{DynamicResource ControlBackgroundBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    AutomationProperties.Name="Microphone device" />
+                    AutomationProperties.Name="Microphone device">
+            <ComboBox.ItemContainerStyle>
+              <Style TargetType="{x:Type ComboBoxItem}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+              </Style>
+            </ComboBox.ItemContainerStyle>
+          </ComboBox>
 
           <Label Grid.Row="1" Target="{Binding ElementName=OutputDeviceBox}" Content="Speaker" />
           <ComboBox x:Name="OutputDeviceBox"
@@ -95,7 +107,13 @@
                     Background="{DynamicResource ControlBackgroundBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    AutomationProperties.Name="Speaker device" />
+                    AutomationProperties.Name="Speaker device">
+            <ComboBox.ItemContainerStyle>
+              <Style TargetType="{x:Type ComboBoxItem}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+              </Style>
+            </ComboBox.ItemContainerStyle>
+          </ComboBox>
 
           <Label Grid.Row="2" Target="{Binding ElementName=VoiceActivationLevelBox}" Content="Voice activation level" />
           <Slider x:Name="VoiceActivationLevelBox"

@@ -31,4 +31,9 @@ public sealed class AudioDeviceOptionViewModel
         string suffix = device.IsDefaultOutput ? " (system default)" : string.Empty;
         return new AudioDeviceOptionViewModel(device.Id, $"{device.Name}{suffix}");
     }
+
+    public override string ToString()
+    {
+        return Name;
+    }
 }
