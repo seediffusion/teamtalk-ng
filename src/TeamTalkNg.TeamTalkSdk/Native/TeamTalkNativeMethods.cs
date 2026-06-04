@@ -124,6 +124,15 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoUnBanUserEx")]
     internal static extern int DoUnBanUserEx(IntPtr instance, ref NativeBannedUser bannedUser);
 
+    [DllImport(LibraryName, EntryPoint = "TT_DoListUserAccounts")]
+    internal static extern int DoListUserAccounts(IntPtr instance, int index, int count);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoNewUserAccount")]
+    internal static extern int DoNewUserAccount(IntPtr instance, ref NativeUserAccount userAccount);
+
+    [DllImport(LibraryName, EntryPoint = "TT_DoDeleteUserAccount", CharSet = CharSet.Unicode)]
+    internal static extern int DoDeleteUserAccount(IntPtr instance, string username);
+
     [DllImport(LibraryName, EntryPoint = "TT_GetChannelFiles")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int GetChannelFiles(IntPtr instance, int channelId, IntPtr remoteFiles, ref int fileCount);

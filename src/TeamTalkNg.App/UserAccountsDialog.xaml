@@ -1,0 +1,66 @@
+<Window x:Class="TeamTalkNg.App.UserAccountsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="User Accounts"
+        Width="900"
+        Height="560"
+        MinWidth="720"
+        MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <ListView ItemsSource="{Binding Accounts}"
+              SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"
+              Background="{DynamicResource ControlBackgroundBrush}"
+              Foreground="{DynamicResource TextBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              AutomationProperties.Name="User accounts">
+      <ListView.ItemContainerStyle>
+        <Style TargetType="{x:Type ListViewItem}">
+          <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+        </Style>
+      </ListView.ItemContainerStyle>
+      <ListView.View>
+        <GridView>
+          <GridViewColumn Header="Username" DisplayMemberBinding="{Binding Username}" Width="140" />
+          <GridViewColumn Header="Type" DisplayMemberBinding="{Binding Type}" Width="120" />
+          <GridViewColumn Header="Initial channel" DisplayMemberBinding="{Binding InitialChannel}" Width="140" />
+          <GridViewColumn Header="Rights" DisplayMemberBinding="{Binding Rights}" Width="260" />
+          <GridViewColumn Header="Last login" DisplayMemberBinding="{Binding LastLoginTime}" Width="150" />
+          <GridViewColumn Header="Modified" DisplayMemberBinding="{Binding LastModified}" Width="150" />
+          <GridViewColumn Header="Note" DisplayMemberBinding="{Binding Note}" Width="220" />
+        </GridView>
+      </ListView.View>
+    </ListView>
+
+    <DockPanel Grid.Row="1"
+               Margin="0,16,0,0"
+               LastChildFill="False">
+      <Button DockPanel.Dock="Right"
+              Content="Close"
+              Command="{Binding CloseCommand}"
+              IsCancel="True"
+              MinWidth="96"
+              Margin="8,0,0,0"
+              AutomationProperties.Name="Close user accounts" />
+      <Button DockPanel.Dock="Right"
+              Content="Delete"
+              Command="{Binding DeleteCommand}"
+              MinWidth="96"
+              Margin="8,0,0,0"
+              AutomationProperties.Name="Delete selected user account" />
+      <Button DockPanel.Dock="Right"
+              Content="New"
+              Command="{Binding NewCommand}"
+              IsDefault="True"
+              MinWidth="96"
+              AutomationProperties.Name="Create new user account" />
+    </DockPanel>
+  </Grid>
+</Window>

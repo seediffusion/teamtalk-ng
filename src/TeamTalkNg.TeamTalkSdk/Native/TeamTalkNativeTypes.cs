@@ -25,6 +25,7 @@ internal enum ClientEvent
     CommandChannelUpdate = 330,
     CommandChannelRemove = 340,
     CommandServerStatistics = 360,
+    CommandUserAccount = 390,
     CommandBannedUser = 400,
     FileTransfer = 1040,
     InternalError = 1000
@@ -42,6 +43,7 @@ internal enum TTType
     ServerStatistics = 11,
     TTMessage = 16,
     User = 17,
+    UserAccount = 18,
     ClientErrorMsg = 28,
     TTBool = 29,
     Int32 = 30
@@ -144,6 +146,7 @@ internal static unsafe class NativeConstants
     public const int StringLength = 512;
     public const int TransmitUsersMax = 128;
     public const int TransmitQueueMax = 16;
+    public const int ChannelsOperatorMax = 16;
     public const int SampleRatesMax = 16;
     public const int MessageHeaderSize = 16;
 
@@ -508,6 +511,102 @@ internal unsafe struct NativeBannedUser
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct NativeAbusePrevention
+{
+    public int CommandsLimit;
+    public int CommandsIntervalMilliseconds;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeUserAccount
+{
+    public fixed char Username[NativeConstants.StringLength];
+    public fixed char Password[NativeConstants.StringLength];
+    public uint UserType;
+    public uint UserRights;
+    public int UserData;
+    public fixed char Note[NativeConstants.StringLength];
+    public fixed char InitialChannel[NativeConstants.StringLength];
+    public fixed int AutoOperatorChannels[NativeConstants.ChannelsOperatorMax];
+    public int AudioCodecBitrateLimit;
+    public NativeAbusePrevention AbusePrevention;
+    public fixed char LastModified[NativeConstants.StringLength];
+    public fixed char LastLoginTime[NativeConstants.StringLength];
+
+    public string ReadUsername()
+    {
+        fixed (char* value = Username)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadNote()
+    {
+        fixed (char* value = Note)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadInitialChannel()
+    {
+        fixed (char* value = InitialChannel)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadLastModified()
+    {
+        fixed (char* value = LastModified)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadLastLoginTime()
+    {
+        fixed (char* value = LastLoginTime)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public void WriteUsername(string value)
+    {
+        fixed (char* target = Username)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WritePassword(string value)
+    {
+        fixed (char* target = Password)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WriteNote(string value)
+    {
+        fixed (char* target = Note)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WriteInitialChannel(string value)
+    {
+        fixed (char* target = InitialChannel)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct NativeRemoteFile
 {
     public int ChannelId;
@@ -674,4 +773,5 @@ internal sealed record TeamTalkMessage(
     int IntValue,
     NativeFileTransfer FileTransfer = default,
     NativeServerStatistics ServerStatistics = default,
-    NativeBannedUser BannedUser = default);
+    NativeBannedUser BannedUser = default,
+    NativeUserAccount UserAccount = default);

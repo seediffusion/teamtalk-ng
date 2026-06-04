@@ -194,6 +194,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesFileTransferUpdate();
         DispatchesServerStatisticsResponse();
         DispatchesBannedUserListResponse();
+        DispatchesUserAccountListResponse();
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         RejectsVoiceControlsBeforeJoiningChannel();
@@ -203,6 +204,7 @@ internal static unsafe class SdkDispatchTests
         RejectsServerInformationBeforeLogin();
         RejectsServerStatisticsBeforeLogin();
         RejectsBannedUsersBeforeLogin();
+        RejectsUserAccountsBeforeLogin();
         RejectsServerConfigurationSaveBeforeLogin();
         RejectsChannelFilesBeforeJoiningChannel();
         RejectsFileCommandsBeforeJoiningChannel();
@@ -541,6 +543,56 @@ internal static unsafe class SdkDispatchTests
         Assert((bannedUsers[0].BanTypes & BannedUserType.Channel) != 0, "Expected channel ban type.");
     }
 
+    private static unsafe void DispatchesUserAccountListResponse()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        Task<IReadOnlyList<UserAccountSummary>> request = session.BeginUserAccountsRequestForTest(92);
+        NativeUserAccount account = default;
+        WriteString(account.Username, "alex");
+        account.UserType = (uint)UserAccountType.Default;
+        account.UserRights = (uint)(UserAccountRights.ViewAllUsers | UserAccountRights.TransmitVoice | UserAccountRights.SendChannelMessages);
+        account.UserData = 42;
+        WriteString(account.Note, "Test account");
+        WriteString(account.InitialChannel, "/Lobby");
+        account.AudioCodecBitrateLimit = 64000;
+        WriteString(account.LastModified, "2026-06-04");
+        WriteString(account.LastLoginTime, "2026-06-03");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserAccount,
+            Source: 0,
+            TTType.UserAccount,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0,
+            UserAccount: account));
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandProcessing,
+            Source: 92,
+            TTType.TTBool,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0));
+
+        IReadOnlyList<UserAccountSummary> accounts = request.GetAwaiter().GetResult();
+        AssertEqual(1, accounts.Count);
+        AssertEqual("alex", accounts[0].Username);
+        AssertEqual(UserAccountType.Default, accounts[0].Type);
+        Assert((accounts[0].Rights & UserAccountRights.TransmitVoice) != 0, "Expected transmit voice right.");
+        AssertEqual(42, accounts[0].UserData);
+        AssertEqual("Test account", accounts[0].Note);
+        AssertEqual("/Lobby", accounts[0].InitialChannel);
+        AssertEqual(64000, accounts[0].AudioCodecBitrateLimit);
+        AssertEqual("2026-06-03", accounts[0].LastLoginTime);
+    }
+
     private static void DispatchesLoggedInStatusWithoutNativeInstance()
     {
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
@@ -609,6 +661,22 @@ internal static unsafe class SdkDispatchTests
         var bannedUser = new BannedUserSummary("192.0.2.*", string.Empty, string.Empty, string.Empty, string.Empty, BannedUserType.IpAddress, string.Empty);
         AssertThrows(() => session.GetBannedUsersAsync().GetAwaiter().GetResult());
         AssertThrows(() => session.UnbanUserAsync(bannedUser).GetAwaiter().GetResult());
+    }
+
+    private static void RejectsUserAccountsBeforeLogin()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        var account = new UserAccountCreationRequest(
+            "alex",
+            "secret",
+            UserAccountType.Default,
+            UserAccountRights.TransmitVoice,
+            string.Empty,
+            string.Empty);
+        AssertThrows(() => session.GetUserAccountsAsync().GetAwaiter().GetResult());
+        AssertThrows(() => session.CreateUserAccountAsync(account).GetAwaiter().GetResult());
+        AssertThrows(() => session.DeleteUserAccountAsync("alex").GetAwaiter().GetResult());
     }
 
     private static void RejectsServerConfigurationSaveBeforeLogin()

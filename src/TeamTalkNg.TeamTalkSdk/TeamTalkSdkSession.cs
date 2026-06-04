@@ -11,6 +11,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private static readonly TimeSpan ConnectionProgressTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ServerStatisticsTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan BannedUsersTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan UserAccountsTimeout = TimeSpan.FromSeconds(10);
 
     private readonly TeamTalkSdkOptions options;
     private readonly Lock stateLock = new();
@@ -24,6 +25,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int bannedUsersCommandId;
     private TaskCompletionSource<IReadOnlyList<BannedUserSummary>>? pendingBannedUsers;
     private List<BannedUserSummary>? pendingBannedUserItems;
+    private int userAccountsCommandId;
+    private TaskCompletionSource<IReadOnlyList<UserAccountSummary>>? pendingUserAccounts;
+    private List<UserAccountSummary>? pendingUserAccountItems;
     private TeamTalkServerProfile? activeProfile;
     private int currentChannelId;
     private int myUserId;
@@ -335,6 +339,114 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         if (commandId <= 0)
         {
             RaiseSystemMessage("TeamTalk SDK did not accept the remove ban command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<UserAccountSummary>> GetUserAccountsAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing user accounts.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = new TaskCompletionSource<IReadOnlyList<UserAccountSummary>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (pendingUserAccounts is not null)
+            {
+                throw new InvalidOperationException("A user accounts request is already in progress.");
+            }
+
+            commandId = TeamTalkNativeMethods.DoListUserAccounts(instance, index: 0, count: 1000);
+            if (commandId <= 0)
+            {
+                throw new InvalidOperationException("TeamTalk SDK did not accept the user accounts command.");
+            }
+
+            userAccountsCommandId = commandId;
+            pendingUserAccountItems = [];
+            pendingUserAccounts = request;
+        }
+
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(UserAccountsTimeout);
+
+        try
+        {
+            return await request.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("TeamTalk user accounts did not arrive in time.");
+        }
+        finally
+        {
+            ClearPendingUserAccounts(request);
+        }
+    }
+
+    public Task CreateUserAccountAsync(UserAccountCreationRequest account, CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before creating user accounts.");
+        }
+
+        string username = account.Username.Trim();
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            throw new InvalidOperationException("Username cannot be empty.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        NativeUserAccount nativeAccount = CreateNativeUserAccount(account with { Username = username });
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoNewUserAccount(instance, ref nativeAccount);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the create user account command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteUserAccountAsync(string username, CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before deleting user accounts.");
+        }
+
+        string trimmedUsername = username.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedUsername))
+        {
+            throw new InvalidOperationException("Select a user account before deleting.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoDeleteUserAccount(instance, trimmedUsername);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the delete user account command.");
         }
 
         return Task.CompletedTask;
@@ -1035,6 +1147,19 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return request.Task;
     }
 
+    internal Task<IReadOnlyList<UserAccountSummary>> BeginUserAccountsRequestForTest(int commandId)
+    {
+        var request = new TaskCompletionSource<IReadOnlyList<UserAccountSummary>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (stateLock)
+        {
+            userAccountsCommandId = commandId;
+            pendingUserAccountItems = [];
+            pendingUserAccounts = request;
+        }
+
+        return request.Task;
+    }
+
     private void EnsureInstance()
     {
         if (instance != IntPtr.Zero)
@@ -1242,6 +1367,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 break;
             case ClientEvent.CommandBannedUser:
                 AddPendingBannedUser(message.BannedUser);
+                break;
+            case ClientEvent.CommandUserAccount:
+                AddPendingUserAccount(message.UserAccount);
                 break;
             case ClientEvent.FileTransfer:
                 DispatchFileTransfer(message.FileTransfer);
@@ -1808,6 +1936,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         loginCommandId = 0;
         FailPendingServerStatistics(new InvalidOperationException(reason));
         FailPendingBannedUsers(new InvalidOperationException(reason));
+        FailPendingUserAccounts(new InvalidOperationException(reason));
         CloseInstance();
         SetStatus(ConnectionStatus.Disconnected);
     }
@@ -1831,6 +1960,11 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             FailPendingBannedUsers(new InvalidOperationException(error));
         }
 
+        if (userAccountsCommandId > 0 && message.Source == userAccountsCommandId)
+        {
+            FailPendingUserAccounts(new InvalidOperationException(error));
+        }
+
         RaiseSystemMessage(error);
     }
 
@@ -1844,6 +1978,11 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         if (bannedUsersCommandId > 0 && message.Source == bannedUsersCommandId)
         {
             CompletePendingBannedUsers();
+        }
+
+        if (userAccountsCommandId > 0 && message.Source == userAccountsCommandId)
+        {
+            CompletePendingUserAccounts();
         }
     }
 
@@ -1899,6 +2038,40 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         request.TrySetResult(users);
     }
 
+    private void AddPendingUserAccount(NativeUserAccount userAccount)
+    {
+        lock (stateLock)
+        {
+            if (pendingUserAccountItems is null)
+            {
+                return;
+            }
+
+            pendingUserAccountItems.Add(CreateUserAccountSummary(userAccount));
+        }
+    }
+
+    private void CompletePendingUserAccounts()
+    {
+        TaskCompletionSource<IReadOnlyList<UserAccountSummary>>? request = null;
+        IReadOnlyList<UserAccountSummary> accounts = [];
+        lock (stateLock)
+        {
+            if (pendingUserAccounts is null)
+            {
+                return;
+            }
+
+            request = pendingUserAccounts;
+            accounts = pendingUserAccountItems?.ToList() ?? [];
+            pendingUserAccounts = null;
+            pendingUserAccountItems = null;
+            userAccountsCommandId = 0;
+        }
+
+        request.TrySetResult(accounts);
+    }
+
     private void FailPendingServerStatistics(Exception exception)
     {
         TaskCompletionSource<ServerStatisticsSummary>? request = null;
@@ -1926,6 +2099,20 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         request?.TrySetException(exception);
     }
 
+    private void FailPendingUserAccounts(Exception exception)
+    {
+        TaskCompletionSource<IReadOnlyList<UserAccountSummary>>? request = null;
+        lock (stateLock)
+        {
+            request = pendingUserAccounts;
+            pendingUserAccounts = null;
+            pendingUserAccountItems = null;
+            userAccountsCommandId = 0;
+        }
+
+        request?.TrySetException(exception);
+    }
+
     private void ClearPendingServerStatistics(TaskCompletionSource<ServerStatisticsSummary> request)
     {
         lock (stateLock)
@@ -1947,6 +2134,19 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 pendingBannedUsers = null;
                 pendingBannedUserItems = null;
                 bannedUsersCommandId = 0;
+            }
+        }
+    }
+
+    private void ClearPendingUserAccounts(TaskCompletionSource<IReadOnlyList<UserAccountSummary>> request)
+    {
+        lock (stateLock)
+        {
+            if (ReferenceEquals(pendingUserAccounts, request))
+            {
+                pendingUserAccounts = null;
+                pendingUserAccountItems = null;
+                userAccountsCommandId = 0;
             }
         }
     }
@@ -1992,6 +2192,49 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         nativeBannedUser.WriteUsername(bannedUser.Username);
         nativeBannedUser.BanTypes = (uint)bannedUser.BanTypes;
         return nativeBannedUser;
+    }
+
+    private static UserAccountSummary CreateUserAccountSummary(NativeUserAccount account)
+    {
+        var type = (UserAccountType)account.UserType;
+        if (type is not (UserAccountType.Default or UserAccountType.Administrator))
+        {
+            type = UserAccountType.Default;
+        }
+
+        return new UserAccountSummary(
+            account.ReadUsername(),
+            type,
+            (UserAccountRights)account.UserRights,
+            account.UserData,
+            account.ReadNote(),
+            account.ReadInitialChannel(),
+            Math.Max(0, account.AudioCodecBitrateLimit),
+            account.ReadLastModified(),
+            account.ReadLastLoginTime());
+    }
+
+    private static NativeUserAccount CreateNativeUserAccount(UserAccountCreationRequest account)
+    {
+        NativeUserAccount nativeAccount = default;
+        nativeAccount.WriteUsername(account.Username);
+        nativeAccount.WritePassword(account.Password);
+        nativeAccount.UserType = (uint)account.Type;
+        nativeAccount.UserRights = (uint)account.Rights;
+        nativeAccount.WriteNote(account.Note);
+        nativeAccount.WriteInitialChannel(NormalizeNativeChannelPath(account.InitialChannel));
+        nativeAccount.AudioCodecBitrateLimit = Math.Max(0, account.AudioCodecBitrateLimit);
+        return nativeAccount;
+    }
+
+    private static string NormalizeNativeChannelPath(string? channelPath)
+    {
+        if (string.IsNullOrWhiteSpace(channelPath) || channelPath == "/")
+        {
+            return string.Empty;
+        }
+
+        return "/" + channelPath.Trim().Trim('/');
     }
 
     private void RaiseSystemMessage(string text)

@@ -33,6 +33,12 @@ public interface ITeamTalkSession
 
     Task UnbanUserAsync(BannedUserSummary bannedUser, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<UserAccountSummary>> GetUserAccountsAsync(CancellationToken cancellationToken = default);
+
+    Task CreateUserAccountAsync(UserAccountCreationRequest account, CancellationToken cancellationToken = default);
+
+    Task DeleteUserAccountAsync(string username, CancellationToken cancellationToken = default);
+
     Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default);

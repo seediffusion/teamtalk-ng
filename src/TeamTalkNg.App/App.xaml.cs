@@ -35,6 +35,8 @@ public partial class App : Application
             IServerInformationDialogService serverInformationDialogService = new ServerInformationDialogService();
             IServerStatisticsDialogService serverStatisticsDialogService = new ServerStatisticsDialogService();
             IBannedUsersDialogService bannedUsersDialogService = new BannedUsersDialogService();
+            IUserAccountsDialogService userAccountsDialogService = new UserAccountsDialogService();
+            IUserAccountDialogService userAccountDialogService = new UserAccountDialogService();
             IPreferencesDialogService preferencesDialogService = new PreferencesDialogService();
             IChannelDialogService channelDialogService = new ChannelDialogService();
             IChannelInformationDialogService channelInformationDialogService = new ChannelInformationDialogService();
@@ -58,6 +60,8 @@ public partial class App : Application
                 serverInformationDialogService,
                 serverStatisticsDialogService,
                 bannedUsersDialogService,
+                userAccountsDialogService,
+                userAccountDialogService,
                 settingsStore,
                 preferencesDialogService,
                 channelDialogService,

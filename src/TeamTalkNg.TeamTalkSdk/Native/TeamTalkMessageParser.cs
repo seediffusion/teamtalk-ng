@@ -18,6 +18,7 @@ internal static class TeamTalkMessageParser
         NativeFileTransfer fileTransfer = default;
         NativeServerStatistics serverStatistics = default;
         NativeBannedUser bannedUser = default;
+        NativeUserAccount userAccount = default;
         int boolValue = 0;
         int intValue = 0;
 
@@ -44,6 +45,9 @@ internal static class TeamTalkMessageParser
             case TTType.BannedUser:
                 bannedUser = Marshal.PtrToStructure<NativeBannedUser>(payload);
                 break;
+            case TTType.UserAccount:
+                userAccount = Marshal.PtrToStructure<NativeUserAccount>(payload);
+                break;
             case TTType.TTBool:
                 boolValue = Marshal.ReadInt32(payload);
                 break;
@@ -52,6 +56,6 @@ internal static class TeamTalkMessageParser
                 break;
         }
 
-        return new TeamTalkMessage(clientEvent, source, type, user, textMessage, clientError, channel, boolValue, intValue, fileTransfer, serverStatistics, bannedUser);
+        return new TeamTalkMessage(clientEvent, source, type, user, textMessage, clientError, channel, boolValue, intValue, fileTransfer, serverStatistics, bannedUser, userAccount);
     }
 }

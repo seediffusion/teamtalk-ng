@@ -18,6 +18,29 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             BannedUserType.IpAddress,
             "TeamTalk NG")
     ];
+    private readonly List<UserAccountSummary> userAccounts =
+    [
+        new UserAccountSummary(
+            "admin",
+            UserAccountType.Administrator,
+            UserAccountRights.None,
+            UserData: 0,
+            "Mock administrator account",
+            "/Lobby",
+            AudioCodecBitrateLimit: 0,
+            DateTimeOffset.Now.AddDays(-7).ToString("g"),
+            DateTimeOffset.Now.AddDays(-1).ToString("g")),
+        new UserAccountSummary(
+            "guest",
+            UserAccountType.Default,
+            DefaultAccountRights,
+            UserData: 0,
+            "Mock guest account",
+            "/Lobby",
+            AudioCodecBitrateLimit: 0,
+            DateTimeOffset.Now.AddDays(-5).ToString("g"),
+            DateTimeOffset.Now.AddHours(-2).ToString("g"))
+    ];
     private readonly Dictionary<int, FileTransferSummary> activeTransfers = [];
     private int nextFileId = 1;
     private int nextTransferId = 1;
@@ -32,6 +55,14 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public event EventHandler<FileTransferSummary>? FileTransferUpdated;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
+
+    private const UserAccountRights DefaultAccountRights =
+        UserAccountRights.ViewAllUsers
+        | UserAccountRights.CreateTemporaryChannel
+        | UserAccountRights.DownloadFiles
+        | UserAccountRights.TransmitVoice
+        | UserAccountRights.SendDirectMessages
+        | UserAccountRights.SendChannelMessages;
 
     public Task<IReadOnlyList<AudioDeviceSummary>> GetAudioDevicesAsync(CancellationToken cancellationToken = default)
     {
@@ -181,6 +212,66 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             "TeamTalk NG",
             $"Remove ban command sent for {bannedUser.DisplayName}.",
             IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<UserAccountSummary>> GetUserAccountsAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing user accounts.");
+        }
+
+        return Task.FromResult<IReadOnlyList<UserAccountSummary>>(userAccounts.ToList());
+    }
+
+    public Task CreateUserAccountAsync(UserAccountCreationRequest account, CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before creating user accounts.");
+        }
+
+        string username = account.Username.Trim();
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            throw new InvalidOperationException("Username cannot be empty.");
+        }
+
+        if (userAccounts.Any(item => string.Equals(item.Username, username, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"A user account named {username} already exists.");
+        }
+
+        userAccounts.Add(new UserAccountSummary(
+            username,
+            account.Type,
+            account.Rights,
+            UserData: 0,
+            account.Note.Trim(),
+            account.InitialChannel.Trim(),
+            account.AudioCodecBitrateLimit,
+            DateTimeOffset.Now.ToString("g"),
+            string.Empty));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Create user account command sent for {username}.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteUserAccountAsync(string username, CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before deleting user accounts.");
+        }
+
+        string trimmedUsername = username.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedUsername))
+        {
+            throw new InvalidOperationException("Select a user account before deleting.");
+        }
+
+        userAccounts.RemoveAll(item => string.Equals(item.Username, trimmedUsername, StringComparison.OrdinalIgnoreCase));
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"Delete user account command sent for {trimmedUsername}.", IsSystem: true));
         return Task.CompletedTask;
     }
 

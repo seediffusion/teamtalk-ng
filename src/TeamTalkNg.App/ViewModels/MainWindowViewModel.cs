@@ -21,6 +21,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IServerInformationDialogService serverInformationDialogService;
     private readonly IServerStatisticsDialogService serverStatisticsDialogService;
     private readonly IBannedUsersDialogService bannedUsersDialogService;
+    private readonly IUserAccountsDialogService userAccountsDialogService;
+    private readonly IUserAccountDialogService userAccountDialogService;
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
     private readonly IChannelDialogService channelDialogService;
@@ -61,6 +63,8 @@ public sealed class MainWindowViewModel : ObservableObject
         IServerInformationDialogService serverInformationDialogService,
         IServerStatisticsDialogService serverStatisticsDialogService,
         IBannedUsersDialogService bannedUsersDialogService,
+        IUserAccountsDialogService userAccountsDialogService,
+        IUserAccountDialogService userAccountDialogService,
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
         IChannelDialogService channelDialogService,
@@ -85,6 +89,8 @@ public sealed class MainWindowViewModel : ObservableObject
         this.serverInformationDialogService = serverInformationDialogService;
         this.serverStatisticsDialogService = serverStatisticsDialogService;
         this.bannedUsersDialogService = bannedUsersDialogService;
+        this.userAccountsDialogService = userAccountsDialogService;
+        this.userAccountDialogService = userAccountDialogService;
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
         this.channelDialogService = channelDialogService;
@@ -111,6 +117,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ServerInformationCommand = new AsyncRelayCommand(ShowServerInformationAsync, CanShowServerInformation);
         ServerStatisticsCommand = new AsyncRelayCommand(ShowServerStatisticsAsync, CanUseLoggedInServerCommand);
         BannedUsersCommand = new AsyncRelayCommand(ShowBannedUsersAsync, CanUseLoggedInServerCommand);
+        UserAccountsCommand = new AsyncRelayCommand(ShowUserAccountsAsync, CanUseLoggedInServerCommand);
         SaveServerConfigurationCommand = new AsyncRelayCommand(SaveServerConfigurationAsync, CanUseLoggedInServerCommand);
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
         ChannelInformationCommand = new RelayCommand(ShowChannelInformation, CanShowChannelInformation);
@@ -203,6 +210,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand ServerStatisticsCommand { get; }
 
     public ICommand BannedUsersCommand { get; }
+
+    public ICommand UserAccountsCommand { get; }
 
     public ICommand SaveServerConfigurationCommand { get; }
 
@@ -506,6 +515,58 @@ public sealed class MainWindowViewModel : ObservableObject
 
             await teamTalkSession.UnbanUserAsync(selectedBan);
             await AnnounceAsync($"Remove ban command sent for {selectedBan.DisplayName}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task ShowUserAccountsAsync()
+    {
+        try
+        {
+            IReadOnlyList<UserAccountSummary> accounts = await teamTalkSession.GetUserAccountsAsync();
+            UserAccountsDialogResult result = userAccountsDialogService.ShowUserAccountsDialog(accounts);
+            switch (result.Action)
+            {
+                case UserAccountsDialogAction.New:
+                    UserAccountCreationRequest? request = userAccountDialogService.ShowCreateUserAccountDialog();
+                    if (request is null)
+                    {
+                        await AnnounceAsync("New user account canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+                        return;
+                    }
+
+                    await teamTalkSession.CreateUserAccountAsync(request);
+                    await AnnounceAsync($"Create user account command sent for {request.Username}", AnnouncementPriority.Normal, AnnouncementKind.System);
+                    break;
+                case UserAccountsDialogAction.Delete:
+                    if (result.SelectedAccount is null)
+                    {
+                        await AnnounceAsync("Select a user account before deleting", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+                        return;
+                    }
+
+                    MessageBoxResult confirmation = MessageBox.Show(
+                        $"Delete user account {result.SelectedAccount.DisplayName}?",
+                        "Delete User Account",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning,
+                        MessageBoxResult.No);
+                    if (confirmation != MessageBoxResult.Yes)
+                    {
+                        await AnnounceAsync("Delete user account canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+                        return;
+                    }
+
+                    await teamTalkSession.DeleteUserAccountAsync(result.SelectedAccount.Username);
+                    await AnnounceAsync($"Delete user account command sent for {result.SelectedAccount.DisplayName}", AnnouncementPriority.Normal, AnnouncementKind.System);
+                    break;
+                default:
+                    await AnnounceAsync("User accounts closed", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+                    break;
+            }
         }
         catch (Exception ex)
         {
@@ -1699,6 +1760,11 @@ public sealed class MainWindowViewModel : ObservableObject
         if (BannedUsersCommand is AsyncRelayCommand bannedUsers)
         {
             bannedUsers.RaiseCanExecuteChanged();
+        }
+
+        if (UserAccountsCommand is AsyncRelayCommand userAccounts)
+        {
+            userAccounts.RaiseCanExecuteChanged();
         }
 
         if (SaveServerConfigurationCommand is AsyncRelayCommand saveServerConfiguration)
