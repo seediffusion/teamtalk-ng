@@ -57,6 +57,12 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int SetVoiceActivationLevel(IntPtr instance, int level);
 
+    [DllImport(LibraryName, EntryPoint = "TT_GetVoiceActivationLevel")]
+    internal static extern int GetVoiceActivationLevel(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_GetSoundInputLevel")]
+    internal static extern int GetSoundInputLevel(IntPtr instance);
+
     [DllImport(LibraryName, EntryPoint = "TT_SetSoundInputGainLevel")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int SetSoundInputGainLevel(IntPtr instance, int level);

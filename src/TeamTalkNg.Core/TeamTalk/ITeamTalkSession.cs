@@ -19,6 +19,8 @@ public interface ITeamTalkSession
 
     Task SetAudioVolumeAsync(int inputVolumePercent, int outputVolumePercent, CancellationToken cancellationToken = default);
 
+    Task<AudioInputLevelSummary> GetAudioInputLevelAsync(CancellationToken cancellationToken = default);
+
     Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default);
 
     Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default);

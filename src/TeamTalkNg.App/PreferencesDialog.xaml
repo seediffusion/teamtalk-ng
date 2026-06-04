@@ -63,6 +63,8 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
@@ -106,7 +108,30 @@
                   Value="{Binding VoiceActivationLevel}"
                   AutomationProperties.Name="Voice activation level" />
 
-          <StackPanel Grid.Row="3"
+          <Button Grid.Row="3"
+                  Grid.Column="1"
+                  Content="Calibrate Voice Activation"
+                  Command="{Binding CalibrateVoiceActivationCommand}"
+                  MinWidth="170"
+                  Margin="0,12,0,0"
+                  HorizontalAlignment="Left"
+                  AutomationProperties.Name="Calibrate voice activation" />
+
+          <TextBlock Grid.Row="4"
+                     Grid.Column="1"
+                     Text="{Binding VoiceActivationCalibrationStatus}"
+                     Margin="0,8,0,0"
+                     Foreground="{DynamicResource MutedTextBrush}"
+                     AutomationProperties.Name="Voice activation calibration status" />
+
+          <CheckBox Grid.Row="5"
+                    Grid.Column="1"
+                    Content="Show input level meter"
+                    IsChecked="{Binding ShowInputMeter}"
+                    Margin="0,14,0,0"
+                    AutomationProperties.Name="Show input level meter" />
+
+          <StackPanel Grid.Row="6"
                       Grid.Column="1"
                       Orientation="Horizontal"
                       Margin="0,14,0,0"

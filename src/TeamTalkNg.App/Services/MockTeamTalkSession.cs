@@ -84,6 +84,17 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task<AudioInputLevelSummary> GetAudioInputLevelAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before monitoring microphone input.");
+        }
+
+        int level = (int)(DateTimeOffset.Now.Millisecond / 10.0) % 100;
+        return Task.FromResult(new AudioInputLevelSummary(level, 50));
+    }
+
     public Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)

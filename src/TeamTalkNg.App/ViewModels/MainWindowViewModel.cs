@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using TeamTalkNg.App.Services;
 using TeamTalkNg.Core.Accessibility;
 using TeamTalkNg.Core.TeamTalk;
@@ -35,14 +36,19 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
     private readonly INicknameDialogService nicknameDialogService;
+    private readonly DispatcherTimer inputLevelTimer;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
     private double inputVolume = 50;
     private double outputVolume = 50;
+    private int inputLevelPercent;
+    private int voiceActivationLevelPercent = 50;
     private ChannelTreeItemViewModel? selectedChannelItem;
     private bool pushToTalkEnabled;
     private bool voiceActivationEnabled;
+    private bool isInputMeterVisible;
+    private bool isPollingInputLevel;
     private bool isAway;
     private string currentNickname = Environment.UserName;
     private bool appliedInitialStatus;
@@ -107,8 +113,15 @@ public sealed class MainWindowViewModel : ObservableObject
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
+        voiceActivationLevelPercent = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
+        isInputMeterVisible = settings.ShowInputMeter;
         currentNickname = GetDefaultNickname();
         isAway = settings.IsAway;
+        inputLevelTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(150)
+        };
+        inputLevelTimer.Tick += OnInputLevelTimerTick;
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
@@ -140,6 +153,7 @@ public sealed class MainWindowViewModel : ObservableObject
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
+        ToggleInputMeterCommand = new AsyncRelayCommand(ToggleInputMeterAsync);
         ChangeNicknameCommand = new AsyncRelayCommand(ChangeNicknameAsync, CanSetProfileState);
         SetStatusCommand = new AsyncRelayCommand(SetStatusAsync, CanSetStatus);
         SimulateUserJoinedCommand = new RelayCommand(SimulateUserJoined);
@@ -161,6 +175,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         BuildDisconnectedTree();
         ShowFilesPlaceholder("Join a channel to view files");
+        UpdateInputLevelTimer();
     }
 
     public string WindowTitle => $"TeamTalk NG - {ConnectionStatusText}";
@@ -257,6 +272,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public ICommand ToggleVoiceActivationCommand { get; }
 
+    public ICommand ToggleInputMeterCommand { get; }
+
     public ICommand SetStatusCommand { get; }
 
     public ICommand ChangeNicknameCommand { get; }
@@ -323,6 +340,50 @@ public sealed class MainWindowViewModel : ObservableObject
             if (SetProperty(ref outputVolume, Math.Clamp(value, 0, 100)))
             {
                 _ = ApplyAudioVolumeAsync();
+            }
+        }
+    }
+
+    public int InputLevelPercent
+    {
+        get => inputLevelPercent;
+        private set
+        {
+            int clampedValue = Math.Clamp(value, 0, 100);
+            if (SetProperty(ref inputLevelPercent, clampedValue))
+            {
+                OnPropertyChanged(nameof(InputLevelMeterWidth));
+                OnPropertyChanged(nameof(InputLevelText));
+            }
+        }
+    }
+
+    public int VoiceActivationLevelPercent
+    {
+        get => voiceActivationLevelPercent;
+        private set
+        {
+            if (SetProperty(ref voiceActivationLevelPercent, Math.Clamp(value, 0, 100)))
+            {
+                OnPropertyChanged(nameof(VoiceActivationMarkerMargin));
+            }
+        }
+    }
+
+    public double InputLevelMeterWidth => InputLevelPercent * 1.8;
+
+    public Thickness VoiceActivationMarkerMargin => new(VoiceActivationLevelPercent * 1.8, 0, 0, 0);
+
+    public string InputLevelText => $"Input level {InputLevelPercent} percent";
+
+    public bool IsInputMeterVisible
+    {
+        get => isInputMeterVisible;
+        private set
+        {
+            if (SetProperty(ref isInputMeterVisible, value))
+            {
+                UpdateInputLevelTimer();
             }
         }
     }
@@ -1138,7 +1199,8 @@ public sealed class MainWindowViewModel : ObservableObject
         AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(
             settings,
             audioDevices,
-            () => teamTalkSession.GetAudioDevicesAsync());
+            () => teamTalkSession.GetAudioDevicesAsync(),
+            () => teamTalkSession.GetAudioInputLevelAsync());
         if (updatedSettings is null)
         {
             return;
@@ -1146,6 +1208,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
+        IsInputMeterVisible = settings.ShowInputMeter;
+        VoiceActivationLevelPercent = settings.VoiceActivationLevel;
         if (teamTalkSession.Status == ConnectionStatus.Disconnected)
         {
             currentNickname = GetDefaultNickname();
@@ -1158,6 +1222,19 @@ public sealed class MainWindowViewModel : ObservableObject
         IsVoiceActivationEnabled = false;
         await settingsStore.SaveAsync(settings);
         await AnnounceAsync("Preferences saved", AnnouncementPriority.Normal, AnnouncementKind.System);
+    }
+
+    private async Task ToggleInputMeterAsync()
+    {
+        IsInputMeterVisible = !IsInputMeterVisible;
+        settings = settings with { ShowInputMeter = IsInputMeterVisible };
+        await settingsStore.SaveAsync(settings);
+        if (!IsInputMeterVisible)
+        {
+            InputLevelPercent = 0;
+        }
+
+        await AnnounceAsync(IsInputMeterVisible ? "Input meter shown" : "Input meter hidden", AnnouncementPriority.Normal, AnnouncementKind.System);
     }
 
     private async Task ApplyAudioVolumeAsync()
@@ -1226,6 +1303,7 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 IsPushToTalkEnabled = false;
                 IsVoiceActivationEnabled = false;
+                InputLevelPercent = 0;
                 ShowFilesPlaceholder("Join a channel to view files");
             }
             else
@@ -1234,6 +1312,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 _ = RefreshFilesAsync(announce: false);
             }
 
+            UpdateInputLevelTimer();
             RaiseCommandStateChanged();
             RaiseChannelCommandStateChanged();
         });
@@ -1241,6 +1320,46 @@ public sealed class MainWindowViewModel : ObservableObject
         if (status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
         {
             _ = ApplyInitialStatusAsync();
+        }
+    }
+
+    private async void OnInputLevelTimerTick(object? sender, EventArgs e)
+    {
+        if (!IsInputMeterVisible || isPollingInputLevel)
+        {
+            return;
+        }
+
+        isPollingInputLevel = true;
+        try
+        {
+            AudioInputLevelSummary level = await teamTalkSession.GetAudioInputLevelAsync();
+            InputLevelPercent = level.ClampedLevel;
+            VoiceActivationLevelPercent = level.ClampedVoiceActivationLevel;
+        }
+        catch
+        {
+            InputLevelPercent = 0;
+            UpdateInputLevelTimer();
+        }
+        finally
+        {
+            isPollingInputLevel = false;
+        }
+    }
+
+    private void UpdateInputLevelTimer()
+    {
+        if (IsInputMeterVisible && teamTalkSession.Status == ConnectionStatus.InChannel)
+        {
+            if (!inputLevelTimer.IsEnabled)
+            {
+                inputLevelTimer.Start();
+            }
+        }
+        else if (inputLevelTimer.IsEnabled)
+        {
+            inputLevelTimer.Stop();
         }
     }
 

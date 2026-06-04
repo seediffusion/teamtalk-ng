@@ -8,4 +8,5 @@
   <SolidColorBrush x:Key="BorderBrush" Color="#C9D1D9" />
   <SolidColorBrush x:Key="SplitterBrush" Color="#D0D7DE" />
   <SolidColorBrush x:Key="AccentBrush" Color="#0969DA" />
+  <SolidColorBrush x:Key="WarningBrush" Color="#D1242F" />
 </ResourceDictionary>

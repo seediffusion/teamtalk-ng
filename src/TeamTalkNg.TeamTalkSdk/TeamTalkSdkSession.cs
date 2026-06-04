@@ -106,6 +106,30 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task<AudioInputLevelSummary> GetAudioInputLevelAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before monitoring microphone input.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureSoundInputInitialized();
+
+        int inputLevel;
+        int activationLevel;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            inputLevel = TeamTalkNativeMethods.GetSoundInputLevel(instance);
+            activationLevel = TeamTalkNativeMethods.GetVoiceActivationLevel(instance);
+        }
+
+        return Task.FromResult(new AudioInputLevelSummary(
+            Math.Clamp(inputLevel, SoundLevel.VuMin, SoundLevel.VuMax),
+            Math.Clamp(activationLevel, SoundLevel.VuMin, SoundLevel.VuMax)));
+    }
+
     public Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
@@ -1325,6 +1349,15 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.ConnectionLost:
                 HandleDisconnected("Connection lost.");
                 break;
+            case ClientEvent.SoundDeviceAdded:
+            case ClientEvent.SoundDeviceRemoved:
+            case ClientEvent.SoundDeviceUnplugged:
+            case ClientEvent.SoundDeviceNewDefaultInput:
+            case ClientEvent.SoundDeviceNewDefaultOutput:
+            case ClientEvent.SoundDeviceNewDefaultInputCommunication:
+            case ClientEvent.SoundDeviceNewDefaultOutputCommunication:
+                HandleSoundDeviceChanged(message.ClientEvent);
+                break;
             case ClientEvent.CommandProcessing:
                 HandleCommandProcessing(message);
                 break;
@@ -1939,6 +1972,105 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         FailPendingUserAccounts(new InvalidOperationException(reason));
         CloseInstance();
         SetStatus(ConnectionStatus.Disconnected);
+    }
+
+    private void HandleSoundDeviceChanged(ClientEvent clientEvent)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel) || instance == IntPtr.Zero)
+        {
+            return;
+        }
+
+        bool inputDefaultChanged = clientEvent is ClientEvent.SoundDeviceNewDefaultInput
+            or ClientEvent.SoundDeviceNewDefaultInputCommunication;
+        bool outputDefaultChanged = clientEvent is ClientEvent.SoundDeviceNewDefaultOutput
+            or ClientEvent.SoundDeviceNewDefaultOutputCommunication;
+        bool deviceListChanged = clientEvent is ClientEvent.SoundDeviceAdded
+            or ClientEvent.SoundDeviceRemoved
+            or ClientEvent.SoundDeviceUnplugged;
+
+        if (!deviceListChanged
+            && !(inputDefaultChanged && configuredInputDeviceId is null)
+            && !(outputDefaultChanged && configuredOutputDeviceId is null))
+        {
+            return;
+        }
+
+        bool restartVoiceTransmission;
+        bool restartVoiceActivation;
+        int activationLevel = 50;
+        lock (stateLock)
+        {
+            restartVoiceTransmission = voiceTransmissionEnabled;
+            restartVoiceActivation = voiceActivationEnabled;
+            if (instance != IntPtr.Zero)
+            {
+                activationLevel = Math.Clamp(
+                    TeamTalkNativeMethods.GetVoiceActivationLevel(instance),
+                    SoundLevel.VuMin,
+                    SoundLevel.VuMax);
+            }
+
+            StopVoiceInput();
+            CloseSoundDevices();
+        }
+
+        InitializeDefaultAudioDevices();
+
+        if (restartVoiceTransmission)
+        {
+            TryRestoreVoiceTransmission();
+        }
+        else if (restartVoiceActivation)
+        {
+            TryRestoreVoiceActivation(activationLevel);
+        }
+
+        RaiseSystemMessage("Audio devices changed; TeamTalk NG refreshed the microphone and speaker.");
+    }
+
+    private void TryRestoreVoiceTransmission()
+    {
+        try
+        {
+            EnsureSoundInputInitialized();
+            lock (stateLock)
+            {
+                if (instance != IntPtr.Zero && TeamTalkNativeMethods.EnableVoiceTransmission(instance, 1) != 0)
+                {
+                    voiceTransmissionEnabled = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            RaiseSystemMessage($"Audio devices refreshed, but voice transmission could not be restored: {ex.Message}");
+        }
+    }
+
+    private void TryRestoreVoiceActivation(int activationLevel)
+    {
+        try
+        {
+            EnsureSoundInputInitialized();
+            lock (stateLock)
+            {
+                if (instance == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                TeamTalkNativeMethods.SetVoiceActivationLevel(instance, activationLevel);
+                if (TeamTalkNativeMethods.EnableVoiceActivation(instance, 1) != 0)
+                {
+                    voiceActivationEnabled = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            RaiseSystemMessage($"Audio devices refreshed, but voice activation could not be restored: {ex.Message}");
+        }
     }
 
     private void HandleCommandError(TeamTalkMessage message)

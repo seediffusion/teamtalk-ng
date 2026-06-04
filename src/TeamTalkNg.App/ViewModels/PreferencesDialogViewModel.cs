@@ -20,16 +20,21 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool isAway;
     private string statusMessage = string.Empty;
     private string audioDeviceRefreshStatus = "Audio devices loaded";
+    private string voiceActivationCalibrationStatus = "Voice activation calibration not run";
+    private bool showInputMeter;
     private readonly int inputVolume;
     private readonly int outputVolume;
     private readonly Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices;
+    private readonly Func<Task<AudioInputLevelSummary>> getAudioInputLevel;
 
     public PreferencesDialogViewModel(
         AppSettings settings,
         IReadOnlyList<AudioDeviceSummary> audioDevices,
-        Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices)
+        Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices,
+        Func<Task<AudioInputLevelSummary>> getAudioInputLevel)
     {
         this.refreshAudioDevices = refreshAudioDevices;
+        this.getAudioInputLevel = getAudioInputLevel;
         inputVolume = settings.InputVolume;
         outputVolume = settings.OutputVolume;
         Themes =
@@ -49,6 +54,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         selectedInputDeviceId = settings.AudioInputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         selectedOutputDeviceId = settings.AudioOutputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         voiceActivationLevel = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
+        showInputMeter = settings.ShowInputMeter;
         defaultNickname = string.IsNullOrWhiteSpace(settings.DefaultNickname) ? Environment.UserName : settings.DefaultNickname;
         isAway = settings.IsAway;
         statusMessage = settings.StatusMessage;
@@ -57,6 +63,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         SaveCommand = new RelayCommand(() => RequestClose?.Invoke(this, true));
         CancelCommand = new RelayCommand(() => RequestClose?.Invoke(this, false));
         RefreshAudioDevicesCommand = new AsyncRelayCommand(RefreshAudioDevicesAsync);
+        CalibrateVoiceActivationCommand = new AsyncRelayCommand(CalibrateVoiceActivationAsync);
     }
 
     public event EventHandler<bool>? RequestClose;
@@ -73,10 +80,18 @@ public sealed class PreferencesDialogViewModel : ObservableObject
 
     public ICommand RefreshAudioDevicesCommand { get; }
 
+    public ICommand CalibrateVoiceActivationCommand { get; }
+
     public string AudioDeviceRefreshStatus
     {
         get => audioDeviceRefreshStatus;
         private set => SetProperty(ref audioDeviceRefreshStatus, value);
+    }
+
+    public string VoiceActivationCalibrationStatus
+    {
+        get => voiceActivationCalibrationStatus;
+        private set => SetProperty(ref voiceActivationCalibrationStatus, value);
     }
 
     public AppTheme SelectedTheme
@@ -133,6 +148,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref voiceActivationLevel, Math.Clamp(value, 0, 100));
     }
 
+    public bool ShowInputMeter
+    {
+        get => showInputMeter;
+        set => SetProperty(ref showInputMeter, value);
+    }
+
     public string DefaultNickname
     {
         get => defaultNickname;
@@ -164,6 +185,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             AudioInputDeviceId = SelectedInputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedInputDeviceId,
             AudioOutputDeviceId = SelectedOutputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedOutputDeviceId,
             VoiceActivationLevel = VoiceActivationLevel,
+            ShowInputMeter = ShowInputMeter,
             InputVolume = inputVolume,
             OutputVolume = outputVolume,
             DefaultNickname = string.IsNullOrWhiteSpace(DefaultNickname) ? Environment.UserName : DefaultNickname.Trim(),
@@ -183,6 +205,28 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         catch (Exception ex)
         {
             AudioDeviceRefreshStatus = ex.Message;
+        }
+    }
+
+    private async Task CalibrateVoiceActivationAsync()
+    {
+        try
+        {
+            VoiceActivationCalibrationStatus = "Calibrating voice activation";
+            int peak = 0;
+            for (int sample = 0; sample < 12; sample++)
+            {
+                AudioInputLevelSummary level = await getAudioInputLevel();
+                peak = Math.Max(peak, level.ClampedLevel);
+                await Task.Delay(100);
+            }
+
+            VoiceActivationLevel = Math.Clamp(peak + 10, 5, 95);
+            VoiceActivationCalibrationStatus = $"Voice activation level set to {VoiceActivationLevel}";
+        }
+        catch (Exception ex)
+        {
+            VoiceActivationCalibrationStatus = ex.Message;
         }
     }
 

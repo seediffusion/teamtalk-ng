@@ -20,6 +20,8 @@ public sealed record AppSettings
 
     public int VoiceActivationLevel { get; init; } = 50;
 
+    public bool ShowInputMeter { get; init; }
+
     public int InputVolume { get; init; } = 50;
 
     public int OutputVolume { get; init; } = 50;

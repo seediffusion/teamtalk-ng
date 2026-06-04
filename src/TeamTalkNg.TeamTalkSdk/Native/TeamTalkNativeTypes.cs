@@ -9,6 +9,13 @@ internal enum ClientEvent
     ConnectionCryptError = 15,
     ConnectionFailed = 20,
     ConnectionLost = 30,
+    SoundDeviceAdded = 1100,
+    SoundDeviceRemoved = 1110,
+    SoundDeviceUnplugged = 1120,
+    SoundDeviceNewDefaultInput = 1130,
+    SoundDeviceNewDefaultOutput = 1140,
+    SoundDeviceNewDefaultInputCommunication = 1150,
+    SoundDeviceNewDefaultOutputCommunication = 1160,
     CommandProcessing = 200,
     CommandError = 210,
     CommandSuccess = 220,
@@ -105,6 +112,8 @@ internal enum SoundSystem
 
 internal static class SoundLevel
 {
+    public const int VuMin = 0;
+    public const int VuMax = 100;
     public const int VolumeMin = 0;
     public const int VolumeDefault = 1000;
     public const int VolumeMax = 32000;

@@ -17,6 +17,7 @@
   </Window.InputBindings>
 
   <Window.Resources>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <HierarchicalDataTemplate DataType="{x:Type vm:ChannelTreeItemViewModel}" ItemsSource="{Binding Children}">
       <StackPanel Orientation="Horizontal">
         <TextBlock Text="{Binding Icon}" Margin="0,0,6,0" />
@@ -38,6 +39,10 @@
         <MenuItem Header="_Disconnect" Command="{Binding DisconnectCommand}" />
         <Separator />
         <MenuItem Header="_Refresh Audio Devices" Command="{Binding RefreshAudioDevicesCommand}" />
+        <MenuItem Header="Show _Input Meter"
+                  Command="{Binding ToggleInputMeterCommand}"
+                  IsCheckable="True"
+                  IsChecked="{Binding IsInputMeterVisible, Mode=OneWay}" />
         <Separator />
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
       </MenuItem>
@@ -211,6 +216,7 @@
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -240,6 +246,34 @@
                     Value="{Binding OutputVolume}"
                     AutomationProperties.LabeledBy="{Binding ElementName=OutputVolumeLabel}"
                     AutomationProperties.Name="Speaker output volume" />
+
+            <StackPanel Grid.Row="2"
+                        Grid.ColumnSpan="2"
+                        Margin="0,12,0,0"
+                        Visibility="{Binding IsInputMeterVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Focusable="False"
+                        IsHitTestVisible="False">
+              <TextBlock Text="{Binding InputLevelText}"
+                         Foreground="{DynamicResource MutedTextBrush}"
+                         FontSize="12" />
+              <Grid Width="180"
+                    Height="12"
+                    Margin="0,4,0,0"
+                    HorizontalAlignment="Left"
+                    ClipToBounds="True">
+                <Border Background="{DynamicResource ControlBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1" />
+                <Rectangle Width="{Binding InputLevelMeterWidth}"
+                           HorizontalAlignment="Left"
+                           Fill="{DynamicResource AccentBrush}" />
+                <Border Width="2"
+                        Height="12"
+                        HorizontalAlignment="Left"
+                        Margin="{Binding VoiceActivationMarkerMargin}"
+                        Background="{DynamicResource WarningBrush}" />
+              </Grid>
+            </StackPanel>
           </Grid>
         </GroupBox>
       </Grid>
