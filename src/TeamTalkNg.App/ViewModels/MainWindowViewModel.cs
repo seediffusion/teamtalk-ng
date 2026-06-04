@@ -57,6 +57,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private ChannelTreeItemViewModel? serverTreeItem;
     private FileTransferViewModel? selectedFile;
     private TransferActivityViewModel? selectedTransfer;
+    private MediaStreamViewModel? selectedVideoStream;
+    private MediaStreamViewModel? selectedDesktopStream;
     private readonly IFileDialogService fileDialogService;
 
     public MainWindowViewModel(
@@ -172,6 +174,7 @@ public sealed class MainWindowViewModel : ObservableObject
         teamTalkSession.UserUpdated += OnUserUpdated;
         teamTalkSession.UserLeft += OnUserLeft;
         teamTalkSession.FileTransferUpdated += OnFileTransferUpdated;
+        teamTalkSession.MediaFrameReceived += OnMediaFrameReceived;
 
         BuildDisconnectedTree();
         ShowFilesPlaceholder("Join a channel to view files");
@@ -187,6 +190,46 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<FileTransferViewModel> Files { get; } = [];
 
     public ObservableCollection<TransferActivityViewModel> Transfers { get; } = [];
+
+    public ObservableCollection<MediaStreamViewModel> VideoStreams { get; } = [];
+
+    public ObservableCollection<MediaStreamViewModel> DesktopStreams { get; } = [];
+
+    public MediaStreamViewModel? SelectedVideoStream
+    {
+        get => selectedVideoStream;
+        set
+        {
+            if (SetProperty(ref selectedVideoStream, value))
+            {
+                RaiseMediaPreviewPropertiesChanged();
+            }
+        }
+    }
+
+    public MediaStreamViewModel? SelectedDesktopStream
+    {
+        get => selectedDesktopStream;
+        set
+        {
+            if (SetProperty(ref selectedDesktopStream, value))
+            {
+                RaiseMediaPreviewPropertiesChanged();
+            }
+        }
+    }
+
+    public string VideoPreviewName => SelectedVideoStream?.PreviewName ?? "No active video streams";
+
+    public string DesktopPreviewName => SelectedDesktopStream?.PreviewName ?? "No shared desktops";
+
+    public Visibility VideoPreviewVisibility => SelectedVideoStream?.Frame is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility DesktopPreviewVisibility => SelectedDesktopStream?.Frame is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility NoVideoStreamsVisibility => VideoStreams.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility NoDesktopStreamsVisibility => DesktopStreams.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public FileTransferViewModel? SelectedFile
     {
@@ -525,6 +568,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ChatMessages.Clear();
         Transfers.Clear();
         SelectedTransfer = null;
+        ClearMediaStreams();
         ShowFilesPlaceholder("Join a channel to view files");
         await AnnounceAsync("Disconnected", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         RaiseCommandStateChanged();
@@ -1304,6 +1348,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 IsPushToTalkEnabled = false;
                 IsVoiceActivationEnabled = false;
                 InputLevelPercent = 0;
+                ClearMediaStreams();
                 ShowFilesPlaceholder("Join a channel to view files");
             }
             else
@@ -1431,6 +1476,45 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private void OnMediaFrameReceived(object? sender, MediaFrameSummary frame)
+    {
+        bool isNewStream = false;
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            ObservableCollection<MediaStreamViewModel> streams = frame.Kind == MediaStreamKind.Video
+                ? VideoStreams
+                : DesktopStreams;
+            MediaStreamViewModel? stream = streams.FirstOrDefault(item => item.UserId == frame.UserId);
+            if (stream is null)
+            {
+                stream = new MediaStreamViewModel(frame);
+                streams.Add(stream);
+                isNewStream = true;
+
+                if (frame.Kind == MediaStreamKind.Video && SelectedVideoStream is null)
+                {
+                    SelectedVideoStream = stream;
+                }
+                else if (frame.Kind == MediaStreamKind.Desktop && SelectedDesktopStream is null)
+                {
+                    SelectedDesktopStream = stream;
+                }
+            }
+            else
+            {
+                stream.Update(frame);
+            }
+
+            RaiseMediaPreviewPropertiesChanged();
+        });
+
+        if (isNewStream)
+        {
+            string kind = frame.Kind == MediaStreamKind.Video ? "video" : "desktop";
+            _ = AnnounceAsync($"{frame.DisplayName} {kind} stream available", AnnouncementPriority.Normal, AnnouncementKind.System, includeBraille: false);
+        }
+    }
+
     private void OnUserJoined(object? sender, UserSummary user)
     {
         Application.Current.Dispatcher.Invoke(() =>
@@ -1460,6 +1544,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 channel.Children.Remove(existingUser);
                 channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
             }
+
+            RemoveMediaStreamsForUser(user.Id);
         });
 
         _ = AnnounceAsync($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
@@ -1560,6 +1646,50 @@ public sealed class MainWindowViewModel : ObservableObject
         SelectedFile = null;
         Files.Clear();
         Files.Add(new FileTransferViewModel(0, text, string.Empty, string.Empty));
+    }
+
+    private void ClearMediaStreams()
+    {
+        SelectedVideoStream = null;
+        SelectedDesktopStream = null;
+        VideoStreams.Clear();
+        DesktopStreams.Clear();
+        RaiseMediaPreviewPropertiesChanged();
+    }
+
+    private void RemoveMediaStreamsForUser(int userId)
+    {
+        MediaStreamViewModel? video = VideoStreams.FirstOrDefault(item => item.UserId == userId);
+        if (video is not null)
+        {
+            VideoStreams.Remove(video);
+            if (SelectedVideoStream == video)
+            {
+                SelectedVideoStream = VideoStreams.FirstOrDefault();
+            }
+        }
+
+        MediaStreamViewModel? desktop = DesktopStreams.FirstOrDefault(item => item.UserId == userId);
+        if (desktop is not null)
+        {
+            DesktopStreams.Remove(desktop);
+            if (SelectedDesktopStream == desktop)
+            {
+                SelectedDesktopStream = DesktopStreams.FirstOrDefault();
+            }
+        }
+
+        RaiseMediaPreviewPropertiesChanged();
+    }
+
+    private void RaiseMediaPreviewPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(VideoPreviewName));
+        OnPropertyChanged(nameof(DesktopPreviewName));
+        OnPropertyChanged(nameof(VideoPreviewVisibility));
+        OnPropertyChanged(nameof(DesktopPreviewVisibility));
+        OnPropertyChanged(nameof(NoVideoStreamsVisibility));
+        OnPropertyChanged(nameof(NoDesktopStreamsVisibility));
     }
 
     private ChannelTreeItemViewModel EnsureChannel(string? channelPath, int id)

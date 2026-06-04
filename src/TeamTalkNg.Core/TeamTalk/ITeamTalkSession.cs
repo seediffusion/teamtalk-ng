@@ -10,6 +10,7 @@ public interface ITeamTalkSession
     event EventHandler<UserSummary>? UserUpdated;
     event EventHandler<UserSummary>? UserLeft;
     event EventHandler<FileTransferSummary>? FileTransferUpdated;
+    event EventHandler<MediaFrameSummary>? MediaFrameReceived;
 
     ConnectionStatus Status { get; }
 

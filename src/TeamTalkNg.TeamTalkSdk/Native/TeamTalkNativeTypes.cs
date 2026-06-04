@@ -9,6 +9,8 @@ internal enum ClientEvent
     ConnectionCryptError = 15,
     ConnectionFailed = 20,
     ConnectionLost = 30,
+    UserVideoCapture = 510,
+    UserDesktopWindow = 530,
     SoundDeviceAdded = 1100,
     SoundDeviceRemoved = 1110,
     SoundDeviceUnplugged = 1120,
@@ -51,9 +53,11 @@ internal enum TTType
     TTMessage = 16,
     User = 17,
     UserAccount = 18,
+    VideoFrame = 24,
     ClientErrorMsg = 28,
     TTBool = 29,
-    Int32 = 30
+    Int32 = 30,
+    DesktopWindow = 45
 }
 
 internal enum TextMsgType
@@ -68,10 +72,13 @@ internal enum TextMsgType
 internal enum StreamType
 {
     None = 0,
-    Voice = 1,
-    VideoCapture = 2,
-    Desktop = 3,
-    MediaFile = 4
+    Voice = 0x00000001,
+    VideoCapture = 0x00000002,
+    MediaFileAudio = 0x00000004,
+    MediaFileVideo = 0x00000008,
+    Desktop = 0x00000010,
+    DesktopInput = 0x00000020,
+    MediaFile = MediaFileAudio | MediaFileVideo
 }
 
 [Flags]
@@ -95,6 +102,20 @@ internal enum NativeFileTransferStatus
     Error = 1,
     Active = 2,
     Finished = 3
+}
+
+internal enum BitmapFormat
+{
+    None = 0,
+    Rgb8Palette = 1,
+    Rgb16_555 = 2,
+    Rgb24 = 3,
+    Rgb32 = 4
+}
+
+internal enum DesktopProtocol
+{
+    Zlib1 = 1
 }
 
 internal enum SoundSystem
@@ -425,6 +446,30 @@ internal struct NativeServerStatistics
     public long FilesTx;
     public long FilesRx;
     public long UptimeMilliseconds;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeVideoFrame
+{
+    public int Width;
+    public int Height;
+    public int StreamId;
+    public int KeyFrame;
+    public IntPtr FrameBuffer;
+    public int FrameBufferSize;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeDesktopWindow
+{
+    public int Width;
+    public int Height;
+    public BitmapFormat BitmapFormat;
+    public int BytesPerLine;
+    public int SessionId;
+    public DesktopProtocol Protocol;
+    public IntPtr FrameBuffer;
+    public int FrameBufferSize;
 }
 
 [StructLayout(LayoutKind.Sequential)]

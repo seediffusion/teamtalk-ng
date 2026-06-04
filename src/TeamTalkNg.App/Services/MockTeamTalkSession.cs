@@ -53,6 +53,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public event EventHandler<UserSummary>? UserUpdated;
     public event EventHandler<UserSummary>? UserLeft;
     public event EventHandler<FileTransferSummary>? FileTransferUpdated;
+    public event EventHandler<MediaFrameSummary>? MediaFrameReceived;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
@@ -651,6 +652,8 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public void SimulateUserJoined()
     {
         UserJoined?.Invoke(this, new UserSummary(44, "Morgan", "morgan", "/Lobby", IsTalking: false, IsAway: false, IsOperator: false));
+        PublishMockMediaFrame(44, "Morgan", MediaStreamKind.Video);
+        PublishMockMediaFrame(44, "Morgan", MediaStreamKind.Desktop);
     }
 
     public void SimulateUserLeft()
@@ -686,6 +689,39 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         }
 
         FileTransferUpdated?.Invoke(this, transfer);
+    }
+
+    private void PublishMockMediaFrame(int userId, string displayName, MediaStreamKind kind)
+    {
+        const int width = 320;
+        const int height = 180;
+        const int stride = width * 4;
+        byte[] pixels = new byte[stride * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int offset = y * stride + x * 4;
+                byte blue = (byte)(kind == MediaStreamKind.Video ? 64 + (x * 128 / width) : 40);
+                byte green = (byte)(kind == MediaStreamKind.Desktop ? 80 + (y * 120 / height) : 60);
+                byte red = (byte)(kind == MediaStreamKind.Video ? 80 + (y * 120 / height) : 120 + (x * 80 / width));
+                pixels[offset] = blue;
+                pixels[offset + 1] = green;
+                pixels[offset + 2] = red;
+                pixels[offset + 3] = 255;
+            }
+        }
+
+        MediaFrameReceived?.Invoke(this, new MediaFrameSummary(
+            userId,
+            displayName,
+            kind,
+            width,
+            height,
+            stride,
+            pixels,
+            DateTimeOffset.Now));
     }
 
     private static TeamTalkServerProfile ApplyIdentityDefaults(TeamTalkServerProfile profile)

@@ -114,6 +114,20 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_DoUnsubscribe")]
     internal static extern int DoUnsubscribe(IntPtr instance, int userId, Subscription subscriptions);
 
+    [DllImport(LibraryName, EntryPoint = "TT_AcquireUserVideoCaptureFrame")]
+    internal static extern IntPtr AcquireUserVideoCaptureFrame(IntPtr instance, int userId);
+
+    [DllImport(LibraryName, EntryPoint = "TT_ReleaseUserVideoCaptureFrame")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int ReleaseUserVideoCaptureFrame(IntPtr instance, IntPtr videoFrame);
+
+    [DllImport(LibraryName, EntryPoint = "TT_AcquireUserDesktopWindowEx")]
+    internal static extern IntPtr AcquireUserDesktopWindowEx(IntPtr instance, int userId, BitmapFormat bitmapFormat);
+
+    [DllImport(LibraryName, EntryPoint = "TT_ReleaseUserDesktopWindow")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int ReleaseUserDesktopWindow(IntPtr instance, IntPtr desktopWindow);
+
     [DllImport(LibraryName, EntryPoint = "TT_GetServerProperties")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int GetServerProperties(IntPtr instance, out NativeServerProperties serverProperties);

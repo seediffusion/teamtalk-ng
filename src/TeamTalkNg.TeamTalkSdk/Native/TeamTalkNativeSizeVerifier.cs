@@ -13,10 +13,12 @@ public static class TeamTalkNativeSizeVerifier
         Compare<NativeFileTransfer>(TTType.FileTransfer, "FileTransfer", mismatches);
         Compare<NativeTextMessage>(TTType.TextMessage, "TextMessage", mismatches);
         Compare<NativeUser>(TTType.User, "User", mismatches);
+        Compare<NativeVideoFrame>(TTType.VideoFrame, "VideoFrame", mismatches);
         Compare<NativeUserAccount>(TTType.UserAccount, "UserAccount", mismatches);
         Compare<NativeClientErrorMsg>(TTType.ClientErrorMsg, "ClientErrorMsg", mismatches);
         Compare<NativeServerProperties>(TTType.ServerProperties, "ServerProperties", mismatches);
         Compare<NativeServerStatistics>(TTType.ServerStatistics, "ServerStatistics", mismatches);
+        Compare<NativeDesktopWindow>(TTType.DesktopWindow, "DesktopWindow", mismatches);
         return mismatches;
     }
 

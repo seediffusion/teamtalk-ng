@@ -336,29 +336,139 @@
         </TabItem>
 
         <TabItem Header="Video">
-          <Border Margin="0,10,0,0"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
-                  Background="{DynamicResource ControlBackgroundBrush}">
-            <TextBlock Text="No active video streams"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource MutedTextBrush}"
-                       AutomationProperties.Name="No active video streams" />
-          </Border>
+          <Grid Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="260" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox ItemsSource="{Binding VideoStreams}"
+                     SelectedItem="{Binding SelectedVideoStream}"
+                     Background="{DynamicResource ControlBackgroundBrush}"
+                     Foreground="{DynamicResource TextBrush}"
+                     BorderBrush="{DynamicResource BorderBrush}"
+                     AutomationProperties.Name="Active video streams">
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:MediaStreamViewModel}">
+                  <Grid Margin="4">
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{Binding DisplayName}"
+                               FontWeight="SemiBold"
+                               TextTrimming="None"
+                               TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding Resolution}"
+                               Foreground="{DynamicResource MutedTextBrush}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <GridSplitter Grid.Column="1"
+                          Width="8"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="{DynamicResource BorderBrush}"
+                          KeyboardNavigation.TabNavigation="None"
+                          AutomationProperties.Name="Resize video preview" />
+
+            <Border Grid.Column="2"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    AutomationProperties.Name="{Binding VideoPreviewName}">
+              <Grid>
+                <TextBlock Text="No active video streams"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Visibility="{Binding NoVideoStreamsVisibility}"
+                           AutomationProperties.Name="No active video streams" />
+                <Image Source="{Binding SelectedVideoStream.Frame}"
+                       Stretch="Uniform"
+                       Focusable="False"
+                       Visibility="{Binding VideoPreviewVisibility}"
+                       AutomationProperties.Name="{Binding VideoPreviewName}" />
+              </Grid>
+            </Border>
+          </Grid>
         </TabItem>
 
         <TabItem Header="Desktops">
-          <Border Margin="0,10,0,0"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
-                  Background="{DynamicResource ControlBackgroundBrush}">
-            <TextBlock Text="No shared desktops"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource MutedTextBrush}"
-                       AutomationProperties.Name="No shared desktops" />
-          </Border>
+          <Grid Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="260" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox ItemsSource="{Binding DesktopStreams}"
+                     SelectedItem="{Binding SelectedDesktopStream}"
+                     Background="{DynamicResource ControlBackgroundBrush}"
+                     Foreground="{DynamicResource TextBrush}"
+                     BorderBrush="{DynamicResource BorderBrush}"
+                     AutomationProperties.Name="Shared desktops">
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:MediaStreamViewModel}">
+                  <Grid Margin="4">
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{Binding DisplayName}"
+                               FontWeight="SemiBold"
+                               TextTrimming="None"
+                               TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding Resolution}"
+                               Foreground="{DynamicResource MutedTextBrush}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <GridSplitter Grid.Column="1"
+                          Width="8"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="{DynamicResource BorderBrush}"
+                          KeyboardNavigation.TabNavigation="None"
+                          AutomationProperties.Name="Resize desktop preview" />
+
+            <Border Grid.Column="2"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    Background="{DynamicResource ControlBackgroundBrush}"
+                    AutomationProperties.Name="{Binding DesktopPreviewName}">
+              <Grid>
+                <TextBlock Text="No shared desktops"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Visibility="{Binding NoDesktopStreamsVisibility}"
+                           AutomationProperties.Name="No shared desktops" />
+                <Image Source="{Binding SelectedDesktopStream.Frame}"
+                       Stretch="Uniform"
+                       Focusable="False"
+                       Visibility="{Binding DesktopPreviewVisibility}"
+                       AutomationProperties.Name="{Binding DesktopPreviewName}" />
+              </Grid>
+            </Border>
+          </Grid>
         </TabItem>
 
         <TabItem Header="Files">

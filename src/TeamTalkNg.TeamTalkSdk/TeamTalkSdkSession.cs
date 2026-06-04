@@ -40,6 +40,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int? configuredOutputDeviceId;
     private int configuredInputVolumePercent = 50;
     private int configuredOutputVolumePercent = 50;
+    private readonly Dictionary<int, string> userDisplayNames = [];
 
     public TeamTalkSdkSession(TeamTalkSdkOptions options)
     {
@@ -54,6 +55,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     public event EventHandler<UserSummary>? UserUpdated;
     public event EventHandler<UserSummary>? UserLeft;
     public event EventHandler<FileTransferSummary>? FileTransferUpdated;
+    public event EventHandler<MediaFrameSummary>? MediaFrameReceived;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
@@ -705,6 +707,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             activeProfile = profile;
             currentChannelId = 0;
             myUserId = 0;
+            userDisplayNames.Clear();
             loginCommandId = 0;
             soundInputInitialized = false;
             soundOutputInitialized = false;
@@ -1295,14 +1298,15 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch (Exception ex)
-        {
-            RaiseSystemMessage($"TeamTalk event polling stopped unexpectedly: {ex.Message}");
-            currentChannelId = 0;
-            myUserId = 0;
-            CloseInstance();
-            SetStatus(ConnectionStatus.Disconnected);
-        }
+            catch (Exception ex)
+            {
+                RaiseSystemMessage($"TeamTalk event polling stopped unexpectedly: {ex.Message}");
+                currentChannelId = 0;
+                myUserId = 0;
+                userDisplayNames.Clear();
+                CloseInstance();
+                SetStatus(ConnectionStatus.Disconnected);
+            }
         finally
         {
             Marshal.FreeHGlobal(buffer);
@@ -1387,6 +1391,12 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 break;
             case ClientEvent.CommandUserTextMessage:
                 DispatchTextMessage(message.TextMessage);
+                break;
+            case ClientEvent.UserVideoCapture:
+                DispatchVideoFrame(message.Source);
+                break;
+            case ClientEvent.UserDesktopWindow:
+                DispatchDesktopFrame(message.Source);
                 break;
             case ClientEvent.CommandChannelNew:
             case ClientEvent.CommandChannelUpdate:
@@ -1760,6 +1770,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private void DispatchUserJoined(NativeUser user)
     {
         UserSummary summary = CreateUserSummary(user, user.ChannelId);
+        RememberUserDisplayName(summary);
         UserJoined?.Invoke(this, summary);
 
         if (user.UserId == myUserId)
@@ -1769,13 +1780,15 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
         else
         {
-            EnsureVoiceSubscription(user);
+            EnsureMediaSubscriptions(user);
         }
     }
 
     private void DispatchUserLeft(NativeUser user, int previousChannelId)
     {
-        UserLeft?.Invoke(this, CreateUserSummary(user, previousChannelId));
+        UserSummary summary = CreateUserSummary(user, previousChannelId);
+        UserLeft?.Invoke(this, summary);
+        userDisplayNames.Remove(user.UserId);
 
         if (user.UserId == myUserId)
         {
@@ -1786,18 +1799,24 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
     private void DispatchUserUpdated(NativeUser user)
     {
-        UserUpdated?.Invoke(this, CreateUserSummary(user, user.ChannelId));
-        EnsureVoiceSubscription(user);
+        UserSummary summary = CreateUserSummary(user, user.ChannelId);
+        RememberUserDisplayName(summary);
+        UserUpdated?.Invoke(this, summary);
+        EnsureMediaSubscriptions(user);
     }
 
-    private void EnsureVoiceSubscription(NativeUser user)
+    private void EnsureMediaSubscriptions(NativeUser user)
     {
+        const Subscription desiredSubscriptions = Subscription.Voice | Subscription.VideoCapture | Subscription.Desktop;
+        Subscription localSubscriptions = (Subscription)user.LocalSubscriptions;
+        Subscription missingSubscriptions = desiredSubscriptions & ~localSubscriptions;
+
         if (instance == IntPtr.Zero
             || currentChannelId <= 0
             || user.UserId <= 0
             || user.UserId == myUserId
             || user.ChannelId != currentChannelId
-            || (((Subscription)user.LocalSubscriptions) & Subscription.Voice) != 0)
+            || missingSubscriptions == Subscription.None)
         {
             return;
         }
@@ -1810,7 +1829,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 return;
             }
 
-            commandId = TeamTalkNativeMethods.DoSubscribe(instance, user.UserId, Subscription.Voice);
+            commandId = TeamTalkNativeMethods.DoSubscribe(instance, user.UserId, missingSubscriptions);
         }
 
         if (commandId <= 0)
@@ -1821,8 +1840,143 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 nickname = user.ReadUsername();
             }
 
-            RaiseSystemMessage($"TeamTalk could not subscribe to voice from {nickname}.");
+            RaiseSystemMessage($"TeamTalk could not subscribe to media from {nickname}.");
         }
+    }
+
+    private void DispatchVideoFrame(int userId)
+    {
+        if (userId <= 0 || instance == IntPtr.Zero)
+        {
+            return;
+        }
+
+        NativeVideoFrame frame;
+        byte[] pixels;
+        int stride;
+
+        lock (stateLock)
+        {
+            if (instance == IntPtr.Zero)
+            {
+                return;
+            }
+
+            IntPtr framePointer = TeamTalkNativeMethods.AcquireUserVideoCaptureFrame(instance, userId);
+            if (framePointer == IntPtr.Zero)
+            {
+                return;
+            }
+
+            try
+            {
+                frame = Marshal.PtrToStructure<NativeVideoFrame>(framePointer);
+                stride = frame.Width * 4;
+                if (!CanCopyBgraFrame(frame.Width, frame.Height, stride, frame.FrameBuffer, frame.FrameBufferSize))
+                {
+                    return;
+                }
+
+                int bytesToCopy = stride * frame.Height;
+                pixels = new byte[bytesToCopy];
+                Marshal.Copy(frame.FrameBuffer, pixels, 0, bytesToCopy);
+            }
+            finally
+            {
+                TeamTalkNativeMethods.ReleaseUserVideoCaptureFrame(instance, framePointer);
+            }
+        }
+
+        MediaFrameReceived?.Invoke(this, new MediaFrameSummary(
+            userId,
+            GetUserDisplayName(userId),
+            MediaStreamKind.Video,
+            frame.Width,
+            frame.Height,
+            stride,
+            pixels,
+            DateTimeOffset.Now));
+    }
+
+    private void DispatchDesktopFrame(int userId)
+    {
+        if (userId <= 0 || instance == IntPtr.Zero)
+        {
+            return;
+        }
+
+        NativeDesktopWindow desktop;
+        byte[] pixels;
+        int stride;
+
+        lock (stateLock)
+        {
+            if (instance == IntPtr.Zero)
+            {
+                return;
+            }
+
+            IntPtr desktopPointer = TeamTalkNativeMethods.AcquireUserDesktopWindowEx(instance, userId, BitmapFormat.Rgb32);
+            if (desktopPointer == IntPtr.Zero)
+            {
+                return;
+            }
+
+            try
+            {
+                desktop = Marshal.PtrToStructure<NativeDesktopWindow>(desktopPointer);
+                stride = desktop.BytesPerLine > 0 ? desktop.BytesPerLine : desktop.Width * 4;
+                if (desktop.BitmapFormat != BitmapFormat.Rgb32
+                    || !CanCopyBgraFrame(desktop.Width, desktop.Height, stride, desktop.FrameBuffer, desktop.FrameBufferSize))
+                {
+                    return;
+                }
+
+                int bytesToCopy = stride * desktop.Height;
+                pixels = new byte[bytesToCopy];
+                Marshal.Copy(desktop.FrameBuffer, pixels, 0, bytesToCopy);
+            }
+            finally
+            {
+                TeamTalkNativeMethods.ReleaseUserDesktopWindow(instance, desktopPointer);
+            }
+        }
+
+        MediaFrameReceived?.Invoke(this, new MediaFrameSummary(
+            userId,
+            GetUserDisplayName(userId),
+            MediaStreamKind.Desktop,
+            desktop.Width,
+            desktop.Height,
+            stride,
+            pixels,
+            DateTimeOffset.Now));
+    }
+
+    private static bool CanCopyBgraFrame(int width, int height, int stride, IntPtr buffer, int bufferSize)
+    {
+        if (width <= 0 || height <= 0 || stride < width * 4 || buffer == IntPtr.Zero || bufferSize <= 0)
+        {
+            return false;
+        }
+
+        long requiredBytes = (long)stride * height;
+        return requiredBytes <= int.MaxValue && bufferSize >= requiredBytes;
+    }
+
+    private void RememberUserDisplayName(UserSummary user)
+    {
+        if (user.Id > 0 && !string.IsNullOrWhiteSpace(user.Nickname))
+        {
+            userDisplayNames[user.Id] = user.Nickname;
+        }
+    }
+
+    private string GetUserDisplayName(int userId)
+    {
+        return userDisplayNames.TryGetValue(userId, out string? displayName) && !string.IsNullOrWhiteSpace(displayName)
+            ? displayName
+            : $"User {userId}";
     }
 
     private void DispatchTextMessage(NativeTextMessage textMessage)
@@ -1966,6 +2120,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         RaiseSystemMessage(reason);
         currentChannelId = 0;
         myUserId = 0;
+        userDisplayNames.Clear();
         loginCommandId = 0;
         FailPendingServerStatistics(new InvalidOperationException(reason));
         FailPendingBannedUsers(new InvalidOperationException(reason));
