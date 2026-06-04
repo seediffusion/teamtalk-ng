@@ -13,6 +13,7 @@ namespace TeamTalkNg.App.ViewModels;
 
 public sealed class MainWindowViewModel : ObservableObject
 {
+    private static readonly TimeSpan InitialChannelRosterSoundSuppression = TimeSpan.FromSeconds(2);
     private readonly ITeamTalkSession teamTalkSession;
     private readonly IAnnouncementService announcements;
     private readonly IThemeService themeService;
@@ -63,6 +64,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private VideoCaptureDeviceSummary? selectedVideoCaptureDevice;
     private bool isVideoCaptureActive;
     private bool isDesktopSharingActive;
+    private DateTimeOffset suppressUserJoinSoundsUntil = DateTimeOffset.MinValue;
     private readonly IFileDialogService fileDialogService;
 
     public MainWindowViewModel(
@@ -1415,9 +1417,12 @@ public sealed class MainWindowViewModel : ObservableObject
         AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(
             settings,
             audioDevices,
+            soundEvents.GetSoundEvents(),
             soundEvents.GetSoundPacks(),
             () => teamTalkSession.GetAudioDevicesAsync(),
-            () => teamTalkSession.GetAudioInputLevelAsync());
+            () => teamTalkSession.GetAudioInputLevelAsync(),
+            soundEvents.GetSoundFileName,
+            soundEvents.Preview);
         if (updatedSettings is null)
         {
             return;
@@ -1425,7 +1430,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
-        soundEvents.Configure(settings.PlaySoundEvents, settings.SoundPack);
+        soundEvents.Configure(settings.PlaySoundEvents, settings.SoundPack, settings.SoundEventVolume, settings.SoundEventEnabled);
         IsInputMeterVisible = settings.ShowInputMeter;
         VoiceActivationLevelPercent = settings.VoiceActivationLevel;
         if (teamTalkSession.Status == ConnectionStatus.Disconnected)
@@ -1519,6 +1524,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
             if (status != ConnectionStatus.InChannel)
             {
+                suppressUserJoinSoundsUntil = DateTimeOffset.MinValue;
                 IsPushToTalkEnabled = false;
                 IsVoiceActivationEnabled = false;
                 IsVideoCaptureActive = false;
@@ -1544,6 +1550,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 soundEvents.Play(SoundEvent.Connected);
                 break;
             case ConnectionStatus.InChannel:
+                suppressUserJoinSoundsUntil = DateTimeOffset.UtcNow.Add(InitialChannelRosterSoundSuppression);
                 soundEvents.Play(SoundEvent.JoinedChannel);
                 break;
             case ConnectionStatus.Disconnected:
@@ -1720,8 +1727,11 @@ public sealed class MainWindowViewModel : ObservableObject
             AddOrUpdateUser(user);
         });
 
-        soundEvents.Play(SoundEvent.UserJoined);
-        _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+        if (ShouldPlayLiveUserJoinSound())
+        {
+            soundEvents.Play(SoundEvent.UserJoined);
+            _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+        }
     }
 
     private void OnUserUpdated(object? sender, UserSummary user)
@@ -1779,6 +1789,12 @@ public sealed class MainWindowViewModel : ObservableObject
         existingUser.VoiceVolumePercent = user.VoiceVolumePercent;
         existingUser.IsVoiceMuted = user.IsVoiceMuted;
         channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
+    }
+
+    private bool ShouldPlayLiveUserJoinSound()
+    {
+        return teamTalkSession.Status == ConnectionStatus.InChannel
+            && DateTimeOffset.UtcNow >= suppressUserJoinSoundsUntil;
     }
 
     private void OnChannelAddedOrUpdated(object? sender, ChannelSummary channel)

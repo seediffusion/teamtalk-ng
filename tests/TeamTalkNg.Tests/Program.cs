@@ -213,7 +213,7 @@ internal static class SoundPackTests
         try
         {
             var service = new SoundEventService(soundsRoot);
-            service.Configure(enabled: true, SoundEventService.DefaultSoundPackId);
+            service.Configure(enabled: true, SoundEventService.DefaultSoundPackId, volume: 100, new Dictionary<string, bool>());
 
             AssertEqual(Path.Combine(soundsRoot, "newuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserJoined));
             AssertEqual(Path.Combine(soundsRoot, "removeuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserLeft));
@@ -250,7 +250,7 @@ internal static class SoundPackTests
             Assert(soundPacks.Any(pack => pack.Id == SoundEventService.DefaultSoundPackId && pack.Name == SoundEventService.DefaultSoundPackName), "Expected Default sound pack.");
             Assert(soundPacks.Any(pack => pack.Id == "Majorly-G" && pack.Name == "Majorly-G"), "Expected official sound pack folder to be discovered.");
 
-            service.Configure(enabled: true, "Majorly-G");
+            service.Configure(enabled: true, "Majorly-G", volume: 100, new Dictionary<string, bool>());
             AssertEqual(Path.Combine(packDirectory, "newuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserJoined));
         }
         finally
@@ -266,7 +266,7 @@ internal static class SoundPackTests
         try
         {
             var service = new SoundEventService(soundsRoot);
-            service.Configure(enabled: true, "Default");
+            service.Configure(enabled: true, "Default", volume: 100, new Dictionary<string, bool>());
 
             AssertEqual(Path.Combine(soundsRoot, "channel_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.ChannelMessage));
         }

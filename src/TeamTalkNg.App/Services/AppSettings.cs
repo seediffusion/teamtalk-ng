@@ -18,6 +18,10 @@ public sealed record AppSettings
 
     public string SoundPack { get; init; } = SoundEventService.DefaultSoundPackId;
 
+    public int SoundEventVolume { get; init; } = 100;
+
+    public Dictionary<string, bool> SoundEventEnabled { get; init; } = [];
+
     public int? AudioInputDeviceId { get; init; }
 
     public int? AudioOutputDeviceId { get; init; }

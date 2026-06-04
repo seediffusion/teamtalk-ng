@@ -15,6 +15,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool sendAnnouncementsToBraille;
     private bool playSoundEvents;
     private string selectedSoundPack = SoundEventService.DefaultSoundPackId;
+    private int soundEventVolume = 100;
     private int selectedInputDeviceId;
     private int selectedOutputDeviceId;
     private int voiceActivationLevel;
@@ -28,16 +29,23 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private readonly int outputVolume;
     private readonly Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices;
     private readonly Func<Task<AudioInputLevelSummary>> getAudioInputLevel;
+    private readonly Func<SoundEvent, string, string> getSoundFileName;
+    private readonly Action<SoundEvent, string, int> previewSoundEvent;
 
     public PreferencesDialogViewModel(
         AppSettings settings,
         IReadOnlyList<AudioDeviceSummary> audioDevices,
+        IReadOnlyList<SoundEventDefinition> soundEvents,
         IReadOnlyList<SoundPackOption> soundPacks,
         Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices,
-        Func<Task<AudioInputLevelSummary>> getAudioInputLevel)
+        Func<Task<AudioInputLevelSummary>> getAudioInputLevel,
+        Func<SoundEvent, string, string> getSoundFileName,
+        Action<SoundEvent, string, int> previewSoundEvent)
     {
         this.refreshAudioDevices = refreshAudioDevices;
         this.getAudioInputLevel = getAudioInputLevel;
+        this.getSoundFileName = getSoundFileName;
+        this.previewSoundEvent = previewSoundEvent;
         inputVolume = settings.InputVolume;
         outputVolume = settings.OutputVolume;
         Themes =
@@ -48,6 +56,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         InputDevices = [];
         OutputDevices = [];
         SoundPacks = new ObservableCollection<SoundPackOption>(soundPacks);
+        SoundEvents = new ObservableCollection<SoundEventOptionViewModel>(soundEvents.Select(definition =>
+            new SoundEventOptionViewModel(
+                definition,
+                !settings.SoundEventEnabled.TryGetValue(definition.Id, out bool enabledForEvent) || enabledForEvent,
+                getSoundFileName(definition.Event, settings.SoundPack),
+                PlaySoundEventPreview)));
 
         selectedTheme = settings.Theme;
         announceChannelMessages = settings.AnnounceChannelMessages;
@@ -56,9 +70,11 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         announceSelectionChanges = settings.AnnounceSelectionChanges;
         sendAnnouncementsToBraille = settings.SendAnnouncementsToBraille;
         playSoundEvents = settings.PlaySoundEvents;
+        soundEventVolume = Math.Clamp(settings.SoundEventVolume, 0, 100);
         selectedSoundPack = SoundPacks.Any(soundPack => string.Equals(soundPack.Id, settings.SoundPack, StringComparison.OrdinalIgnoreCase))
             ? settings.SoundPack
             : SoundEventService.DefaultSoundPackId;
+        RefreshSoundEventFileNames();
         selectedInputDeviceId = settings.AudioInputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         selectedOutputDeviceId = settings.AudioOutputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         voiceActivationLevel = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
@@ -83,6 +99,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public ObservableCollection<AudioDeviceOptionViewModel> OutputDevices { get; }
 
     public ObservableCollection<SoundPackOption> SoundPacks { get; }
+
+    public ObservableCollection<SoundEventOptionViewModel> SoundEvents { get; }
 
     public ICommand SaveCommand { get; }
 
@@ -149,7 +167,25 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public string SelectedSoundPack
     {
         get => selectedSoundPack;
-        set => SetProperty(ref selectedSoundPack, value);
+        set
+        {
+            if (SetProperty(ref selectedSoundPack, value))
+            {
+                RefreshSoundEventFileNames();
+            }
+        }
+    }
+
+    public int SoundEventVolume
+    {
+        get => soundEventVolume;
+        set
+        {
+            if (SetProperty(ref soundEventVolume, Math.Clamp(value, 0, 100)))
+            {
+                RefreshSoundEventFileNames();
+            }
+        }
     }
 
     public int SelectedInputDeviceId
@@ -206,6 +242,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             SendAnnouncementsToBraille = SendAnnouncementsToBraille,
             PlaySoundEvents = PlaySoundEvents,
             SoundPack = SelectedSoundPack,
+            SoundEventVolume = SoundEventVolume,
+            SoundEventEnabled = SoundEvents.ToDictionary(item => item.Id, item => item.IsEnabled, StringComparer.OrdinalIgnoreCase),
             AudioInputDeviceId = SelectedInputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedInputDeviceId,
             AudioOutputDeviceId = SelectedOutputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedOutputDeviceId,
             VoiceActivationLevel = VoiceActivationLevel,
@@ -283,5 +321,18 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         SelectedOutputDeviceId = OutputDevices.Any(device => device.Id == previousOutputId)
             ? previousOutputId
             : AudioDeviceOptionViewModel.DefaultDeviceId;
+    }
+
+    private void RefreshSoundEventFileNames()
+    {
+        foreach (SoundEventOptionViewModel soundEvent in SoundEvents)
+        {
+            soundEvent.FileName = getSoundFileName(soundEvent.Event, SelectedSoundPack);
+        }
+    }
+
+    private void PlaySoundEventPreview(SoundEventOptionViewModel soundEvent)
+    {
+        previewSoundEvent(soundEvent.Event, SelectedSoundPack, SoundEventVolume);
     }
 }

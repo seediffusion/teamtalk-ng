@@ -29,7 +29,7 @@ public partial class App : Application
             AppSettings appSettings = await settingsStore.LoadAsync();
             themeService.UseTheme(appSettings.Theme);
             ISoundEventService soundEvents = new SoundEventService();
-            soundEvents.Configure(appSettings.PlaySoundEvents, appSettings.SoundPack);
+            soundEvents.Configure(appSettings.PlaySoundEvents, appSettings.SoundPack, appSettings.SoundEventVolume, appSettings.SoundEventEnabled);
 
             IServerProfileStore profileStore = new JsonServerProfileStore();
             IConnectionDialogService connectionDialogService = new ConnectionDialogService();

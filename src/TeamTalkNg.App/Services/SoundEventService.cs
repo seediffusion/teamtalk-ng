@@ -1,5 +1,7 @@
 using System.IO;
 using System.Media;
+using System.Windows;
+using System.Windows.Media;
 
 namespace TeamTalkNg.App.Services;
 
@@ -7,6 +9,32 @@ public sealed class SoundEventService : ISoundEventService
 {
     public const string DefaultSoundPackId = "";
     public const string DefaultSoundPackName = "Default";
+
+    private static readonly SoundEventDefinition[] EventDefinitions =
+    [
+        new(SoundEvent.Connecting, nameof(SoundEvent.Connecting), "Connecting to server", "connecting.wav"),
+        new(SoundEvent.Connected, nameof(SoundEvent.Connected), "Logged in to server", "logged_on.wav"),
+        new(SoundEvent.Disconnected, nameof(SoundEvent.Disconnected), "Server lost", "serverlost.wav"),
+        new(SoundEvent.JoinedChannel, nameof(SoundEvent.JoinedChannel), "Joined channel", "joinedchannel.wav"),
+        new(SoundEvent.ChannelMessage, nameof(SoundEvent.ChannelMessage), "New channel message", "channel_msg.wav"),
+        new(SoundEvent.ChannelMessageSent, nameof(SoundEvent.ChannelMessageSent), "Channel message sent", "channel_msg_sent.wav"),
+        new(SoundEvent.DirectMessage, nameof(SoundEvent.DirectMessage), "New direct message", "user_msg.wav"),
+        new(SoundEvent.DirectMessageSent, nameof(SoundEvent.DirectMessageSent), "Direct message sent", "user_msg_sent.wav"),
+        new(SoundEvent.UserJoined, nameof(SoundEvent.UserJoined), "New user", "newuser.wav"),
+        new(SoundEvent.UserLeft, nameof(SoundEvent.UserLeft), "User removed", "removeuser.wav"),
+        new(SoundEvent.FileTransferStarted, nameof(SoundEvent.FileTransferStarted), "File transfer started", "fileupdate.wav"),
+        new(SoundEvent.FileTransferFinished, nameof(SoundEvent.FileTransferFinished), "File transfer complete", "filetx_complete.wav"),
+        new(SoundEvent.FileTransferFailed, nameof(SoundEvent.FileTransferFailed), "File transfer failed", "filetx_complete.wav"),
+        new(SoundEvent.FileTransferCanceled, nameof(SoundEvent.FileTransferCanceled), "File transfer canceled", "filetx_complete.wav"),
+        new(SoundEvent.PushToTalkEnabled, nameof(SoundEvent.PushToTalkEnabled), "Hotkey pressed", "hotkey.wav"),
+        new(SoundEvent.PushToTalkDisabled, nameof(SoundEvent.PushToTalkDisabled), "Hotkey released", "hotkey.wav"),
+        new(SoundEvent.VoiceActivationEnabled, nameof(SoundEvent.VoiceActivationEnabled), "Voice activation enabled via Me menu", "vox_me_enable.wav"),
+        new(SoundEvent.VoiceActivationDisabled, nameof(SoundEvent.VoiceActivationDisabled), "Voice activation disabled via Me menu", "vox_me_disable.wav"),
+        new(SoundEvent.VideoStarted, nameof(SoundEvent.VideoStarted), "New video session", "videosession.wav"),
+        new(SoundEvent.VideoStopped, nameof(SoundEvent.VideoStopped), "Video session stopped", "videosession.wav"),
+        new(SoundEvent.DesktopShareStarted, nameof(SoundEvent.DesktopShareStarted), "New desktop session", "desktopsession.wav"),
+        new(SoundEvent.DesktopShareStopped, nameof(SoundEvent.DesktopShareStopped), "Desktop session stopped", "desktopsession.wav")
+    ];
 
     private static readonly Dictionary<SoundEvent, string[]> OfficialEventFileNames = new()
     {
@@ -20,7 +48,7 @@ public sealed class SoundEventService : ISoundEventService
         [SoundEvent.DirectMessageSent] = ["user_msg_sent", "directmessagesent", "privatemessagesent", "dmsent"],
         [SoundEvent.UserJoined] = ["newuser", "userjoined", "userjoin", "joinedchanneluser"],
         [SoundEvent.UserLeft] = ["removeuser", "userleft", "userleave", "leftchanneluser"],
-        [SoundEvent.FileTransferStarted] = ["filetransferstarted", "filestarted", "transferstarted"],
+        [SoundEvent.FileTransferStarted] = ["fileupdate", "filetransferstarted", "filestarted", "transferstarted"],
         [SoundEvent.FileTransferFinished] = ["filetx_complete", "filetransferfinished", "filetransfercomplete", "filefinished", "transfercomplete"],
         [SoundEvent.FileTransferFailed] = ["filetransferfailed", "filetransfererror", "filefailed", "transferfailed"],
         [SoundEvent.FileTransferCanceled] = ["filetransfercanceled", "filetransfercancelled", "filecanceled", "filecancelled"],
@@ -35,8 +63,12 @@ public sealed class SoundEventService : ISoundEventService
     };
 
     private readonly string soundsRoot;
+    private readonly object playersLock = new();
+    private readonly List<MediaPlayer> activePlayers = [];
     private bool enabled;
+    private int volume = 100;
     private string selectedSoundPack = DefaultSoundPackId;
+    private IReadOnlyDictionary<string, bool> eventEnabled = new Dictionary<string, bool>();
 
     public SoundEventService()
         : this(Path.Combine(AppContext.BaseDirectory, "Sounds"))
@@ -46,6 +78,11 @@ public sealed class SoundEventService : ISoundEventService
     public SoundEventService(string soundsRoot)
     {
         this.soundsRoot = soundsRoot;
+    }
+
+    public IReadOnlyList<SoundEventDefinition> GetSoundEvents()
+    {
+        return EventDefinitions;
     }
 
     public IReadOnlyList<SoundPackOption> GetSoundPacks()
@@ -68,38 +105,76 @@ public sealed class SoundEventService : ISoundEventService
         return soundPacks;
     }
 
-    public void Configure(bool enabled, string soundPack)
+    public string GetSoundFileName(SoundEvent soundEvent, string soundPack)
+    {
+        string? soundPath = ResolveSoundPath(soundPack, soundEvent);
+        if (soundPath is not null)
+        {
+            return Path.GetFileName(soundPath) ?? string.Empty;
+        }
+
+        SoundEventDefinition? definition = EventDefinitions.FirstOrDefault(item => item.Event == soundEvent);
+        return definition?.OfficialFileName ?? string.Empty;
+    }
+
+    public void Configure(bool enabled, string soundPack, int volume, IReadOnlyDictionary<string, bool> eventEnabled)
     {
         this.enabled = enabled;
         selectedSoundPack = soundPack ?? DefaultSoundPackId;
+        this.volume = Math.Clamp(volume, 0, 100);
+        this.eventEnabled = new Dictionary<string, bool>(eventEnabled, StringComparer.OrdinalIgnoreCase);
     }
 
     public void Play(SoundEvent soundEvent)
     {
-        if (!enabled)
+        if (!enabled || !IsEventEnabled(soundEvent))
         {
             return;
         }
 
-        string? soundPath = ResolveSoundPath(soundEvent);
+        string? soundPath = ResolveSoundPath(selectedSoundPack, soundEvent);
         if (soundPath is null)
         {
             return;
         }
 
+        PlaySoundPath(soundPath, volume);
+    }
+
+    public void Preview(SoundEvent soundEvent, string soundPack, int volume)
+    {
+        string? soundPath = ResolveSoundPath(soundPack, soundEvent);
+        if (soundPath is not null)
+        {
+            PlaySoundPath(soundPath, volume);
+        }
+    }
+
+    private void PlaySoundPath(string soundPath, int volume)
+    {
         try
         {
-            _ = Task.Run(() =>
+            if (Application.Current?.Dispatcher is { } dispatcher)
             {
-                try
+                _ = dispatcher.BeginInvoke(() =>
                 {
-                    using var player = new SoundPlayer(soundPath);
-                    player.PlaySync();
-                }
-                catch
+                    PlayWithMediaPlayer(soundPath, volume);
+                });
+            }
+            else
+            {
+                _ = Task.Run(() =>
                 {
-                }
-            });
+                    try
+                    {
+                        using var player = new SoundPlayer(soundPath);
+                        player.PlaySync();
+                    }
+                    catch
+                    {
+                    }
+                });
+            }
         }
         catch
         {
@@ -107,17 +182,59 @@ public sealed class SoundEventService : ISoundEventService
         }
     }
 
-    private string? ResolveSoundPath(SoundEvent soundEvent)
+    private void PlayWithMediaPlayer(string soundPath, int volume)
     {
-        string? selectedPath = IsDefaultSoundPack(selectedSoundPack)
+        var player = new MediaPlayer
+        {
+            Volume = Math.Clamp(volume, 0, 100) / 100.0
+        };
+
+        EventHandler cleanup = (_, _) => ClosePlayer(player);
+        EventHandler<ExceptionEventArgs> fail = (_, _) => ClosePlayer(player);
+        player.MediaEnded += cleanup;
+        player.MediaFailed += fail;
+
+        lock (playersLock)
+        {
+            activePlayers.Add(player);
+        }
+
+        player.Open(new Uri(soundPath, UriKind.Absolute));
+        player.Play();
+    }
+
+    private void ClosePlayer(MediaPlayer player)
+    {
+        try
+        {
+            player.Close();
+        }
+        finally
+        {
+            lock (playersLock)
+            {
+                activePlayers.Remove(player);
+            }
+        }
+    }
+
+    private string? ResolveSoundPath(string soundPack, SoundEvent soundEvent)
+    {
+        string? selectedPath = IsDefaultSoundPack(soundPack)
             ? null
-            : ResolveSoundPathInDirectory(Path.Combine(soundsRoot, selectedSoundPack), soundEvent);
+            : ResolveSoundPathInDirectory(Path.Combine(soundsRoot, soundPack), soundEvent);
         return selectedPath ?? ResolveSoundPathInDirectory(soundsRoot, soundEvent);
     }
 
     internal string? ResolveSoundPathForTest(SoundEvent soundEvent)
     {
-        return ResolveSoundPath(soundEvent);
+        return ResolveSoundPath(selectedSoundPack, soundEvent);
+    }
+
+    private bool IsEventEnabled(SoundEvent soundEvent)
+    {
+        string id = soundEvent.ToString();
+        return !eventEnabled.TryGetValue(id, out bool enabledForEvent) || enabledForEvent;
     }
 
     private static bool IsDefaultSoundPack(string soundPack)
