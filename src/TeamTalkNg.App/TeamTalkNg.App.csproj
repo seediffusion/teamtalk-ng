@@ -10,4 +10,9 @@
     <ProjectReference Include="..\TeamTalkNg.Core\TeamTalkNg.Core.csproj" />
     <ProjectReference Include="..\TeamTalkNg.TeamTalkSdk\TeamTalkNg.TeamTalkSdk.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Sounds\**\*.wav" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Sounds\README.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

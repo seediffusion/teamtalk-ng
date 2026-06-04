@@ -13,6 +13,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool announceUserJoinLeave;
     private bool announceSelectionChanges;
     private bool sendAnnouncementsToBraille;
+    private bool playSoundEvents;
+    private string selectedSoundPack = SoundEventService.DefaultSoundPackId;
     private int selectedInputDeviceId;
     private int selectedOutputDeviceId;
     private int voiceActivationLevel;
@@ -30,6 +32,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public PreferencesDialogViewModel(
         AppSettings settings,
         IReadOnlyList<AudioDeviceSummary> audioDevices,
+        IReadOnlyList<SoundPackOption> soundPacks,
         Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices,
         Func<Task<AudioInputLevelSummary>> getAudioInputLevel)
     {
@@ -44,6 +47,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         ];
         InputDevices = [];
         OutputDevices = [];
+        SoundPacks = new ObservableCollection<SoundPackOption>(soundPacks);
 
         selectedTheme = settings.Theme;
         announceChannelMessages = settings.AnnounceChannelMessages;
@@ -51,6 +55,10 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         announceUserJoinLeave = settings.AnnounceUserJoinLeave;
         announceSelectionChanges = settings.AnnounceSelectionChanges;
         sendAnnouncementsToBraille = settings.SendAnnouncementsToBraille;
+        playSoundEvents = settings.PlaySoundEvents;
+        selectedSoundPack = SoundPacks.Any(soundPack => string.Equals(soundPack.Id, settings.SoundPack, StringComparison.OrdinalIgnoreCase))
+            ? settings.SoundPack
+            : SoundEventService.DefaultSoundPackId;
         selectedInputDeviceId = settings.AudioInputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         selectedOutputDeviceId = settings.AudioOutputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         voiceActivationLevel = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
@@ -73,6 +81,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public ObservableCollection<AudioDeviceOptionViewModel> InputDevices { get; }
 
     public ObservableCollection<AudioDeviceOptionViewModel> OutputDevices { get; }
+
+    public ObservableCollection<SoundPackOption> SoundPacks { get; }
 
     public ICommand SaveCommand { get; }
 
@@ -130,6 +140,18 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref sendAnnouncementsToBraille, value);
     }
 
+    public bool PlaySoundEvents
+    {
+        get => playSoundEvents;
+        set => SetProperty(ref playSoundEvents, value);
+    }
+
+    public string SelectedSoundPack
+    {
+        get => selectedSoundPack;
+        set => SetProperty(ref selectedSoundPack, value);
+    }
+
     public int SelectedInputDeviceId
     {
         get => selectedInputDeviceId;
@@ -182,6 +204,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             AnnounceUserJoinLeave = AnnounceUserJoinLeave,
             AnnounceSelectionChanges = AnnounceSelectionChanges,
             SendAnnouncementsToBraille = SendAnnouncementsToBraille,
+            PlaySoundEvents = PlaySoundEvents,
+            SoundPack = SelectedSoundPack,
             AudioInputDeviceId = SelectedInputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedInputDeviceId,
             AudioOutputDeviceId = SelectedOutputDeviceId == AudioDeviceOptionViewModel.DefaultDeviceId ? null : SelectedOutputDeviceId,
             VoiceActivationLevel = VoiceActivationLevel,

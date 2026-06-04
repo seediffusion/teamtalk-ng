@@ -9,10 +9,11 @@ public sealed class PreferencesDialogService : IPreferencesDialogService
     public AppSettings? ShowPreferencesDialog(
         AppSettings currentSettings,
         IReadOnlyList<AudioDeviceSummary> audioDevices,
+        IReadOnlyList<SoundPackOption> soundPacks,
         Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices,
         Func<Task<AudioInputLevelSummary>> getAudioInputLevel)
     {
-        var viewModel = new PreferencesDialogViewModel(currentSettings, audioDevices, refreshAudioDevices, getAudioInputLevel);
+        var viewModel = new PreferencesDialogViewModel(currentSettings, audioDevices, soundPacks, refreshAudioDevices, getAudioInputLevel);
         var dialog = new PreferencesDialog
         {
             Owner = Application.Current.MainWindow,

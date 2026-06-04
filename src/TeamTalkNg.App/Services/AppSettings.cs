@@ -14,6 +14,10 @@ public sealed record AppSettings
 
     public bool SendAnnouncementsToBraille { get; init; } = true;
 
+    public bool PlaySoundEvents { get; init; } = true;
+
+    public string SoundPack { get; init; } = SoundEventService.DefaultSoundPackId;
+
     public int? AudioInputDeviceId { get; init; }
 
     public int? AudioOutputDeviceId { get; init; }

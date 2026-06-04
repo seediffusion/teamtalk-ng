@@ -36,6 +36,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IStatusDialogService statusDialogService;
     private readonly IJoinChannelDialogService joinChannelDialogService;
     private readonly INicknameDialogService nicknameDialogService;
+    private readonly ISoundEventService soundEvents;
     private readonly DispatcherTimer inputLevelTimer;
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
@@ -89,6 +90,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IJoinChannelDialogService joinChannelDialogService,
         INicknameDialogService nicknameDialogService,
         IFileDialogService fileDialogService,
+        ISoundEventService soundEvents,
         AppSettings settings)
     {
         this.teamTalkSession = teamTalkSession;
@@ -115,6 +117,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.joinChannelDialogService = joinChannelDialogService;
         this.nicknameDialogService = nicknameDialogService;
         this.fileDialogService = fileDialogService;
+        this.soundEvents = soundEvents;
         this.settings = settings;
         inputVolume = Math.Clamp(settings.InputVolume, 0, 100);
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
@@ -583,6 +586,7 @@ public sealed class MainWindowViewModel : ObservableObject
         currentNickname = effectiveProfile.Nickname;
         appliedInitialStatus = false;
         await AnnounceAsync($"Connecting to {effectiveProfile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        soundEvents.Play(SoundEvent.Connecting);
         BuildConnectingTree(effectiveProfile);
         try
         {
@@ -802,6 +806,7 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 await teamTalkSession.StopVideoCaptureAsync();
                 IsVideoCaptureActive = false;
+                soundEvents.Play(SoundEvent.VideoStopped);
                 await AnnounceAsync("Video transmission stopped", AnnouncementPriority.Normal, AnnouncementKind.System);
             }
             catch (Exception ex)
@@ -829,6 +834,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.StartVideoCaptureAsync(device.DeviceId, format);
             IsVideoCaptureActive = true;
+            soundEvents.Play(SoundEvent.VideoStarted);
             await AnnounceAsync($"Video transmission started using {device.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
@@ -844,6 +850,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.StartDesktopShareAsync(source);
             IsDesktopSharingActive = true;
+            soundEvents.Play(SoundEvent.DesktopShareStarted);
             await AnnounceAsync(
                 source == DesktopShareSource.ActiveWindow ? "Active window sharing started" : "Desktop sharing started",
                 AnnouncementPriority.Normal,
@@ -861,6 +868,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.StopDesktopShareAsync();
             IsDesktopSharingActive = false;
+            soundEvents.Play(SoundEvent.DesktopShareStopped);
             await AnnounceAsync("Desktop sharing stopped", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
@@ -1321,6 +1329,7 @@ public sealed class MainWindowViewModel : ObservableObject
             }
 
             string state = target ? "enabled" : "disabled";
+            soundEvents.Play(target ? SoundEvent.PushToTalkEnabled : SoundEvent.PushToTalkDisabled);
             await AnnounceAsync($"Push to talk {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
@@ -1342,6 +1351,7 @@ public sealed class MainWindowViewModel : ObservableObject
             }
 
             string state = target ? "enabled" : "disabled";
+            soundEvents.Play(target ? SoundEvent.VoiceActivationEnabled : SoundEvent.VoiceActivationDisabled);
             await AnnounceAsync($"Voice activation {state}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
@@ -1403,6 +1413,7 @@ public sealed class MainWindowViewModel : ObservableObject
         AppSettings? updatedSettings = preferencesDialogService.ShowPreferencesDialog(
             settings,
             audioDevices,
+            soundEvents.GetSoundPacks(),
             () => teamTalkSession.GetAudioDevicesAsync(),
             () => teamTalkSession.GetAudioInputLevelAsync());
         if (updatedSettings is null)
@@ -1412,6 +1423,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
+        soundEvents.Configure(settings.PlaySoundEvents, settings.SoundPack);
         IsInputMeterVisible = settings.ShowInputMeter;
         VoiceActivationLevelPercent = settings.VoiceActivationLevel;
         if (teamTalkSession.Status == ConnectionStatus.Disconnected)
@@ -1524,6 +1536,19 @@ public sealed class MainWindowViewModel : ObservableObject
             RaiseChannelCommandStateChanged();
         });
 
+        switch (status)
+        {
+            case ConnectionStatus.LoggedIn:
+                soundEvents.Play(SoundEvent.Connected);
+                break;
+            case ConnectionStatus.InChannel:
+                soundEvents.Play(SoundEvent.JoinedChannel);
+                break;
+            case ConnectionStatus.Disconnected:
+                soundEvents.Play(SoundEvent.Disconnected);
+                break;
+        }
+
         if (status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
         {
             _ = ApplyInitialStatusAsync();
@@ -1580,6 +1605,11 @@ public sealed class MainWindowViewModel : ObservableObject
         string announcement = message.IsSystem
             ? message.Text
             : $"{message.Sender}: {message.Text}";
+        if (!message.IsSystem)
+        {
+            soundEvents.Play(message.IsDirect ? SoundEvent.DirectMessage : SoundEvent.ChannelMessage);
+        }
+
         _ = AnnounceAsync(
             announcement,
             message.IsDirect ? AnnouncementPriority.High : AnnouncementPriority.Normal,
@@ -1622,18 +1652,22 @@ public sealed class MainWindowViewModel : ObservableObject
 
         if (isNew && transfer.Status == TeamTalkFileTransferStatus.Active)
         {
+            soundEvents.Play(SoundEvent.FileTransferStarted);
             _ = AnnounceAsync($"{(transfer.IsDownload ? "Download" : "Upload")} started for {transfer.RemoteFileName}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         else if (transfer.Status == TeamTalkFileTransferStatus.Finished)
         {
+            soundEvents.Play(SoundEvent.FileTransferFinished);
             _ = AnnounceAsync($"{(transfer.IsDownload ? "Download" : "Upload")} finished for {transfer.RemoteFileName}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         else if (transfer.Status == TeamTalkFileTransferStatus.Error)
         {
+            soundEvents.Play(SoundEvent.FileTransferFailed);
             _ = AnnounceAsync($"File transfer failed for {transfer.RemoteFileName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
         else if (transfer.Status == TeamTalkFileTransferStatus.Closed)
         {
+            soundEvents.Play(SoundEvent.FileTransferCanceled);
             _ = AnnounceAsync($"File transfer canceled for {transfer.RemoteFileName}", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
     }
@@ -1684,6 +1718,7 @@ public sealed class MainWindowViewModel : ObservableObject
             AddOrUpdateUser(user);
         });
 
+        soundEvents.Play(SoundEvent.UserJoined);
         _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
     }
 
@@ -1710,6 +1745,7 @@ public sealed class MainWindowViewModel : ObservableObject
             RemoveMediaStreamsForUser(user.Id);
         });
 
+        soundEvents.Play(SoundEvent.UserLeft);
         _ = AnnounceAsync($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
     }
 

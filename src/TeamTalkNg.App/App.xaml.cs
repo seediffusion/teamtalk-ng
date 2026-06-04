@@ -28,6 +28,8 @@ public partial class App : Application
             IAppSettingsStore settingsStore = new JsonAppSettingsStore();
             AppSettings appSettings = await settingsStore.LoadAsync();
             themeService.UseTheme(appSettings.Theme);
+            ISoundEventService soundEvents = new SoundEventService();
+            soundEvents.Configure(appSettings.PlaySoundEvents, appSettings.SoundPack);
 
             IServerProfileStore profileStore = new JsonServerProfileStore();
             IConnectionDialogService connectionDialogService = new ConnectionDialogService();
@@ -75,6 +77,7 @@ public partial class App : Application
                 joinChannelDialogService,
                 nicknameDialogService,
                 fileDialogService,
+                soundEvents,
                 appSettings);
             var window = new MainWindow
             {
