@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\TeamTalkNg.App\TeamTalkNg.App.csproj" />
     <ProjectReference Include="..\..\src\TeamTalkNg.Core\TeamTalkNg.Core.csproj" />
     <ProjectReference Include="..\..\src\TeamTalkNg.TeamTalkSdk\TeamTalkNg.TeamTalkSdk.csproj" />
   </ItemGroup>

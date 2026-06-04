@@ -1,3 +1,4 @@
+using TeamTalkNg.App.Services;
 using TeamTalkNg.Core.TeamTalk;
 using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
 using TeamTalkNg.TeamTalkSdk;
@@ -6,6 +7,7 @@ using TeamTalkNg.TeamTalkSdk.Native;
 ParserTests.RunAll();
 SdkProbeTests.RunAll();
 SdkDispatchTests.RunAll();
+SoundPackTests.RunAll();
 
 internal static class ParserTests
 {
@@ -177,6 +179,128 @@ internal static class SdkProbeTests
         if (!condition)
         {
             throw new InvalidOperationException(message);
+        }
+    }
+}
+
+internal static class SoundPackTests
+{
+    public static void RunAll()
+    {
+        ResolvesOfficialDefaultSoundNames();
+        DiscoversOfficialSoundPackFolders();
+        TreatsOfficialDefaultPackNameAsRootSoundsFolder();
+        Console.WriteLine("TeamTalk NG sound pack tests passed.");
+    }
+
+    private static void ResolvesOfficialDefaultSoundNames()
+    {
+        string soundsRoot = CreateSoundRoot(
+            "newuser.wav",
+            "removeuser.wav",
+            "serverlost.wav",
+            "user_msg.wav",
+            "user_msg_sent.wav",
+            "channel_msg.wav",
+            "channel_msg_sent.wav",
+            "filetx_complete.wav",
+            "hotkey.wav",
+            "videosession.wav",
+            "desktopsession.wav",
+            "vox_me_enable.wav",
+            "vox_me_disable.wav");
+
+        try
+        {
+            var service = new SoundEventService(soundsRoot);
+            service.Configure(enabled: true, SoundEventService.DefaultSoundPackId);
+
+            AssertEqual(Path.Combine(soundsRoot, "newuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserJoined));
+            AssertEqual(Path.Combine(soundsRoot, "removeuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserLeft));
+            AssertEqual(Path.Combine(soundsRoot, "serverlost.wav"), service.ResolveSoundPathForTest(SoundEvent.Disconnected));
+            AssertEqual(Path.Combine(soundsRoot, "user_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.DirectMessage));
+            AssertEqual(Path.Combine(soundsRoot, "user_msg_sent.wav"), service.ResolveSoundPathForTest(SoundEvent.DirectMessageSent));
+            AssertEqual(Path.Combine(soundsRoot, "channel_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.ChannelMessage));
+            AssertEqual(Path.Combine(soundsRoot, "channel_msg_sent.wav"), service.ResolveSoundPathForTest(SoundEvent.ChannelMessageSent));
+            AssertEqual(Path.Combine(soundsRoot, "filetx_complete.wav"), service.ResolveSoundPathForTest(SoundEvent.FileTransferFinished));
+            AssertEqual(Path.Combine(soundsRoot, "hotkey.wav"), service.ResolveSoundPathForTest(SoundEvent.PushToTalkEnabled));
+            AssertEqual(Path.Combine(soundsRoot, "videosession.wav"), service.ResolveSoundPathForTest(SoundEvent.VideoStarted));
+            AssertEqual(Path.Combine(soundsRoot, "desktopsession.wav"), service.ResolveSoundPathForTest(SoundEvent.DesktopShareStarted));
+            AssertEqual(Path.Combine(soundsRoot, "vox_me_enable.wav"), service.ResolveSoundPathForTest(SoundEvent.VoiceActivationEnabled));
+            AssertEqual(Path.Combine(soundsRoot, "vox_me_disable.wav"), service.ResolveSoundPathForTest(SoundEvent.VoiceActivationDisabled));
+        }
+        finally
+        {
+            Directory.Delete(soundsRoot, recursive: true);
+        }
+    }
+
+    private static void DiscoversOfficialSoundPackFolders()
+    {
+        string soundsRoot = CreateSoundRoot("newuser.wav");
+        string packDirectory = Path.Combine(soundsRoot, "Majorly-G");
+        Directory.CreateDirectory(packDirectory);
+        File.WriteAllBytes(Path.Combine(packDirectory, "newuser.wav"), []);
+
+        try
+        {
+            var service = new SoundEventService(soundsRoot);
+            IReadOnlyList<SoundPackOption> soundPacks = service.GetSoundPacks();
+
+            Assert(soundPacks.Any(pack => pack.Id == SoundEventService.DefaultSoundPackId && pack.Name == SoundEventService.DefaultSoundPackName), "Expected Default sound pack.");
+            Assert(soundPacks.Any(pack => pack.Id == "Majorly-G" && pack.Name == "Majorly-G"), "Expected official sound pack folder to be discovered.");
+
+            service.Configure(enabled: true, "Majorly-G");
+            AssertEqual(Path.Combine(packDirectory, "newuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserJoined));
+        }
+        finally
+        {
+            Directory.Delete(soundsRoot, recursive: true);
+        }
+    }
+
+    private static void TreatsOfficialDefaultPackNameAsRootSoundsFolder()
+    {
+        string soundsRoot = CreateSoundRoot("channel_msg.wav");
+
+        try
+        {
+            var service = new SoundEventService(soundsRoot);
+            service.Configure(enabled: true, "Default");
+
+            AssertEqual(Path.Combine(soundsRoot, "channel_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.ChannelMessage));
+        }
+        finally
+        {
+            Directory.Delete(soundsRoot, recursive: true);
+        }
+    }
+
+    private static string CreateSoundRoot(params string[] fileNames)
+    {
+        string soundsRoot = Path.Combine(Path.GetTempPath(), $"teamtalk-ng-sounds-{Guid.NewGuid():N}", "Sounds");
+        Directory.CreateDirectory(soundsRoot);
+        foreach (string fileName in fileNames)
+        {
+            File.WriteAllBytes(Path.Combine(soundsRoot, fileName), []);
+        }
+
+        return soundsRoot;
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static void AssertEqual<T>(T expected, T actual)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"Expected {expected}, got {actual}.");
         }
     }
 }

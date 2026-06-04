@@ -8,27 +8,29 @@ public sealed class SoundEventService : ISoundEventService
     public const string DefaultSoundPackId = "";
     public const string DefaultSoundPackName = "Default";
 
-    private static readonly Dictionary<SoundEvent, string[]> EventAliases = new()
+    private static readonly Dictionary<SoundEvent, string[]> OfficialEventFileNames = new()
     {
         [SoundEvent.Connecting] = ["connecting", "connect"],
-        [SoundEvent.Connected] = ["connected", "loggedin", "login", "serverconnected"],
-        [SoundEvent.Disconnected] = ["disconnected", "disconnect", "loggedout", "serverdisconnected"],
+        [SoundEvent.Connected] = ["logged_on", "connected", "loggedin", "login", "serverconnected"],
+        [SoundEvent.Disconnected] = ["serverlost", "disconnected", "disconnect", "serverdisconnected", "logged_off"],
         [SoundEvent.JoinedChannel] = ["joinedchannel", "channeljoined", "joinchannel", "joined"],
-        [SoundEvent.ChannelMessage] = ["channelmessage", "message", "newmessage", "msg"],
-        [SoundEvent.DirectMessage] = ["directmessage", "privatemessage", "usermessage", "dm"],
-        [SoundEvent.UserJoined] = ["userjoined", "userjoin", "joinedchanneluser", "newuser"],
-        [SoundEvent.UserLeft] = ["userleft", "userleave", "leftchanneluser"],
+        [SoundEvent.ChannelMessage] = ["channel_msg", "channelmessage", "message", "newmessage", "msg"],
+        [SoundEvent.ChannelMessageSent] = ["channel_msg_sent", "channelmessagesent", "messagesent"],
+        [SoundEvent.DirectMessage] = ["user_msg", "directmessage", "privatemessage", "usermessage", "dm"],
+        [SoundEvent.DirectMessageSent] = ["user_msg_sent", "directmessagesent", "privatemessagesent", "dmsent"],
+        [SoundEvent.UserJoined] = ["newuser", "userjoined", "userjoin", "joinedchanneluser"],
+        [SoundEvent.UserLeft] = ["removeuser", "userleft", "userleave", "leftchanneluser"],
         [SoundEvent.FileTransferStarted] = ["filetransferstarted", "filestarted", "transferstarted"],
-        [SoundEvent.FileTransferFinished] = ["filetransferfinished", "filetransfercomplete", "filefinished", "transfercomplete"],
+        [SoundEvent.FileTransferFinished] = ["filetx_complete", "filetransferfinished", "filetransfercomplete", "filefinished", "transfercomplete"],
         [SoundEvent.FileTransferFailed] = ["filetransferfailed", "filetransfererror", "filefailed", "transferfailed"],
         [SoundEvent.FileTransferCanceled] = ["filetransfercanceled", "filetransfercancelled", "filecanceled", "filecancelled"],
-        [SoundEvent.PushToTalkEnabled] = ["pushtotalkenabled", "voicetxenabled", "transmitenabled", "txon"],
-        [SoundEvent.PushToTalkDisabled] = ["pushtotalkdisabled", "voicetxdisabled", "transmitdisabled", "txoff"],
-        [SoundEvent.VoiceActivationEnabled] = ["voiceactivationenabled", "voiceactenabled", "voxenabled"],
-        [SoundEvent.VoiceActivationDisabled] = ["voiceactivationdisabled", "voiceactdisabled", "voxdisabled"],
-        [SoundEvent.VideoStarted] = ["videostarted", "videotransmissionstarted", "videoon"],
+        [SoundEvent.PushToTalkEnabled] = ["hotkey", "pushtotalkenabled", "voicetxenabled", "transmitenabled", "txon"],
+        [SoundEvent.PushToTalkDisabled] = ["hotkey", "pushtotalkdisabled", "voicetxdisabled", "transmitdisabled", "txoff"],
+        [SoundEvent.VoiceActivationEnabled] = ["vox_me_enable", "vox_enable", "voiceactivationenabled", "voiceactenabled", "voxenabled"],
+        [SoundEvent.VoiceActivationDisabled] = ["vox_me_disable", "vox_disable", "voiceactivationdisabled", "voiceactdisabled", "voxdisabled"],
+        [SoundEvent.VideoStarted] = ["videosession", "videostarted", "videotransmissionstarted", "videoon"],
         [SoundEvent.VideoStopped] = ["videostopped", "videotransmissionstopped", "videooff"],
-        [SoundEvent.DesktopShareStarted] = ["desktopsharestarted", "desktopstarted", "desktopon"],
+        [SoundEvent.DesktopShareStarted] = ["desktopsession", "desktopsharestarted", "desktopstarted", "desktopon"],
         [SoundEvent.DesktopShareStopped] = ["desktopsharestopped", "desktopstopped", "desktopoff"]
     };
 
@@ -107,20 +109,31 @@ public sealed class SoundEventService : ISoundEventService
 
     private string? ResolveSoundPath(SoundEvent soundEvent)
     {
-        string? selectedPath = string.IsNullOrWhiteSpace(selectedSoundPack)
+        string? selectedPath = IsDefaultSoundPack(selectedSoundPack)
             ? null
             : ResolveSoundPathInDirectory(Path.Combine(soundsRoot, selectedSoundPack), soundEvent);
         return selectedPath ?? ResolveSoundPathInDirectory(soundsRoot, soundEvent);
     }
 
+    internal string? ResolveSoundPathForTest(SoundEvent soundEvent)
+    {
+        return ResolveSoundPath(soundEvent);
+    }
+
+    private static bool IsDefaultSoundPack(string soundPack)
+    {
+        return string.IsNullOrWhiteSpace(soundPack)
+            || string.Equals(soundPack, DefaultSoundPackName, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string? ResolveSoundPathInDirectory(string directory, SoundEvent soundEvent)
     {
-        if (!Directory.Exists(directory) || !EventAliases.TryGetValue(soundEvent, out string[]? aliases))
+        if (!Directory.Exists(directory) || !OfficialEventFileNames.TryGetValue(soundEvent, out string[]? fileNames))
         {
             return null;
         }
 
-        HashSet<string> normalizedAliases = aliases
+        HashSet<string> normalizedAliases = fileNames
             .Append(soundEvent.ToString())
             .Select(NormalizeSoundName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);

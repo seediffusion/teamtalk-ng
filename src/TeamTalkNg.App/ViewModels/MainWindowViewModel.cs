@@ -889,6 +889,7 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             await teamTalkSession.SendChannelMessageAsync(text);
+            soundEvents.Play(SoundEvent.ChannelMessageSent);
             await AnnounceAsync($"Sent message: {text}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
         }
         catch (Exception ex)
@@ -1204,6 +1205,7 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             await teamTalkSession.SendDirectMessageAsync(user.Id, message);
+            soundEvents.Play(SoundEvent.DirectMessageSent);
             await AnnounceAsync($"Sent direct message to {user.Name}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
         }
         catch (Exception ex)
