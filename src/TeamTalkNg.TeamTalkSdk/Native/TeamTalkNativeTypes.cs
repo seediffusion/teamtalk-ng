@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace TeamTalkNg.TeamTalkSdk.Native;
@@ -113,6 +114,14 @@ internal enum BitmapFormat
     Rgb32 = 4
 }
 
+internal enum FourCC
+{
+    None = 0,
+    I420 = 100,
+    Yuy2 = 101,
+    Rgb32 = 102
+}
+
 internal enum DesktopProtocol
 {
     Zlib1 = 1
@@ -178,6 +187,7 @@ internal static unsafe class NativeConstants
     public const int TransmitQueueMax = 16;
     public const int ChannelsOperatorMax = 16;
     public const int SampleRatesMax = 16;
+    public const int VideoFormatsMax = 1024;
     public const int MessageHeaderSize = 16;
 
     public static string ReadString(char* value)
@@ -202,6 +212,70 @@ internal static unsafe class NativeConstants
             destination[index] = '\0';
         }
     }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeVideoFormat
+{
+    public int Width;
+    public int Height;
+    public int FpsNumerator;
+    public int FpsDenominator;
+    public FourCC FourCC;
+}
+
+[InlineArray(NativeConstants.VideoFormatsMax)]
+internal struct NativeVideoFormatArray
+{
+    private NativeVideoFormat element0;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeVideoCaptureDevice
+{
+    public fixed char DeviceId[NativeConstants.StringLength];
+    public fixed char DeviceName[NativeConstants.StringLength];
+    public fixed char CaptureApi[NativeConstants.StringLength];
+    public NativeVideoFormatArray VideoFormats;
+    public int VideoFormatsCount;
+
+    public string ReadDeviceId()
+    {
+        fixed (char* value = DeviceId)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadName()
+    {
+        fixed (char* value = DeviceName)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadCaptureApi()
+    {
+        fixed (char* value = CaptureApi)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebMVP8Codec
+{
+    public int TargetBitrate;
+    public uint EncodeDeadline;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeVideoCodec
+{
+    public Codec Codec;
+    public NativeWebMVP8Codec WebMVp8;
 }
 
 [StructLayout(LayoutKind.Sequential)]

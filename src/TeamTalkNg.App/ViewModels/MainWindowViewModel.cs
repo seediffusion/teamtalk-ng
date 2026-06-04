@@ -59,6 +59,9 @@ public sealed class MainWindowViewModel : ObservableObject
     private TransferActivityViewModel? selectedTransfer;
     private MediaStreamViewModel? selectedVideoStream;
     private MediaStreamViewModel? selectedDesktopStream;
+    private VideoCaptureDeviceSummary? selectedVideoCaptureDevice;
+    private bool isVideoCaptureActive;
+    private bool isDesktopSharingActive;
     private readonly IFileDialogService fileDialogService;
 
     public MainWindowViewModel(
@@ -155,6 +158,11 @@ public sealed class MainWindowViewModel : ObservableObject
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
+        RefreshVideoDevicesCommand = new AsyncRelayCommand(RefreshVideoDevicesAsync);
+        ToggleVideoCaptureCommand = new AsyncRelayCommand(ToggleVideoCaptureAsync, CanToggleVideoCapture);
+        ShareDesktopCommand = new AsyncRelayCommand(() => StartDesktopShareAsync(DesktopShareSource.FullDesktop), CanStartDesktopShare);
+        ShareActiveWindowCommand = new AsyncRelayCommand(() => StartDesktopShareAsync(DesktopShareSource.ActiveWindow), CanStartDesktopShare);
+        StopDesktopShareCommand = new AsyncRelayCommand(StopDesktopShareAsync, CanStopDesktopShare);
         ToggleInputMeterCommand = new AsyncRelayCommand(ToggleInputMeterAsync);
         ChangeNicknameCommand = new AsyncRelayCommand(ChangeNicknameAsync, CanSetProfileState);
         SetStatusCommand = new AsyncRelayCommand(SetStatusAsync, CanSetStatus);
@@ -194,6 +202,50 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<MediaStreamViewModel> VideoStreams { get; } = [];
 
     public ObservableCollection<MediaStreamViewModel> DesktopStreams { get; } = [];
+
+    public ObservableCollection<VideoCaptureDeviceSummary> VideoCaptureDevices { get; } = [];
+
+    public VideoCaptureDeviceSummary? SelectedVideoCaptureDevice
+    {
+        get => selectedVideoCaptureDevice;
+        set
+        {
+            if (SetProperty(ref selectedVideoCaptureDevice, value))
+            {
+                OnPropertyChanged(nameof(SelectedVideoCaptureFormatText));
+                RaiseMediaCommandStateChanged();
+            }
+        }
+    }
+
+    public string SelectedVideoCaptureFormatText => SelectBestVideoFormat(SelectedVideoCaptureDevice)?.DisplayName ?? "No camera format selected";
+
+    public bool IsVideoCaptureActive
+    {
+        get => isVideoCaptureActive;
+        private set
+        {
+            if (SetProperty(ref isVideoCaptureActive, value))
+            {
+                OnPropertyChanged(nameof(VideoCaptureButtonText));
+                RaiseMediaCommandStateChanged();
+            }
+        }
+    }
+
+    public bool IsDesktopSharingActive
+    {
+        get => isDesktopSharingActive;
+        private set
+        {
+            if (SetProperty(ref isDesktopSharingActive, value))
+            {
+                RaiseMediaCommandStateChanged();
+            }
+        }
+    }
+
+    public string VideoCaptureButtonText => IsVideoCaptureActive ? "Stop Video" : "Start Video";
 
     public MediaStreamViewModel? SelectedVideoStream
     {
@@ -314,6 +366,16 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand TogglePushToTalkCommand { get; }
 
     public ICommand ToggleVoiceActivationCommand { get; }
+
+    public ICommand RefreshVideoDevicesCommand { get; }
+
+    public ICommand ToggleVideoCaptureCommand { get; }
+
+    public ICommand ShareDesktopCommand { get; }
+
+    public ICommand ShareActiveWindowCommand { get; }
+
+    public ICommand StopDesktopShareCommand { get; }
 
     public ICommand ToggleInputMeterCommand { get; }
 
@@ -702,6 +764,104 @@ public sealed class MainWindowViewModel : ObservableObject
             IsPushToTalkEnabled = false;
             IsVoiceActivationEnabled = false;
             await AnnounceAsync("Audio devices refreshed", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task RefreshVideoDevicesAsync()
+    {
+        try
+        {
+            IReadOnlyList<VideoCaptureDeviceSummary> devices = await teamTalkSession.GetVideoCaptureDevicesAsync();
+            VideoCaptureDevices.Clear();
+            foreach (VideoCaptureDeviceSummary device in devices)
+            {
+                VideoCaptureDevices.Add(device);
+            }
+
+            SelectedVideoCaptureDevice = VideoCaptureDevices.FirstOrDefault();
+            string message = VideoCaptureDevices.Count == 0
+                ? "No cameras found"
+                : $"{VideoCaptureDevices.Count} camera{(VideoCaptureDevices.Count == 1 ? string.Empty : "s")} found";
+            await AnnounceAsync(message, AnnouncementPriority.Normal, AnnouncementKind.System, includeBraille: false);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task ToggleVideoCaptureAsync()
+    {
+        if (IsVideoCaptureActive)
+        {
+            try
+            {
+                await teamTalkSession.StopVideoCaptureAsync();
+                IsVideoCaptureActive = false;
+                await AnnounceAsync("Video transmission stopped", AnnouncementPriority.Normal, AnnouncementKind.System);
+            }
+            catch (Exception ex)
+            {
+                await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+            }
+
+            return;
+        }
+
+        if (SelectedVideoCaptureDevice is null)
+        {
+            await RefreshVideoDevicesAsync();
+        }
+
+        VideoCaptureDeviceSummary? device = SelectedVideoCaptureDevice;
+        VideoCaptureFormatSummary? format = SelectBestVideoFormat(device);
+        if (device is null || format is null)
+        {
+            await AnnounceAsync("No camera with a supported format is available.", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+            return;
+        }
+
+        try
+        {
+            await teamTalkSession.StartVideoCaptureAsync(device.DeviceId, format);
+            IsVideoCaptureActive = true;
+            await AnnounceAsync($"Video transmission started using {device.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            IsVideoCaptureActive = false;
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task StartDesktopShareAsync(DesktopShareSource source)
+    {
+        try
+        {
+            await teamTalkSession.StartDesktopShareAsync(source);
+            IsDesktopSharingActive = true;
+            await AnnounceAsync(
+                source == DesktopShareSource.ActiveWindow ? "Active window sharing started" : "Desktop sharing started",
+                AnnouncementPriority.Normal,
+                AnnouncementKind.System);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task StopDesktopShareAsync()
+    {
+        try
+        {
+            await teamTalkSession.StopDesktopShareAsync();
+            IsDesktopSharingActive = false;
+            await AnnounceAsync("Desktop sharing stopped", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
         {
@@ -1347,6 +1507,8 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 IsPushToTalkEnabled = false;
                 IsVoiceActivationEnabled = false;
+                IsVideoCaptureActive = false;
+                IsDesktopSharingActive = false;
                 InputLevelPercent = 0;
                 ClearMediaStreams();
                 ShowFilesPlaceholder("Join a channel to view files");
@@ -1979,6 +2141,14 @@ public sealed class MainWindowViewModel : ObservableObject
         return lastSlash >= 0 ? trimmed[(lastSlash + 1)..] : trimmed;
     }
 
+    private static VideoCaptureFormatSummary? SelectBestVideoFormat(VideoCaptureDeviceSummary? device)
+    {
+        return device?.Formats
+            .OrderBy(format => Math.Abs((format.Width * format.Height) - (640 * 480)))
+            .ThenByDescending(format => format.FpsDenominator <= 0 ? 0 : (double)format.FpsNumerator / format.FpsDenominator)
+            .FirstOrDefault();
+    }
+
     private void RaiseCommandStateChanged()
     {
         if (ConnectCommand is AsyncRelayCommand connect)
@@ -2033,6 +2203,8 @@ public sealed class MainWindowViewModel : ObservableObject
             voiceActivation.RaiseCanExecuteChanged();
         }
 
+        RaiseMediaCommandStateChanged();
+
         if (SetStatusCommand is AsyncRelayCommand status)
         {
             status.RaiseCanExecuteChanged();
@@ -2071,6 +2243,29 @@ public sealed class MainWindowViewModel : ObservableObject
         if (RefreshFilesCommand is AsyncRelayCommand refreshFiles)
         {
             refreshFiles.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RaiseMediaCommandStateChanged()
+    {
+        if (ToggleVideoCaptureCommand is AsyncRelayCommand videoCapture)
+        {
+            videoCapture.RaiseCanExecuteChanged();
+        }
+
+        if (ShareDesktopCommand is AsyncRelayCommand shareDesktop)
+        {
+            shareDesktop.RaiseCanExecuteChanged();
+        }
+
+        if (ShareActiveWindowCommand is AsyncRelayCommand shareActiveWindow)
+        {
+            shareActiveWindow.RaiseCanExecuteChanged();
+        }
+
+        if (StopDesktopShareCommand is AsyncRelayCommand stopDesktopShare)
+        {
+            stopDesktopShare.RaiseCanExecuteChanged();
         }
     }
 
@@ -2205,6 +2400,21 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool CanUseVoiceControls()
     {
         return teamTalkSession.Status == ConnectionStatus.InChannel;
+    }
+
+    private bool CanToggleVideoCapture()
+    {
+        return IsVideoCaptureActive || teamTalkSession.Status == ConnectionStatus.InChannel;
+    }
+
+    private bool CanStartDesktopShare()
+    {
+        return teamTalkSession.Status == ConnectionStatus.InChannel;
+    }
+
+    private bool CanStopDesktopShare()
+    {
+        return IsDesktopSharingActive;
     }
 
     private bool CanSetStatus()

@@ -67,6 +67,13 @@
                   InputGestureText="Ctrl+Shift+A"
                   IsCheckable="True"
                   IsChecked="{Binding IsVoiceActivationEnabled, Mode=OneWay}" />
+        <Separator />
+        <MenuItem Header="Start _Video" Command="{Binding ToggleVideoCaptureCommand}" />
+        <MenuItem Header="Refresh _Cameras" Command="{Binding RefreshVideoDevicesCommand}" />
+        <Separator />
+        <MenuItem Header="Share _Desktop" Command="{Binding ShareDesktopCommand}" />
+        <MenuItem Header="Share Active _Window" Command="{Binding ShareActiveWindowCommand}" />
+        <MenuItem Header="Stop Desktop _Sharing" Command="{Binding StopDesktopShareCommand}" />
       </MenuItem>
       <MenuItem Header="_Channels">
         <MenuItem Header="_Join Selected Channel" Command="{Binding JoinSelectedChannelCommand}" />
@@ -147,6 +154,30 @@
                       AutomationProperties.Name="Voice activation">
           <TextBlock Text="Voice Activation" />
         </ToggleButton>
+        <Separator />
+        <ToggleButton Command="{Binding ToggleVideoCaptureCommand}"
+                      IsChecked="{Binding IsVideoCaptureActive, Mode=OneWay}"
+                      Tag="ToolbarButton"
+                      Focusable="True"
+                      IsTabStop="False"
+                      AutomationProperties.Name="Video transmission">
+          <TextBlock Text="Video" />
+        </ToggleButton>
+        <ToggleButton Command="{Binding ShareDesktopCommand}"
+                      IsChecked="{Binding IsDesktopSharingActive, Mode=OneWay}"
+                      Tag="ToolbarButton"
+                      Focusable="True"
+                      IsTabStop="False"
+                      AutomationProperties.Name="Share desktop">
+          <TextBlock Text="Share Desktop" />
+        </ToggleButton>
+        <Button Command="{Binding StopDesktopShareCommand}"
+                Tag="ToolbarButton"
+                Focusable="True"
+                IsTabStop="False"
+                AutomationProperties.Name="Stop desktop sharing">
+          <TextBlock Text="Stop Share" />
+        </Button>
         <Separator />
         <Button Command="{Binding SimulateUserJoinedCommand}"
                 Tag="ToolbarButton"
@@ -337,13 +368,49 @@
 
         <TabItem Header="Video">
           <Grid Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="260" />
               <ColumnDefinition Width="8" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ListBox ItemsSource="{Binding VideoStreams}"
+            <DockPanel Grid.ColumnSpan="3" Margin="0,0,0,8">
+              <Button DockPanel.Dock="Right"
+                      Content="{Binding VideoCaptureButtonText}"
+                      Command="{Binding ToggleVideoCaptureCommand}"
+                      MinWidth="100"
+                      Margin="8,0,0,0"
+                      AutomationProperties.Name="Start or stop video transmission" />
+              <Button DockPanel.Dock="Right"
+                      Content="Refresh Cameras"
+                      Command="{Binding RefreshVideoDevicesCommand}"
+                      MinWidth="120"
+                      Margin="8,0,0,0"
+                      AutomationProperties.Name="Refresh cameras" />
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Camera"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <ComboBox ItemsSource="{Binding VideoCaptureDevices}"
+                          SelectedItem="{Binding SelectedVideoCaptureDevice}"
+                          DisplayMemberPath="DisplayName"
+                          Width="240"
+                          IsTextSearchEnabled="True"
+                          AutomationProperties.Name="Camera" />
+                <TextBlock Text="{Binding SelectedVideoCaptureFormatText}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           AutomationProperties.Name="{Binding SelectedVideoCaptureFormatText}" />
+              </StackPanel>
+            </DockPanel>
+
+            <ListBox Grid.Row="1"
+                     ItemsSource="{Binding VideoStreams}"
                      SelectedItem="{Binding SelectedVideoStream}"
                      Background="{DynamicResource ControlBackgroundBrush}"
                      Foreground="{DynamicResource TextBrush}"
@@ -373,7 +440,8 @@
               </ListBox.ItemTemplate>
             </ListBox>
 
-            <GridSplitter Grid.Column="1"
+            <GridSplitter Grid.Row="1"
+                          Grid.Column="1"
                           Width="8"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
@@ -381,7 +449,8 @@
                           KeyboardNavigation.TabNavigation="None"
                           AutomationProperties.Name="Resize video preview" />
 
-            <Border Grid.Column="2"
+            <Border Grid.Row="1"
+                    Grid.Column="2"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1"
                     Background="{DynamicResource ControlBackgroundBrush}"
@@ -405,13 +474,37 @@
 
         <TabItem Header="Desktops">
           <Grid Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="260" />
               <ColumnDefinition Width="8" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ListBox ItemsSource="{Binding DesktopStreams}"
+            <StackPanel Grid.ColumnSpan="3"
+                        Orientation="Horizontal"
+                        Margin="0,0,0,8">
+              <Button Content="Share Desktop"
+                      Command="{Binding ShareDesktopCommand}"
+                      MinWidth="120"
+                      Margin="0,0,8,0"
+                      AutomationProperties.Name="Share full desktop" />
+              <Button Content="Share Active Window"
+                      Command="{Binding ShareActiveWindowCommand}"
+                      MinWidth="150"
+                      Margin="0,0,8,0"
+                      AutomationProperties.Name="Share active window" />
+              <Button Content="Stop Sharing"
+                      Command="{Binding StopDesktopShareCommand}"
+                      MinWidth="110"
+                      AutomationProperties.Name="Stop desktop sharing" />
+            </StackPanel>
+
+            <ListBox Grid.Row="1"
+                     ItemsSource="{Binding DesktopStreams}"
                      SelectedItem="{Binding SelectedDesktopStream}"
                      Background="{DynamicResource ControlBackgroundBrush}"
                      Foreground="{DynamicResource TextBrush}"
@@ -441,7 +534,8 @@
               </ListBox.ItemTemplate>
             </ListBox>
 
-            <GridSplitter Grid.Column="1"
+            <GridSplitter Grid.Row="1"
+                          Grid.Column="1"
                           Width="8"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
@@ -449,7 +543,8 @@
                           KeyboardNavigation.TabNavigation="None"
                           AutomationProperties.Name="Resize desktop preview" />
 
-            <Border Grid.Column="2"
+            <Border Grid.Row="1"
+                    Grid.Column="2"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1"
                     Background="{DynamicResource ControlBackgroundBrush}"

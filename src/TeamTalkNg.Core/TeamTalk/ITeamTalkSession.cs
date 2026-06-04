@@ -22,6 +22,16 @@ public interface ITeamTalkSession
 
     Task<AudioInputLevelSummary> GetAudioInputLevelAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<VideoCaptureDeviceSummary>> GetVideoCaptureDevicesAsync(CancellationToken cancellationToken = default);
+
+    Task StartVideoCaptureAsync(string deviceId, VideoCaptureFormatSummary format, CancellationToken cancellationToken = default);
+
+    Task StopVideoCaptureAsync(CancellationToken cancellationToken = default);
+
+    Task StartDesktopShareAsync(DesktopShareSource source, CancellationToken cancellationToken = default);
+
+    Task StopDesktopShareAsync(CancellationToken cancellationToken = default);
+
     Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default);
 
     Task SetNicknameAsync(string nickname, CancellationToken cancellationToken = default);

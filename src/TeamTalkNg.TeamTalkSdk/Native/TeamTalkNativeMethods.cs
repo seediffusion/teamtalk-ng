@@ -63,6 +63,39 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_GetSoundInputLevel")]
     internal static extern int GetSoundInputLevel(IntPtr instance);
 
+    [DllImport(LibraryName, EntryPoint = "TT_GetVideoCaptureDevices")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int GetVideoCaptureDevices(IntPtr videoDevices, ref int deviceCount);
+
+    [DllImport(LibraryName, EntryPoint = "TT_InitVideoCaptureDevice", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int InitVideoCaptureDevice(IntPtr instance, string deviceId, ref NativeVideoFormat videoFormat);
+
+    [DllImport(LibraryName, EntryPoint = "TT_CloseVideoCaptureDevice")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int CloseVideoCaptureDevice(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_StartVideoCaptureTransmission")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int StartVideoCaptureTransmission(IntPtr instance, ref NativeVideoCodec videoCodec);
+
+    [DllImport(LibraryName, EntryPoint = "TT_StopVideoCaptureTransmission")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int StopVideoCaptureTransmission(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_Windows_GetDesktopHWND")]
+    internal static extern IntPtr WindowsGetDesktopHwnd();
+
+    [DllImport(LibraryName, EntryPoint = "TT_Windows_GetDesktopActiveHWND")]
+    internal static extern IntPtr WindowsGetDesktopActiveHwnd();
+
+    [DllImport(LibraryName, EntryPoint = "TT_SendDesktopWindowFromHWND")]
+    internal static extern int SendDesktopWindowFromHwnd(IntPtr instance, IntPtr windowHandle, BitmapFormat bitmapFormat, DesktopProtocol desktopProtocol);
+
+    [DllImport(LibraryName, EntryPoint = "TT_CloseDesktopWindow")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int CloseDesktopWindow(IntPtr instance);
+
     [DllImport(LibraryName, EntryPoint = "TT_SetSoundInputGainLevel")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int SetSoundInputGainLevel(IntPtr instance, int level);

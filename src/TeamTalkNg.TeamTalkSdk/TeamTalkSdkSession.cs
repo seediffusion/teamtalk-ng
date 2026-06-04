@@ -36,6 +36,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private bool soundOutputInitialized;
     private bool voiceTransmissionEnabled;
     private bool voiceActivationEnabled;
+    private bool videoCaptureInitialized;
+    private bool videoCaptureTransmitting;
+    private bool desktopSharing;
     private int? configuredInputDeviceId;
     private int? configuredOutputDeviceId;
     private int configuredInputVolumePercent = 50;
@@ -130,6 +133,127 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return Task.FromResult(new AudioInputLevelSummary(
             Math.Clamp(inputLevel, SoundLevel.VuMin, SoundLevel.VuMax),
             Math.Clamp(activationLevel, SoundLevel.VuMin, SoundLevel.VuMax)));
+    }
+
+    public Task<IReadOnlyList<VideoCaptureDeviceSummary>> GetVideoCaptureDevicesAsync(CancellationToken cancellationToken = default)
+    {
+        TeamTalkSdkAvailability availability = TeamTalkNativeLibrary.ConfigureResolution(options);
+        if (!availability.IsAvailable)
+        {
+            return Task.FromResult<IReadOnlyList<VideoCaptureDeviceSummary>>([]);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<VideoCaptureDeviceSummary>>(ReadVideoCaptureDevices());
+    }
+
+    public Task StartVideoCaptureAsync(string deviceId, VideoCaptureFormatSummary format, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before transmitting video.");
+        }
+
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            throw new InvalidOperationException("Select a camera before starting video.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        NativeVideoFormat nativeFormat = CreateNativeVideoFormat(format);
+        NativeVideoCodec codec = CreateDefaultVideoCodec();
+        int initialized;
+        int started;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (videoCaptureTransmitting)
+            {
+                TeamTalkNativeMethods.StopVideoCaptureTransmission(instance);
+                videoCaptureTransmitting = false;
+            }
+
+            if (videoCaptureInitialized)
+            {
+                TeamTalkNativeMethods.CloseVideoCaptureDevice(instance);
+                videoCaptureInitialized = false;
+            }
+
+            initialized = TeamTalkNativeMethods.InitVideoCaptureDevice(instance, deviceId, ref nativeFormat);
+            videoCaptureInitialized = initialized != 0;
+            started = initialized == 0
+                ? 0
+                : TeamTalkNativeMethods.StartVideoCaptureTransmission(instance, ref codec);
+            videoCaptureTransmitting = started != 0;
+        }
+
+        if (initialized == 0)
+        {
+            throw new InvalidOperationException("TeamTalk could not initialize the selected camera.");
+        }
+
+        if (started == 0)
+        {
+            throw new InvalidOperationException("TeamTalk could not start video transmission.");
+        }
+
+        RaiseSystemMessage("Video transmission started.");
+        return Task.CompletedTask;
+    }
+
+    public Task StopVideoCaptureAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        StopVideoCapture();
+        RaiseSystemMessage("Video transmission stopped.");
+        return Task.CompletedTask;
+    }
+
+    public Task StartDesktopShareAsync(DesktopShareSource source, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before sharing your desktop.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IntPtr windowHandle = source == DesktopShareSource.ActiveWindow
+            ? TeamTalkNativeMethods.WindowsGetDesktopActiveHwnd()
+            : TeamTalkNativeMethods.WindowsGetDesktopHwnd();
+        if (windowHandle == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("TeamTalk could not find the requested desktop window.");
+        }
+
+        int result;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            result = TeamTalkNativeMethods.SendDesktopWindowFromHwnd(instance, windowHandle, BitmapFormat.Rgb32, DesktopProtocol.Zlib1);
+            desktopSharing = result > 0;
+        }
+
+        if (result <= 0)
+        {
+            throw new InvalidOperationException(result == 0
+                ? "TeamTalk did not detect a desktop change to send yet."
+                : "TeamTalk could not start desktop sharing.");
+        }
+
+        RaiseSystemMessage(source == DesktopShareSource.ActiveWindow
+            ? "Active window sharing started."
+            : "Desktop sharing started.");
+        return Task.CompletedTask;
+    }
+
+    public Task StopDesktopShareAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        StopDesktopSharing();
+        RaiseSystemMessage("Desktop sharing stopped.");
+        return Task.CompletedTask;
     }
 
     public Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default)
@@ -713,6 +837,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             soundOutputInitialized = false;
             voiceTransmissionEnabled = false;
             voiceActivationEnabled = false;
+            videoCaptureInitialized = false;
+            videoCaptureTransmitting = false;
+            desktopSharing = false;
         }
 
         int attemptId = Interlocked.Increment(ref connectionAttemptId);
@@ -755,6 +882,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             if (instance != IntPtr.Zero)
             {
                 StopVoiceInput();
+                StopVideoCapture();
+                StopDesktopSharing();
                 CloseSoundDevices();
                 TeamTalkNativeMethods.Disconnect(instance);
             }
@@ -1230,6 +1359,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             }
 
             StopVoiceInput();
+            StopVideoCapture();
+            StopDesktopSharing();
             CloseSoundDevices();
             TeamTalkNativeMethods.CloseTeamTalk(instance);
             instance = IntPtr.Zero;
@@ -1700,6 +1831,133 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         finally
         {
             Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static IReadOnlyList<VideoCaptureDeviceSummary> ReadVideoCaptureDevices()
+    {
+        int count = 0;
+        if (TeamTalkNativeMethods.GetVideoCaptureDevices(IntPtr.Zero, ref count) == 0 || count <= 0)
+        {
+            return [];
+        }
+
+        int size = Marshal.SizeOf<NativeVideoCaptureDevice>();
+        IntPtr buffer = Marshal.AllocHGlobal(size * count);
+        try
+        {
+            if (TeamTalkNativeMethods.GetVideoCaptureDevices(buffer, ref count) == 0 || count <= 0)
+            {
+                return [];
+            }
+
+            List<VideoCaptureDeviceSummary> devices = [];
+            for (int index = 0; index < count; index++)
+            {
+                IntPtr deviceAddress = IntPtr.Add(buffer, index * size);
+                NativeVideoCaptureDevice nativeDevice = Marshal.PtrToStructure<NativeVideoCaptureDevice>(deviceAddress);
+                string deviceId = nativeDevice.ReadDeviceId();
+                if (string.IsNullOrWhiteSpace(deviceId))
+                {
+                    continue;
+                }
+
+                string name = nativeDevice.ReadName();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = $"Camera {index + 1}";
+                }
+
+                int formatCount = Math.Clamp(nativeDevice.VideoFormatsCount, 0, NativeConstants.VideoFormatsMax);
+                List<VideoCaptureFormatSummary> formats = [];
+                for (int formatIndex = 0; formatIndex < formatCount; formatIndex++)
+                {
+                    NativeVideoFormat nativeFormat = nativeDevice.VideoFormats[formatIndex];
+                    if (nativeFormat.Width <= 0 || nativeFormat.Height <= 0 || nativeFormat.FpsNumerator <= 0 || nativeFormat.FpsDenominator <= 0)
+                    {
+                        continue;
+                    }
+
+                    formats.Add(new VideoCaptureFormatSummary(
+                        nativeFormat.Width,
+                        nativeFormat.Height,
+                        nativeFormat.FpsNumerator,
+                        nativeFormat.FpsDenominator,
+                        nativeFormat.FourCC.ToString()));
+                }
+
+                devices.Add(new VideoCaptureDeviceSummary(deviceId, name, nativeDevice.ReadCaptureApi(), formats));
+            }
+
+            return devices;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static NativeVideoFormat CreateNativeVideoFormat(VideoCaptureFormatSummary format)
+    {
+        return new NativeVideoFormat
+        {
+            Width = Math.Max(1, format.Width),
+            Height = Math.Max(1, format.Height),
+            FpsNumerator = Math.Max(1, format.FpsNumerator),
+            FpsDenominator = Math.Max(1, format.FpsDenominator),
+            FourCC = Enum.TryParse(format.PixelFormat, ignoreCase: true, out FourCC fourCC)
+                ? fourCC
+                : FourCC.I420
+        };
+    }
+
+    private static NativeVideoCodec CreateDefaultVideoCodec()
+    {
+        return new NativeVideoCodec
+        {
+            Codec = Codec.WebMVp8,
+            WebMVp8 = new NativeWebMVP8Codec
+            {
+                TargetBitrate = 256,
+                EncodeDeadline = 1
+            }
+        };
+    }
+
+    private void StopVideoCapture()
+    {
+        if (instance == IntPtr.Zero)
+        {
+            videoCaptureInitialized = false;
+            videoCaptureTransmitting = false;
+            return;
+        }
+
+        if (videoCaptureTransmitting)
+        {
+            TeamTalkNativeMethods.StopVideoCaptureTransmission(instance);
+            videoCaptureTransmitting = false;
+        }
+
+        if (videoCaptureInitialized)
+        {
+            TeamTalkNativeMethods.CloseVideoCaptureDevice(instance);
+            videoCaptureInitialized = false;
+        }
+    }
+
+    private void StopDesktopSharing()
+    {
+        if (instance == IntPtr.Zero)
+        {
+            desktopSharing = false;
+            return;
+        }
+
+        if (desktopSharing)
+        {
+            TeamTalkNativeMethods.CloseDesktopWindow(instance);
+            desktopSharing = false;
         }
     }
 

@@ -96,6 +96,59 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.FromResult(new AudioInputLevelSummary(level, 50));
     }
 
+    public Task<IReadOnlyList<VideoCaptureDeviceSummary>> GetVideoCaptureDevicesAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<VideoCaptureDeviceSummary> devices =
+        [
+            new VideoCaptureDeviceSummary(
+                "mock-camera",
+                "Mock camera",
+                "TeamTalk NG",
+                [
+                    new VideoCaptureFormatSummary(640, 480, 15, 1, "I420"),
+                    new VideoCaptureFormatSummary(320, 240, 15, 1, "I420")
+                ])
+        ];
+        return Task.FromResult(devices);
+    }
+
+    public Task StartVideoCaptureAsync(string deviceId, VideoCaptureFormatSummary format, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before transmitting video.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", "Video transmission started.", IsSystem: true));
+        PublishMockMediaFrame(1, GetSelfNickname(), MediaStreamKind.Video);
+        return Task.CompletedTask;
+    }
+
+    public Task StopVideoCaptureAsync(CancellationToken cancellationToken = default)
+    {
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", "Video transmission stopped.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
+    public Task StartDesktopShareAsync(DesktopShareSource source, CancellationToken cancellationToken = default)
+    {
+        if (Status != ConnectionStatus.InChannel)
+        {
+            throw new InvalidOperationException("You must be in a channel before sharing your desktop.");
+        }
+
+        string sourceName = source == DesktopShareSource.ActiveWindow ? "Active window" : "Desktop";
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", $"{sourceName} sharing started.", IsSystem: true));
+        PublishMockMediaFrame(1, GetSelfNickname(), MediaStreamKind.Desktop);
+        return Task.CompletedTask;
+    }
+
+    public Task StopDesktopShareAsync(CancellationToken cancellationToken = default)
+    {
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", "Desktop sharing stopped.", IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task SetUserStatusAsync(UserStatusRequest status, CancellationToken cancellationToken = default)
     {
         if (Status is ConnectionStatus.Disconnected or ConnectionStatus.Connecting)
