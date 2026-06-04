@@ -103,6 +103,7 @@ public sealed class MainWindowViewModel : ObservableObject
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
         RefreshAudioDevicesCommand = new AsyncRelayCommand(RefreshAudioDevicesAsync);
         ServerInformationCommand = new AsyncRelayCommand(ShowServerInformationAsync, CanShowServerInformation);
+        SaveServerConfigurationCommand = new AsyncRelayCommand(SaveServerConfigurationAsync, CanUseLoggedInServerCommand);
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
         ChannelInformationCommand = new RelayCommand(ShowChannelInformation, CanShowChannelInformation);
         EditChannelTopicCommand = new AsyncRelayCommand(EditChannelTopicAsync, CanEditChannelTopic);
@@ -190,6 +191,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand RefreshAudioDevicesCommand { get; }
 
     public ICommand ServerInformationCommand { get; }
+
+    public ICommand SaveServerConfigurationCommand { get; }
 
     public ICommand JoinSelectedChannelCommand { get; }
 
@@ -451,6 +454,19 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             ServerInformationSummary serverInformation = await teamTalkSession.GetServerInformationAsync();
             serverInformationDialogService.ShowServerInformationDialog(serverInformation);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task SaveServerConfigurationAsync()
+    {
+        try
+        {
+            await teamTalkSession.SaveServerConfigurationAsync();
+            await AnnounceAsync("Save server configuration command sent", AnnouncementPriority.Normal, AnnouncementKind.System);
         }
         catch (Exception ex)
         {
@@ -1623,6 +1639,11 @@ public sealed class MainWindowViewModel : ObservableObject
             serverInformation.RaiseCanExecuteChanged();
         }
 
+        if (SaveServerConfigurationCommand is AsyncRelayCommand saveServerConfiguration)
+        {
+            saveServerConfiguration.RaiseCanExecuteChanged();
+        }
+
         RaiseFileCommandStateChanged();
 
         if (TogglePushToTalkCommand is AsyncRelayCommand pushToTalk)
@@ -1751,6 +1772,11 @@ public sealed class MainWindowViewModel : ObservableObject
     }
 
     private bool CanShowServerInformation()
+    {
+        return CanUseLoggedInServerCommand();
+    }
+
+    private bool CanUseLoggedInServerCommand()
     {
         return teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
     }

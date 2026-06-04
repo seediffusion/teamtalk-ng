@@ -118,6 +118,21 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             LoginDelayMilliseconds: 0));
     }
 
+    public Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before saving server configuration.");
+        }
+
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            "Save server configuration command sent.",
+            IsSystem: true));
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel)

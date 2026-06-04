@@ -215,6 +215,30 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             properties.LoginDelayMilliseconds));
     }
 
+    public Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before saving server configuration.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoSaveConfig(instance);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the save server configuration command.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel || currentChannelId <= 0)

@@ -43,6 +43,8 @@
       </MenuItem>
       <MenuItem Header="_Server">
         <MenuItem Header="Server _Information" Command="{Binding ServerInformationCommand}" />
+        <Separator />
+        <MenuItem Header="_Save Configuration" Command="{Binding SaveServerConfigurationCommand}" />
       </MenuItem>
       <MenuItem Header="_Me">
         <MenuItem Header="Change _Nickname" Command="{Binding ChangeNicknameCommand}" />
