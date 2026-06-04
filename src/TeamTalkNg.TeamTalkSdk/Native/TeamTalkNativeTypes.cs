@@ -22,6 +22,7 @@ internal enum ClientEvent
     CommandChannelNew = 320,
     CommandChannelUpdate = 330,
     CommandChannelRemove = 340,
+    CommandServerStatistics = 360,
     FileTransfer = 1040,
     InternalError = 1000
 }
@@ -34,6 +35,7 @@ internal enum TTType
     FileTransfer = 8,
     TextMessage = 14,
     ServerProperties = 10,
+    ServerStatistics = 11,
     TTMessage = 16,
     User = 17,
     ClientErrorMsg = 28,
@@ -390,6 +392,26 @@ internal unsafe struct NativeServerProperties
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct NativeServerStatistics
+{
+    public long TotalBytesTx;
+    public long TotalBytesRx;
+    public long VoiceBytesTx;
+    public long VoiceBytesRx;
+    public long VideoCaptureBytesTx;
+    public long VideoCaptureBytesRx;
+    public long MediaFileBytesTx;
+    public long MediaFileBytesRx;
+    public long DesktopBytesTx;
+    public long DesktopBytesRx;
+    public int UsersServed;
+    public int UsersPeak;
+    public long FilesTx;
+    public long FilesRx;
+    public long UptimeMilliseconds;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct NativeRemoteFile
 {
     public int ChannelId;
@@ -554,4 +576,5 @@ internal sealed record TeamTalkMessage(
     NativeChannel Channel,
     int BoolValue,
     int IntValue,
-    NativeFileTransfer FileTransfer = default);
+    NativeFileTransfer FileTransfer = default,
+    NativeServerStatistics ServerStatistics = default);

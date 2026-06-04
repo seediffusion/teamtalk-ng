@@ -192,6 +192,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesChannelAddedOrUpdated();
         DispatchesChannelRemoved();
         DispatchesFileTransferUpdate();
+        DispatchesServerStatisticsResponse();
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         RejectsVoiceControlsBeforeJoiningChannel();
@@ -199,6 +200,7 @@ internal static unsafe class SdkDispatchTests
         RejectsNicknameChangeBeforeLogin();
         RejectsUserAudioSettingsBeforeLogin();
         RejectsServerInformationBeforeLogin();
+        RejectsServerStatisticsBeforeLogin();
         RejectsServerConfigurationSaveBeforeLogin();
         RejectsChannelFilesBeforeJoiningChannel();
         RejectsFileCommandsBeforeJoiningChannel();
@@ -448,6 +450,50 @@ internal static unsafe class SdkDispatchTests
         AssertEqual(TeamTalkFileTransferStatus.Active, received.Status);
     }
 
+    private static void DispatchesServerStatisticsResponse()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        Task<ServerStatisticsSummary> request = session.BeginServerStatisticsRequestForTest(88);
+        NativeServerStatistics statistics = default;
+        statistics.TotalBytesTx = 1024;
+        statistics.TotalBytesRx = 2048;
+        statistics.VoiceBytesTx = 512;
+        statistics.VoiceBytesRx = 256;
+        statistics.VideoCaptureBytesTx = 128;
+        statistics.VideoCaptureBytesRx = 64;
+        statistics.MediaFileBytesTx = 32;
+        statistics.MediaFileBytesRx = 16;
+        statistics.DesktopBytesTx = 8;
+        statistics.DesktopBytesRx = 4;
+        statistics.UsersServed = 12;
+        statistics.UsersPeak = 5;
+        statistics.FilesTx = 4096;
+        statistics.FilesRx = 8192;
+        statistics.UptimeMilliseconds = 123456;
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandServerStatistics,
+            Source: 88,
+            TTType.ServerStatistics,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0,
+            ServerStatistics: statistics));
+
+        ServerStatisticsSummary summary = request.GetAwaiter().GetResult();
+        AssertEqual(1024L, summary.TotalBytesSent);
+        AssertEqual(2048L, summary.TotalBytesReceived);
+        AssertEqual(12, summary.UsersServed);
+        AssertEqual(5, summary.PeakUsers);
+        AssertEqual(4096L, summary.FileBytesSent);
+        AssertEqual(8192L, summary.FileBytesReceived);
+        AssertEqual(123456L, summary.UptimeMilliseconds);
+    }
+
     private static void DispatchesLoggedInStatusWithoutNativeInstance()
     {
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
@@ -500,6 +546,13 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
         AssertThrows(() => session.GetServerInformationAsync().GetAwaiter().GetResult());
+    }
+
+    private static void RejectsServerStatisticsBeforeLogin()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        AssertThrows(() => session.GetServerStatisticsAsync().GetAwaiter().GetResult());
     }
 
     private static void RejectsServerConfigurationSaveBeforeLogin()

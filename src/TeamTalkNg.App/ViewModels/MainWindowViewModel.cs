@@ -19,6 +19,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IConnectionDialogService connectionDialogService;
     private readonly IConnectionTargetDialogService connectionTargetDialogService;
     private readonly IServerInformationDialogService serverInformationDialogService;
+    private readonly IServerStatisticsDialogService serverStatisticsDialogService;
     private readonly IAppSettingsStore settingsStore;
     private readonly IPreferencesDialogService preferencesDialogService;
     private readonly IChannelDialogService channelDialogService;
@@ -57,6 +58,7 @@ public sealed class MainWindowViewModel : ObservableObject
         IConnectionDialogService connectionDialogService,
         IConnectionTargetDialogService connectionTargetDialogService,
         IServerInformationDialogService serverInformationDialogService,
+        IServerStatisticsDialogService serverStatisticsDialogService,
         IAppSettingsStore settingsStore,
         IPreferencesDialogService preferencesDialogService,
         IChannelDialogService channelDialogService,
@@ -79,6 +81,7 @@ public sealed class MainWindowViewModel : ObservableObject
         this.connectionDialogService = connectionDialogService;
         this.connectionTargetDialogService = connectionTargetDialogService;
         this.serverInformationDialogService = serverInformationDialogService;
+        this.serverStatisticsDialogService = serverStatisticsDialogService;
         this.settingsStore = settingsStore;
         this.preferencesDialogService = preferencesDialogService;
         this.channelDialogService = channelDialogService;
@@ -103,6 +106,7 @@ public sealed class MainWindowViewModel : ObservableObject
         DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, () => teamTalkSession.Status != ConnectionStatus.Disconnected);
         RefreshAudioDevicesCommand = new AsyncRelayCommand(RefreshAudioDevicesAsync);
         ServerInformationCommand = new AsyncRelayCommand(ShowServerInformationAsync, CanShowServerInformation);
+        ServerStatisticsCommand = new AsyncRelayCommand(ShowServerStatisticsAsync, CanUseLoggedInServerCommand);
         SaveServerConfigurationCommand = new AsyncRelayCommand(SaveServerConfigurationAsync, CanUseLoggedInServerCommand);
         JoinSelectedChannelCommand = new AsyncRelayCommand(ActivateSelectedTreeItemAsync, CanJoinSelectedChannel);
         ChannelInformationCommand = new RelayCommand(ShowChannelInformation, CanShowChannelInformation);
@@ -191,6 +195,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public ICommand RefreshAudioDevicesCommand { get; }
 
     public ICommand ServerInformationCommand { get; }
+
+    public ICommand ServerStatisticsCommand { get; }
 
     public ICommand SaveServerConfigurationCommand { get; }
 
@@ -454,6 +460,19 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             ServerInformationSummary serverInformation = await teamTalkSession.GetServerInformationAsync();
             serverInformationDialogService.ShowServerInformationDialog(serverInformation);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task ShowServerStatisticsAsync()
+    {
+        try
+        {
+            ServerStatisticsSummary serverStatistics = await teamTalkSession.GetServerStatisticsAsync();
+            serverStatisticsDialogService.ShowServerStatisticsDialog(serverStatistics);
         }
         catch (Exception ex)
         {
@@ -1637,6 +1656,11 @@ public sealed class MainWindowViewModel : ObservableObject
         if (ServerInformationCommand is AsyncRelayCommand serverInformation)
         {
             serverInformation.RaiseCanExecuteChanged();
+        }
+
+        if (ServerStatisticsCommand is AsyncRelayCommand serverStatistics)
+        {
+            serverStatistics.RaiseCanExecuteChanged();
         }
 
         if (SaveServerConfigurationCommand is AsyncRelayCommand saveServerConfiguration)

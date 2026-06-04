@@ -14,6 +14,7 @@ public static class TeamTalkNativeSizeVerifier
         Compare<NativeUser>(TTType.User, "User", mismatches);
         Compare<NativeClientErrorMsg>(TTType.ClientErrorMsg, "ClientErrorMsg", mismatches);
         Compare<NativeServerProperties>(TTType.ServerProperties, "ServerProperties", mismatches);
+        Compare<NativeServerStatistics>(TTType.ServerStatistics, "ServerStatistics", mismatches);
         return mismatches;
     }
 

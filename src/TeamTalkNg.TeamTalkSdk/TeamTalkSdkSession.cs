@@ -9,6 +9,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private const string ClientName = "TeamTalk NG";
     private const int MessageWaitMilliseconds = 100;
     private static readonly TimeSpan ConnectionProgressTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ServerStatisticsTimeout = TimeSpan.FromSeconds(10);
 
     private readonly TeamTalkSdkOptions options;
     private readonly Lock stateLock = new();
@@ -17,6 +18,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private Task? pollingTask;
     private int connectionAttemptId;
     private int loginCommandId;
+    private int serverStatisticsCommandId;
+    private TaskCompletionSource<ServerStatisticsSummary>? pendingServerStatistics;
     private TeamTalkServerProfile? activeProfile;
     private int currentChannelId;
     private int myUserId;
@@ -213,6 +216,52 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             properties.ReadServerVersion(),
             properties.ReadServerProtocolVersion(),
             properties.LoginDelayMilliseconds));
+    }
+
+    public async Task<ServerStatisticsSummary> GetServerStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing server statistics.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = new TaskCompletionSource<ServerStatisticsSummary>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (pendingServerStatistics is not null)
+            {
+                throw new InvalidOperationException("A server statistics request is already in progress.");
+            }
+
+            commandId = TeamTalkNativeMethods.DoQueryServerStats(instance);
+            if (commandId <= 0)
+            {
+                throw new InvalidOperationException("TeamTalk SDK did not accept the server statistics command.");
+            }
+
+            serverStatisticsCommandId = commandId;
+            pendingServerStatistics = request;
+        }
+
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(ServerStatisticsTimeout);
+
+        try
+        {
+            return await request.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("TeamTalk server statistics did not arrive in time.");
+        }
+        finally
+        {
+            ClearPendingServerStatistics(request);
+        }
     }
 
     public Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default)
@@ -885,6 +934,18 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         DispatchMessage(message);
     }
 
+    internal Task<ServerStatisticsSummary> BeginServerStatisticsRequestForTest(int commandId)
+    {
+        var request = new TaskCompletionSource<ServerStatisticsSummary>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (stateLock)
+        {
+            serverStatisticsCommandId = commandId;
+            pendingServerStatistics = request;
+        }
+
+        return request.Task;
+    }
+
     private void EnsureInstance()
     {
         if (instance != IntPtr.Zero)
@@ -1083,6 +1144,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 break;
             case ClientEvent.CommandChannelRemove:
                 ChannelRemoved?.Invoke(this, message.Source);
+                break;
+            case ClientEvent.CommandServerStatistics:
+                CompleteServerStatistics(message);
                 break;
             case ClientEvent.FileTransfer:
                 DispatchFileTransfer(message.FileTransfer);
@@ -1647,6 +1711,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         currentChannelId = 0;
         myUserId = 0;
         loginCommandId = 0;
+        FailPendingServerStatistics(new InvalidOperationException(reason));
         CloseInstance();
         SetStatus(ConnectionStatus.Disconnected);
     }
@@ -1660,7 +1725,76 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             return;
         }
 
+        if (serverStatisticsCommandId > 0 && message.Source == serverStatisticsCommandId)
+        {
+            FailPendingServerStatistics(new InvalidOperationException(error));
+        }
+
         RaiseSystemMessage(error);
+    }
+
+    private void CompleteServerStatistics(TeamTalkMessage message)
+    {
+        TaskCompletionSource<ServerStatisticsSummary>? request = null;
+        lock (stateLock)
+        {
+            if (pendingServerStatistics is null
+                || serverStatisticsCommandId > 0 && message.Source != serverStatisticsCommandId)
+            {
+                return;
+            }
+
+            request = pendingServerStatistics;
+            pendingServerStatistics = null;
+            serverStatisticsCommandId = 0;
+        }
+
+        request.TrySetResult(CreateServerStatisticsSummary(message.ServerStatistics));
+    }
+
+    private void FailPendingServerStatistics(Exception exception)
+    {
+        TaskCompletionSource<ServerStatisticsSummary>? request = null;
+        lock (stateLock)
+        {
+            request = pendingServerStatistics;
+            pendingServerStatistics = null;
+            serverStatisticsCommandId = 0;
+        }
+
+        request?.TrySetException(exception);
+    }
+
+    private void ClearPendingServerStatistics(TaskCompletionSource<ServerStatisticsSummary> request)
+    {
+        lock (stateLock)
+        {
+            if (ReferenceEquals(pendingServerStatistics, request))
+            {
+                pendingServerStatistics = null;
+                serverStatisticsCommandId = 0;
+            }
+        }
+    }
+
+    private static ServerStatisticsSummary CreateServerStatisticsSummary(NativeServerStatistics statistics)
+    {
+        return new ServerStatisticsSummary(
+            Math.Max(0, statistics.TotalBytesTx),
+            Math.Max(0, statistics.TotalBytesRx),
+            Math.Max(0, statistics.VoiceBytesTx),
+            Math.Max(0, statistics.VoiceBytesRx),
+            Math.Max(0, statistics.VideoCaptureBytesTx),
+            Math.Max(0, statistics.VideoCaptureBytesRx),
+            Math.Max(0, statistics.MediaFileBytesTx),
+            Math.Max(0, statistics.MediaFileBytesRx),
+            Math.Max(0, statistics.DesktopBytesTx),
+            Math.Max(0, statistics.DesktopBytesRx),
+            Math.Max(0, statistics.UsersServed),
+            Math.Max(0, statistics.UsersPeak),
+            Math.Max(0, statistics.FilesTx),
+            Math.Max(0, statistics.FilesRx),
+            Math.Max(0, statistics.UptimeMilliseconds));
     }
 
     private void RaiseSystemMessage(string text)

@@ -16,6 +16,7 @@ internal static class TeamTalkMessageParser
         NativeClientErrorMsg clientError = default;
         NativeChannel channel = default;
         NativeFileTransfer fileTransfer = default;
+        NativeServerStatistics serverStatistics = default;
         int boolValue = 0;
         int intValue = 0;
 
@@ -36,6 +37,9 @@ internal static class TeamTalkMessageParser
             case TTType.FileTransfer:
                 fileTransfer = Marshal.PtrToStructure<NativeFileTransfer>(payload);
                 break;
+            case TTType.ServerStatistics:
+                serverStatistics = Marshal.PtrToStructure<NativeServerStatistics>(payload);
+                break;
             case TTType.TTBool:
                 boolValue = Marshal.ReadInt32(payload);
                 break;
@@ -44,6 +48,6 @@ internal static class TeamTalkMessageParser
                 break;
         }
 
-        return new TeamTalkMessage(clientEvent, source, type, user, textMessage, clientError, channel, boolValue, intValue, fileTransfer);
+        return new TeamTalkMessage(clientEvent, source, type, user, textMessage, clientError, channel, boolValue, intValue, fileTransfer, serverStatistics);
     }
 }

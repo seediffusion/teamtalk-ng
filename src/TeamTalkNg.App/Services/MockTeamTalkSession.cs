@@ -118,6 +118,31 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             LoginDelayMilliseconds: 0));
     }
 
+    public Task<ServerStatisticsSummary> GetServerStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing server statistics.");
+        }
+
+        return Task.FromResult(new ServerStatisticsSummary(
+            TotalBytesSent: 12_582_912,
+            TotalBytesReceived: 7_340_032,
+            VoiceBytesSent: 8_388_608,
+            VoiceBytesReceived: 5_242_880,
+            VideoCaptureBytesSent: 0,
+            VideoCaptureBytesReceived: 0,
+            MediaFileBytesSent: 0,
+            MediaFileBytesReceived: 0,
+            DesktopBytesSent: 0,
+            DesktopBytesReceived: 0,
+            UsersServed: 12,
+            PeakUsers: 5,
+            FileBytesSent: files.Sum(file => file.SizeBytes),
+            FileBytesReceived: files.Sum(file => file.SizeBytes),
+            UptimeMilliseconds: (long)TimeSpan.FromHours(4.5).TotalMilliseconds));
+    }
+
     public Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default)
     {
         if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
