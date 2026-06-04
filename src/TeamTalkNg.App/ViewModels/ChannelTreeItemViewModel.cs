@@ -16,6 +16,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     private int userCount;
     private int voiceVolumePercent = 100;
     private bool isVoiceMuted;
+    private bool isExpanded;
 
     public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
     {
@@ -50,6 +51,12 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     public ChannelTreeItemKind Kind { get; }
 
     public ObservableCollection<ChannelTreeItemViewModel> Children { get; } = [];
+
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set => SetProperty(ref isExpanded, value);
+    }
 
     public int UserCount
     {

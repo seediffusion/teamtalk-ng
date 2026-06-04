@@ -188,6 +188,7 @@
                     AutomationProperties.Name="Channels and users">
             <TreeView.ItemContainerStyle>
               <Style TargetType="{x:Type TreeViewItem}">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                 <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
                 <Setter Property="AutomationProperties.HelpText" Value="{Binding AccessibleHelpText}" />
                 <Setter Property="KeyboardNavigation.TabNavigation" Value="Continue" />

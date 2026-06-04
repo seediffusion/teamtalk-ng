@@ -359,6 +359,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
             await AnnounceAsync($"Joining {channel.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
             await teamTalkSession.JoinChannelAsync(channel.Path, password);
+            ExpandChannelPath(channel.Path);
         }
         catch (Exception ex)
         {
@@ -1100,6 +1101,7 @@ public sealed class MainWindowViewModel : ObservableObject
             }
             else
             {
+                ExpandChannelPath(activeProfile?.ChannelPath);
                 _ = RefreshFilesAsync(announce: false);
             }
 
@@ -1367,6 +1369,40 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         return parent;
+    }
+
+    private void ExpandChannelPath(string? channelPath)
+    {
+        if (serverTreeItem is null)
+        {
+            return;
+        }
+
+        serverTreeItem.IsExpanded = true;
+        string normalizedPath = NormalizeChannelPath(channelPath);
+        if (normalizedPath == "/")
+        {
+            ChannelTreeItemViewModel? rootChannel = FindChannelByPath("/");
+            if (rootChannel is not null)
+            {
+                rootChannel.IsExpanded = true;
+            }
+
+            return;
+        }
+
+        string currentPath = string.Empty;
+        foreach (string segment in normalizedPath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            currentPath += "/" + segment;
+            ChannelTreeItemViewModel? channel = FindChannelByPath(currentPath);
+            if (channel is null)
+            {
+                return;
+            }
+
+            channel.IsExpanded = true;
+        }
     }
 
     private ChannelTreeItemViewModel? FindChannelByPath(string? channelPath)
