@@ -1,4 +1,6 @@
+using TeamTalkNg.Accessibility;
 using TeamTalkNg.App.Services;
+using TeamTalkNg.Core.Accessibility;
 using TeamTalkNg.Core.TeamTalk;
 using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
 using TeamTalkNg.TeamTalkSdk;
@@ -8,6 +10,7 @@ ParserTests.RunAll();
 SdkProbeTests.RunAll();
 SdkDispatchTests.RunAll();
 SoundPackTests.RunAll();
+AnnouncementBackendTests.RunAll();
 
 internal static class ParserTests
 {
@@ -302,6 +305,146 @@ internal static class SoundPackTests
         {
             throw new InvalidOperationException($"Expected {expected}, got {actual}.");
         }
+    }
+}
+
+internal static class AnnouncementBackendTests
+{
+    public static void RunAll()
+    {
+        HonorsPriorityInterruptOptOut();
+        ContinuesAfterOutputFailure();
+        Console.WriteLine("TeamTalk NG announcement backend tests passed.");
+    }
+
+    private static void HonorsPriorityInterruptOptOut()
+    {
+        var output = new RecordingScreenReaderOutput();
+        var service = new QueuedAnnouncementService(output);
+
+        try
+        {
+            service.AnnounceAsync(new ScreenReaderAnnouncement(
+                "important but queued",
+                AnnouncementPriority.High,
+                AllowPriorityInterrupt: false)).AsTask().GetAwaiter().GetResult();
+
+            RecordingScreenReaderOutput.OutputCall call = output.WaitForCall();
+            AssertEqual("important but queued", call.Message);
+            Assert(!call.Interrupt, "Expected high priority announcement to respect priority interrupt opt-out.");
+        }
+        finally
+        {
+            service.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+    }
+
+    private static void ContinuesAfterOutputFailure()
+    {
+        var output = new RecordingScreenReaderOutput(failFirstCall: true);
+        var service = new QueuedAnnouncementService(output);
+
+        try
+        {
+            service.AnnounceAsync(new ScreenReaderAnnouncement("first")).AsTask().GetAwaiter().GetResult();
+            output.WaitForAttempt();
+
+            service.AnnounceAsync(new ScreenReaderAnnouncement("second")).AsTask().GetAwaiter().GetResult();
+            RecordingScreenReaderOutput.OutputCall call = output.WaitForCall();
+
+            AssertEqual("second", call.Message);
+        }
+        finally
+        {
+            service.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static void AssertEqual<T>(T expected, T actual)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"Expected {expected}, got {actual}.");
+        }
+    }
+
+    private sealed class RecordingScreenReaderOutput : IScreenReaderOutput
+    {
+        private readonly bool failFirstCall;
+        private readonly ManualResetEventSlim callRecorded = new();
+        private readonly ManualResetEventSlim attemptRecorded = new();
+        private int attempts;
+        private OutputCall? lastCall;
+
+        public RecordingScreenReaderOutput(bool failFirstCall = false)
+        {
+            this.failFirstCall = failFirstCall;
+        }
+
+        public bool IsAvailable => true;
+
+        public void Speak(string message, bool interrupt = false)
+        {
+            Record(message, interrupt);
+        }
+
+        public void Braille(string message)
+        {
+        }
+
+        public void Output(string message, bool interrupt = false)
+        {
+            Record(message, interrupt);
+        }
+
+        public OutputCall WaitForCall()
+        {
+            if (!callRecorded.Wait(TimeSpan.FromSeconds(3)))
+            {
+                throw new InvalidOperationException("Timed out waiting for announcement output.");
+            }
+
+            return lastCall ?? throw new InvalidOperationException("Announcement output was not recorded.");
+        }
+
+        public void WaitForAttempt()
+        {
+            if (!attemptRecorded.Wait(TimeSpan.FromSeconds(3)))
+            {
+                throw new InvalidOperationException("Timed out waiting for announcement output attempt.");
+            }
+        }
+
+        public void Dispose()
+        {
+            callRecorded.Dispose();
+            attemptRecorded.Dispose();
+        }
+
+        private void Record(string message, bool interrupt)
+        {
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                attemptRecorded.Set();
+                if (failFirstCall)
+                {
+                    throw new InvalidOperationException("Simulated output failure.");
+                }
+            }
+
+            lastCall = new OutputCall(message, interrupt);
+            callRecorded.Set();
+        }
+
+        public sealed record OutputCall(string Message, bool Interrupt);
     }
 }
 

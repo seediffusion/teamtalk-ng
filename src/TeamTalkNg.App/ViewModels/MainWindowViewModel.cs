@@ -2161,14 +2161,28 @@ public sealed class MainWindowViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
-        bool updateLiveRegion = kind != AnnouncementKind.Selection;
+        bool updateLiveRegion = ShouldUpdateStatusBar(kind);
+        bool effectiveInterrupt = interrupt && settings.InterruptImportantAnnouncements;
+        bool allowPriorityInterrupt = settings.InterruptImportantAnnouncements;
 
         return announcements.AnnounceAsync(new ScreenReaderAnnouncement(
             text,
             priority,
-            interrupt,
+            effectiveInterrupt,
             includeBraille ?? settings.SendAnnouncementsToBraille,
-            updateLiveRegion)).AsTask();
+            updateLiveRegion,
+            allowPriorityInterrupt)).AsTask();
+    }
+
+    private bool ShouldUpdateStatusBar(AnnouncementKind kind)
+    {
+        if (!settings.ShowAnnouncementsInStatusBar || kind == AnnouncementKind.Selection)
+        {
+            return false;
+        }
+
+        return kind is not (AnnouncementKind.ChannelMessage or AnnouncementKind.DirectMessage)
+            || settings.ShowMessageAnnouncementsInStatusBar;
     }
 
     private bool ShouldAnnounce(AnnouncementKind kind)

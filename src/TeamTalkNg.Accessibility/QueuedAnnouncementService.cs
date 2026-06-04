@@ -37,17 +37,26 @@ public sealed class QueuedAnnouncementService : IAnnouncementService
     {
         await foreach (ScreenReaderAnnouncement announcement in channel.Reader.ReadAllAsync(shutdown.Token))
         {
-            AnnouncementRaised?.Invoke(this, announcement);
+            bool interrupt = announcement.Interrupt
+                || (announcement.AllowPriorityInterrupt && announcement.Priority is AnnouncementPriority.High or AnnouncementPriority.Critical);
 
-            bool interrupt = announcement.Interrupt || announcement.Priority is AnnouncementPriority.High or AnnouncementPriority.Critical;
-            if (announcement.IncludeBraille)
+            try
             {
-                output.Output(announcement.Text, interrupt);
+                if (announcement.IncludeBraille)
+                {
+                    output.Output(announcement.Text, interrupt);
+                }
+                else
+                {
+                    output.Speak(announcement.Text, interrupt);
+                }
             }
-            else
+            catch (Exception)
             {
-                output.Speak(announcement.Text, interrupt);
+                // A failing screen reader backend should not stop later announcements.
             }
+
+            AnnouncementRaised?.Invoke(this, announcement);
 
             if (announcement.Priority == AnnouncementPriority.Low)
             {

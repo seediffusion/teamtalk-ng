@@ -237,7 +237,19 @@
                     AutomationProperties.Name="Announce channel tree selection changes" />
           <CheckBox Content="Send announcements to braille when available"
                     IsChecked="{Binding SendAnnouncementsToBraille}"
+                    Margin="0,0,0,10"
                     AutomationProperties.Name="Send announcements to braille when available" />
+          <CheckBox Content="Interrupt speech for important announcements"
+                    IsChecked="{Binding InterruptImportantAnnouncements}"
+                    Margin="0,0,0,10"
+                    AutomationProperties.Name="Interrupt speech for important announcements" />
+          <CheckBox Content="Show announcements in the status bar"
+                    IsChecked="{Binding ShowAnnouncementsInStatusBar}"
+                    Margin="0,0,0,10"
+                    AutomationProperties.Name="Show announcements in the status bar" />
+          <CheckBox Content="Show chat and direct message announcements in the status bar"
+                    IsChecked="{Binding ShowMessageAnnouncementsInStatusBar}"
+                    AutomationProperties.Name="Show chat and direct message announcements in the status bar" />
         </StackPanel>
       </TabItem>
 

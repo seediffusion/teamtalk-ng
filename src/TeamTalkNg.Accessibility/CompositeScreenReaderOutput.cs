@@ -17,7 +17,7 @@ public sealed class CompositeScreenReaderOutput : IScreenReaderOutput
     {
         foreach (IScreenReaderOutput output in outputs.Where(output => output.IsAvailable))
         {
-            output.Speak(message, interrupt);
+            TryOutput(() => output.Speak(message, interrupt));
         }
     }
 
@@ -25,7 +25,7 @@ public sealed class CompositeScreenReaderOutput : IScreenReaderOutput
     {
         foreach (IScreenReaderOutput output in outputs.Where(output => output.IsAvailable))
         {
-            output.Braille(message);
+            TryOutput(() => output.Braille(message));
         }
     }
 
@@ -33,7 +33,7 @@ public sealed class CompositeScreenReaderOutput : IScreenReaderOutput
     {
         foreach (IScreenReaderOutput output in outputs.Where(output => output.IsAvailable))
         {
-            output.Output(message, interrupt);
+            TryOutput(() => output.Output(message, interrupt));
         }
     }
 
@@ -42,6 +42,17 @@ public sealed class CompositeScreenReaderOutput : IScreenReaderOutput
         foreach (IScreenReaderOutput output in outputs)
         {
             output.Dispose();
+        }
+    }
+
+    private static void TryOutput(Action outputAction)
+    {
+        try
+        {
+            outputAction();
+        }
+        catch (Exception)
+        {
         }
     }
 }

@@ -14,6 +14,12 @@ public sealed record AppSettings
 
     public bool SendAnnouncementsToBraille { get; init; } = true;
 
+    public bool InterruptImportantAnnouncements { get; init; } = true;
+
+    public bool ShowAnnouncementsInStatusBar { get; init; } = true;
+
+    public bool ShowMessageAnnouncementsInStatusBar { get; init; }
+
     public bool PlaySoundEvents { get; init; } = true;
 
     public string SoundPack { get; init; } = SoundEventService.DefaultSoundPackId;

@@ -13,6 +13,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool announceUserJoinLeave;
     private bool announceSelectionChanges;
     private bool sendAnnouncementsToBraille;
+    private bool interruptImportantAnnouncements;
+    private bool showAnnouncementsInStatusBar;
+    private bool showMessageAnnouncementsInStatusBar;
     private bool playSoundEvents;
     private string selectedSoundPack = SoundEventService.DefaultSoundPackId;
     private int soundEventVolume = 100;
@@ -69,6 +72,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         announceUserJoinLeave = settings.AnnounceUserJoinLeave;
         announceSelectionChanges = settings.AnnounceSelectionChanges;
         sendAnnouncementsToBraille = settings.SendAnnouncementsToBraille;
+        interruptImportantAnnouncements = settings.InterruptImportantAnnouncements;
+        showAnnouncementsInStatusBar = settings.ShowAnnouncementsInStatusBar;
+        showMessageAnnouncementsInStatusBar = settings.ShowMessageAnnouncementsInStatusBar;
         playSoundEvents = settings.PlaySoundEvents;
         soundEventVolume = Math.Clamp(settings.SoundEventVolume, 0, 100);
         selectedSoundPack = SoundPacks.Any(soundPack => string.Equals(soundPack.Id, settings.SoundPack, StringComparison.OrdinalIgnoreCase))
@@ -158,6 +164,24 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref sendAnnouncementsToBraille, value);
     }
 
+    public bool InterruptImportantAnnouncements
+    {
+        get => interruptImportantAnnouncements;
+        set => SetProperty(ref interruptImportantAnnouncements, value);
+    }
+
+    public bool ShowAnnouncementsInStatusBar
+    {
+        get => showAnnouncementsInStatusBar;
+        set => SetProperty(ref showAnnouncementsInStatusBar, value);
+    }
+
+    public bool ShowMessageAnnouncementsInStatusBar
+    {
+        get => showMessageAnnouncementsInStatusBar;
+        set => SetProperty(ref showMessageAnnouncementsInStatusBar, value);
+    }
+
     public bool PlaySoundEvents
     {
         get => playSoundEvents;
@@ -240,6 +264,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             AnnounceUserJoinLeave = AnnounceUserJoinLeave,
             AnnounceSelectionChanges = AnnounceSelectionChanges,
             SendAnnouncementsToBraille = SendAnnouncementsToBraille,
+            InterruptImportantAnnouncements = InterruptImportantAnnouncements,
+            ShowAnnouncementsInStatusBar = ShowAnnouncementsInStatusBar,
+            ShowMessageAnnouncementsInStatusBar = ShowMessageAnnouncementsInStatusBar,
             PlaySoundEvents = PlaySoundEvents,
             SoundPack = SelectedSoundPack,
             SoundEventVolume = SoundEventVolume,
