@@ -24,4 +24,9 @@ public sealed class UserAccountRightOptionViewModel : ObservableObject
     }
 
     public string AccessibleName => Name;
+
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
 }

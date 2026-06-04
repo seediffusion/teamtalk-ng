@@ -35,6 +35,11 @@ public sealed class UserAccountViewModel
 
     public string AccessibleName { get; }
 
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
+
     private static string FormatRights(UserAccountType type, UserAccountRights rights)
     {
         if (type == UserAccountType.Administrator)

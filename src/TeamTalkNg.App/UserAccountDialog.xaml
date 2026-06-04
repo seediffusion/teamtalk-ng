@@ -64,7 +64,13 @@
                   Background="{DynamicResource ControlBackgroundBrush}"
                   Foreground="{DynamicResource TextBrush}"
                   AutomationProperties.LabeledBy="{Binding ElementName=UserTypeLabel}"
-                  AutomationProperties.Name="Account type" />
+                  AutomationProperties.Name="Account type">
+          <ComboBox.ItemContainerStyle>
+            <Style TargetType="{x:Type ComboBoxItem}">
+              <Setter Property="AutomationProperties.Name" Value="{Binding}" />
+            </Style>
+          </ComboBox.ItemContainerStyle>
+        </ComboBox>
 
         <TextBlock x:Name="InitialChannelLabel" Grid.Row="3" Text="Initial channel" VerticalAlignment="Center" Margin="0,0,12,10" />
         <TextBox Grid.Row="3"

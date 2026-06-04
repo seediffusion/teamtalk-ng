@@ -34,4 +34,9 @@ public sealed class BannedUserViewModel
     public string BanTime { get; }
 
     public string AccessibleName { get; }
+
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
 }

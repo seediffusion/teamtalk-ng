@@ -81,6 +81,11 @@ public sealed class TransferActivityViewModel : ObservableObject
 
     public string AccessibleName => $"{Direction} {RemoteFileName}, {ProgressText}, {StatusText}";
 
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
+
     public void Update(FileTransferSummary transfer)
     {
         LocalFilePath = transfer.LocalFilePath;

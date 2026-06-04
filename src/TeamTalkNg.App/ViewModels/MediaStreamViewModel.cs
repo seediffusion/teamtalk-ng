@@ -61,6 +61,11 @@ public sealed class MediaStreamViewModel : ObservableObject
 
     private string KindLabel => Kind == MediaStreamKind.Video ? "video stream" : "desktop stream";
 
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
+
     public void Update(MediaFrameSummary summary)
     {
         DisplayName = summary.DisplayName;
