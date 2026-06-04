@@ -193,6 +193,7 @@ internal static unsafe class SdkDispatchTests
         DispatchesChannelRemoved();
         DispatchesFileTransferUpdate();
         DispatchesServerStatisticsResponse();
+        DispatchesBannedUserListResponse();
         DispatchesConnectionLost();
         DispatchesLoggedInStatusWithoutNativeInstance();
         RejectsVoiceControlsBeforeJoiningChannel();
@@ -201,6 +202,7 @@ internal static unsafe class SdkDispatchTests
         RejectsUserAudioSettingsBeforeLogin();
         RejectsServerInformationBeforeLogin();
         RejectsServerStatisticsBeforeLogin();
+        RejectsBannedUsersBeforeLogin();
         RejectsServerConfigurationSaveBeforeLogin();
         RejectsChannelFilesBeforeJoiningChannel();
         RejectsFileCommandsBeforeJoiningChannel();
@@ -474,7 +476,7 @@ internal static unsafe class SdkDispatchTests
 
         session.DispatchMessageForTest(new TeamTalkMessage(
             ClientEvent.CommandServerStatistics,
-            Source: 88,
+            Source: 0,
             TTType.ServerStatistics,
             default,
             default,
@@ -492,6 +494,51 @@ internal static unsafe class SdkDispatchTests
         AssertEqual(4096L, summary.FileBytesSent);
         AssertEqual(8192L, summary.FileBytesReceived);
         AssertEqual(123456L, summary.UptimeMilliseconds);
+    }
+
+    private static unsafe void DispatchesBannedUserListResponse()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        Task<IReadOnlyList<BannedUserSummary>> request = session.BeginBannedUsersRequestForTest(91);
+        NativeBannedUser bannedUser = default;
+        WriteString(bannedUser.IpAddress, "192.0.2.*");
+        WriteString(bannedUser.ChannelPath, "/Lobby");
+        WriteString(bannedUser.BanTime, "2026-06-04");
+        WriteString(bannedUser.Nickname, "Bad Guest");
+        WriteString(bannedUser.Username, "guest");
+        bannedUser.BanTypes = (uint)(BannedUserType.IpAddress | BannedUserType.Channel);
+        WriteString(bannedUser.Owner, "admin");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandBannedUser,
+            Source: 0,
+            TTType.BannedUser,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0,
+            BannedUser: bannedUser));
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandProcessing,
+            Source: 91,
+            TTType.TTBool,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0));
+
+        IReadOnlyList<BannedUserSummary> bannedUsers = request.GetAwaiter().GetResult();
+        AssertEqual(1, bannedUsers.Count);
+        AssertEqual("192.0.2.*", bannedUsers[0].IpAddress);
+        AssertEqual("/Lobby", bannedUsers[0].ChannelPath);
+        AssertEqual("guest", bannedUsers[0].Username);
+        Assert((bannedUsers[0].BanTypes & BannedUserType.IpAddress) != 0, "Expected IP address ban type.");
+        Assert((bannedUsers[0].BanTypes & BannedUserType.Channel) != 0, "Expected channel ban type.");
     }
 
     private static void DispatchesLoggedInStatusWithoutNativeInstance()
@@ -553,6 +600,15 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
         AssertThrows(() => session.GetServerStatisticsAsync().GetAwaiter().GetResult());
+    }
+
+    private static void RejectsBannedUsersBeforeLogin()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        var bannedUser = new BannedUserSummary("192.0.2.*", string.Empty, string.Empty, string.Empty, string.Empty, BannedUserType.IpAddress, string.Empty);
+        AssertThrows(() => session.GetBannedUsersAsync().GetAwaiter().GetResult());
+        AssertThrows(() => session.UnbanUserAsync(bannedUser).GetAwaiter().GetResult());
     }
 
     private static void RejectsServerConfigurationSaveBeforeLogin()

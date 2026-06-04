@@ -10,6 +10,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private const int MessageWaitMilliseconds = 100;
     private static readonly TimeSpan ConnectionProgressTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ServerStatisticsTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan BannedUsersTimeout = TimeSpan.FromSeconds(10);
 
     private readonly TeamTalkSdkOptions options;
     private readonly Lock stateLock = new();
@@ -20,6 +21,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int loginCommandId;
     private int serverStatisticsCommandId;
     private TaskCompletionSource<ServerStatisticsSummary>? pendingServerStatistics;
+    private int bannedUsersCommandId;
+    private TaskCompletionSource<IReadOnlyList<BannedUserSummary>>? pendingBannedUsers;
+    private List<BannedUserSummary>? pendingBannedUserItems;
     private TeamTalkServerProfile? activeProfile;
     private int currentChannelId;
     private int myUserId;
@@ -262,6 +266,78 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             ClearPendingServerStatistics(request);
         }
+    }
+
+    public async Task<IReadOnlyList<BannedUserSummary>> GetBannedUsersAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing banned users.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = new TaskCompletionSource<IReadOnlyList<BannedUserSummary>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            if (pendingBannedUsers is not null)
+            {
+                throw new InvalidOperationException("A banned users request is already in progress.");
+            }
+
+            commandId = TeamTalkNativeMethods.DoListBans(instance, channelId: 0, index: 0, count: 1000);
+            if (commandId <= 0)
+            {
+                throw new InvalidOperationException("TeamTalk SDK did not accept the banned users command.");
+            }
+
+            bannedUsersCommandId = commandId;
+            pendingBannedUserItems = [];
+            pendingBannedUsers = request;
+        }
+
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(BannedUsersTimeout);
+
+        try
+        {
+            return await request.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("TeamTalk banned users did not arrive in time.");
+        }
+        finally
+        {
+            ClearPendingBannedUsers(request);
+        }
+    }
+
+    public Task UnbanUserAsync(BannedUserSummary bannedUser, CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before removing bans.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        NativeBannedUser nativeBannedUser = CreateNativeBannedUser(bannedUser);
+        int commandId;
+        lock (stateLock)
+        {
+            EnsureConnectedInstance();
+            commandId = TeamTalkNativeMethods.DoUnBanUserEx(instance, ref nativeBannedUser);
+        }
+
+        if (commandId <= 0)
+        {
+            RaiseSystemMessage("TeamTalk SDK did not accept the remove ban command.");
+        }
+
+        return Task.CompletedTask;
     }
 
     public Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default)
@@ -946,6 +1022,19 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         return request.Task;
     }
 
+    internal Task<IReadOnlyList<BannedUserSummary>> BeginBannedUsersRequestForTest(int commandId)
+    {
+        var request = new TaskCompletionSource<IReadOnlyList<BannedUserSummary>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (stateLock)
+        {
+            bannedUsersCommandId = commandId;
+            pendingBannedUserItems = [];
+            pendingBannedUsers = request;
+        }
+
+        return request.Task;
+    }
+
     private void EnsureInstance()
     {
         if (instance != IntPtr.Zero)
@@ -1111,6 +1200,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.ConnectionLost:
                 HandleDisconnected("Connection lost.");
                 break;
+            case ClientEvent.CommandProcessing:
+                HandleCommandProcessing(message);
+                break;
             case ClientEvent.CommandError:
                 HandleCommandError(message);
                 break;
@@ -1147,6 +1239,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 break;
             case ClientEvent.CommandServerStatistics:
                 CompleteServerStatistics(message);
+                break;
+            case ClientEvent.CommandBannedUser:
+                AddPendingBannedUser(message.BannedUser);
                 break;
             case ClientEvent.FileTransfer:
                 DispatchFileTransfer(message.FileTransfer);
@@ -1712,6 +1807,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         myUserId = 0;
         loginCommandId = 0;
         FailPendingServerStatistics(new InvalidOperationException(reason));
+        FailPendingBannedUsers(new InvalidOperationException(reason));
         CloseInstance();
         SetStatus(ConnectionStatus.Disconnected);
     }
@@ -1730,7 +1826,25 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             FailPendingServerStatistics(new InvalidOperationException(error));
         }
 
+        if (bannedUsersCommandId > 0 && message.Source == bannedUsersCommandId)
+        {
+            FailPendingBannedUsers(new InvalidOperationException(error));
+        }
+
         RaiseSystemMessage(error);
+    }
+
+    private void HandleCommandProcessing(TeamTalkMessage message)
+    {
+        if (message.BoolValue != 0)
+        {
+            return;
+        }
+
+        if (bannedUsersCommandId > 0 && message.Source == bannedUsersCommandId)
+        {
+            CompletePendingBannedUsers();
+        }
     }
 
     private void CompleteServerStatistics(TeamTalkMessage message)
@@ -1738,8 +1852,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         TaskCompletionSource<ServerStatisticsSummary>? request = null;
         lock (stateLock)
         {
-            if (pendingServerStatistics is null
-                || serverStatisticsCommandId > 0 && message.Source != serverStatisticsCommandId)
+            if (pendingServerStatistics is null)
             {
                 return;
             }
@@ -1750,6 +1863,40 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
 
         request.TrySetResult(CreateServerStatisticsSummary(message.ServerStatistics));
+    }
+
+    private void AddPendingBannedUser(NativeBannedUser bannedUser)
+    {
+        lock (stateLock)
+        {
+            if (pendingBannedUserItems is null)
+            {
+                return;
+            }
+
+            pendingBannedUserItems.Add(CreateBannedUserSummary(bannedUser));
+        }
+    }
+
+    private void CompletePendingBannedUsers()
+    {
+        TaskCompletionSource<IReadOnlyList<BannedUserSummary>>? request = null;
+        IReadOnlyList<BannedUserSummary> users = [];
+        lock (stateLock)
+        {
+            if (pendingBannedUsers is null)
+            {
+                return;
+            }
+
+            request = pendingBannedUsers;
+            users = pendingBannedUserItems?.ToList() ?? [];
+            pendingBannedUsers = null;
+            pendingBannedUserItems = null;
+            bannedUsersCommandId = 0;
+        }
+
+        request.TrySetResult(users);
     }
 
     private void FailPendingServerStatistics(Exception exception)
@@ -1765,6 +1912,20 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         request?.TrySetException(exception);
     }
 
+    private void FailPendingBannedUsers(Exception exception)
+    {
+        TaskCompletionSource<IReadOnlyList<BannedUserSummary>>? request = null;
+        lock (stateLock)
+        {
+            request = pendingBannedUsers;
+            pendingBannedUsers = null;
+            pendingBannedUserItems = null;
+            bannedUsersCommandId = 0;
+        }
+
+        request?.TrySetException(exception);
+    }
+
     private void ClearPendingServerStatistics(TaskCompletionSource<ServerStatisticsSummary> request)
     {
         lock (stateLock)
@@ -1773,6 +1934,19 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             {
                 pendingServerStatistics = null;
                 serverStatisticsCommandId = 0;
+            }
+        }
+    }
+
+    private void ClearPendingBannedUsers(TaskCompletionSource<IReadOnlyList<BannedUserSummary>> request)
+    {
+        lock (stateLock)
+        {
+            if (ReferenceEquals(pendingBannedUsers, request))
+            {
+                pendingBannedUsers = null;
+                pendingBannedUserItems = null;
+                bannedUsersCommandId = 0;
             }
         }
     }
@@ -1795,6 +1969,29 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             Math.Max(0, statistics.FilesTx),
             Math.Max(0, statistics.FilesRx),
             Math.Max(0, statistics.UptimeMilliseconds));
+    }
+
+    private static BannedUserSummary CreateBannedUserSummary(NativeBannedUser bannedUser)
+    {
+        return new BannedUserSummary(
+            bannedUser.ReadIpAddress(),
+            bannedUser.ReadChannelPath(),
+            bannedUser.ReadBanTime(),
+            bannedUser.ReadNickname(),
+            bannedUser.ReadUsername(),
+            (BannedUserType)bannedUser.BanTypes,
+            bannedUser.ReadOwner());
+    }
+
+    private static NativeBannedUser CreateNativeBannedUser(BannedUserSummary bannedUser)
+    {
+        NativeBannedUser nativeBannedUser = default;
+        nativeBannedUser.WriteIpAddress(bannedUser.IpAddress);
+        nativeBannedUser.WriteChannelPath(bannedUser.ChannelPath);
+        nativeBannedUser.WriteNickname(bannedUser.Nickname);
+        nativeBannedUser.WriteUsername(bannedUser.Username);
+        nativeBannedUser.BanTypes = (uint)bannedUser.BanTypes;
+        return nativeBannedUser;
     }
 
     private void RaiseSystemMessage(string text)

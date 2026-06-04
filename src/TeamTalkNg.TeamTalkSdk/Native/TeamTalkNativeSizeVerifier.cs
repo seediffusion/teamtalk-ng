@@ -8,6 +8,7 @@ public static class TeamTalkNativeSizeVerifier
     {
         List<string> mismatches = [];
         Compare<NativeChannel>(TTType.Channel, "Channel", mismatches);
+        Compare<NativeBannedUser>(TTType.BannedUser, "BannedUser", mismatches);
         Compare<NativeRemoteFile>(TTType.RemoteFile, "RemoteFile", mismatches);
         Compare<NativeFileTransfer>(TTType.FileTransfer, "FileTransfer", mismatches);
         Compare<NativeTextMessage>(TTType.TextMessage, "TextMessage", mismatches);

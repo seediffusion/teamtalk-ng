@@ -29,6 +29,10 @@ public interface ITeamTalkSession
 
     Task<ServerStatisticsSummary> GetServerStatisticsAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<BannedUserSummary>> GetBannedUsersAsync(CancellationToken cancellationToken = default);
+
+    Task UnbanUserAsync(BannedUserSummary bannedUser, CancellationToken cancellationToken = default);
+
     Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ChannelFileSummary>> GetChannelFilesAsync(CancellationToken cancellationToken = default);

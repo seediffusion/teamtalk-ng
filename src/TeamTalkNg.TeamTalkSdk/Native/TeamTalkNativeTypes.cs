@@ -9,7 +9,9 @@ internal enum ClientEvent
     ConnectionCryptError = 15,
     ConnectionFailed = 20,
     ConnectionLost = 30,
+    CommandProcessing = 200,
     CommandError = 210,
+    CommandSuccess = 220,
     CommandMyselfLoggedIn = 230,
     CommandMyselfLoggedOut = 240,
     CommandMyselfKicked = 250,
@@ -23,6 +25,7 @@ internal enum ClientEvent
     CommandChannelUpdate = 330,
     CommandChannelRemove = 340,
     CommandServerStatistics = 360,
+    CommandBannedUser = 400,
     FileTransfer = 1040,
     InternalError = 1000
 }
@@ -30,6 +33,7 @@ internal enum ClientEvent
 internal enum TTType
 {
     None = 0,
+    BannedUser = 2,
     Channel = 5,
     RemoteFile = 7,
     FileTransfer = 8,
@@ -412,6 +416,98 @@ internal struct NativeServerStatistics
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeBannedUser
+{
+    public fixed char IpAddress[NativeConstants.StringLength];
+    public fixed char ChannelPath[NativeConstants.StringLength];
+    public fixed char BanTime[NativeConstants.StringLength];
+    public fixed char Nickname[NativeConstants.StringLength];
+    public fixed char Username[NativeConstants.StringLength];
+    public uint BanTypes;
+    public fixed char Owner[NativeConstants.StringLength];
+
+    public string ReadIpAddress()
+    {
+        fixed (char* value = IpAddress)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadChannelPath()
+    {
+        fixed (char* value = ChannelPath)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadBanTime()
+    {
+        fixed (char* value = BanTime)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadNickname()
+    {
+        fixed (char* value = Nickname)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadUsername()
+    {
+        fixed (char* value = Username)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public string ReadOwner()
+    {
+        fixed (char* value = Owner)
+        {
+            return NativeConstants.ReadString(value);
+        }
+    }
+
+    public void WriteIpAddress(string value)
+    {
+        fixed (char* target = IpAddress)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WriteChannelPath(string value)
+    {
+        fixed (char* target = ChannelPath)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WriteNickname(string value)
+    {
+        fixed (char* target = Nickname)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+
+    public void WriteUsername(string value)
+    {
+        fixed (char* target = Username)
+        {
+            NativeConstants.WriteString(target, value);
+        }
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct NativeRemoteFile
 {
     public int ChannelId;
@@ -577,4 +673,5 @@ internal sealed record TeamTalkMessage(
     int BoolValue,
     int IntValue,
     NativeFileTransfer FileTransfer = default,
-    NativeServerStatistics ServerStatistics = default);
+    NativeServerStatistics ServerStatistics = default,
+    NativeBannedUser BannedUser = default);

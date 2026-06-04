@@ -7,6 +7,17 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 {
     private TeamTalkServerProfile? activeProfile;
     private readonly List<ChannelFileSummary> files = [];
+    private readonly List<BannedUserSummary> bannedUsers =
+    [
+        new BannedUserSummary(
+            "192.0.2.*",
+            string.Empty,
+            DateTimeOffset.Now.AddDays(-3).ToString("g"),
+            "Example banned user",
+            "example",
+            BannedUserType.IpAddress,
+            "TeamTalk NG")
+    ];
     private readonly Dictionary<int, FileTransferSummary> activeTransfers = [];
     private int nextFileId = 1;
     private int nextTransferId = 1;
@@ -141,6 +152,36 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             FileBytesSent: files.Sum(file => file.SizeBytes),
             FileBytesReceived: files.Sum(file => file.SizeBytes),
             UptimeMilliseconds: (long)TimeSpan.FromHours(4.5).TotalMilliseconds));
+    }
+
+    public Task<IReadOnlyList<BannedUserSummary>> GetBannedUsersAsync(CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before viewing banned users.");
+        }
+
+        return Task.FromResult<IReadOnlyList<BannedUserSummary>>(bannedUsers.ToList());
+    }
+
+    public Task UnbanUserAsync(BannedUserSummary bannedUser, CancellationToken cancellationToken = default)
+    {
+        if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            throw new InvalidOperationException("You must be logged in before removing bans.");
+        }
+
+        bannedUsers.RemoveAll(item =>
+            string.Equals(item.IpAddress, bannedUser.IpAddress, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Username, bannedUser.Username, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.ChannelPath, bannedUser.ChannelPath, StringComparison.OrdinalIgnoreCase)
+            && item.BanTypes == bannedUser.BanTypes);
+        ChannelMessageReceived?.Invoke(this, new ChatMessage(
+            DateTimeOffset.Now,
+            "TeamTalk NG",
+            $"Remove ban command sent for {bannedUser.DisplayName}.",
+            IsSystem: true));
+        return Task.CompletedTask;
     }
 
     public Task SaveServerConfigurationAsync(CancellationToken cancellationToken = default)

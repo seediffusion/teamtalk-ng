@@ -44,6 +44,7 @@
       <MenuItem Header="_Server">
         <MenuItem Header="Server _Information" Command="{Binding ServerInformationCommand}" />
         <MenuItem Header="Server _Statistics" Command="{Binding ServerStatisticsCommand}" />
+        <MenuItem Header="_Banned Users" Command="{Binding BannedUsersCommand}" />
         <Separator />
         <MenuItem Header="_Save Configuration" Command="{Binding SaveServerConfigurationCommand}" />
       </MenuItem>
