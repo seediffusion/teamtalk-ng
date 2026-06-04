@@ -14,4 +14,11 @@ public sealed class ConnectionProfileViewModel
     public string DisplayName => string.IsNullOrWhiteSpace(Profile.DisplayName) ? Profile.Host : Profile.DisplayName;
 
     public string Summary => $"{Profile.Host}, TCP {Profile.TcpPort}, UDP {Profile.UdpPort}";
+
+    public string AccessibleName => $"{DisplayName}, {Summary}";
+
+    public override string ToString()
+    {
+        return AccessibleName;
+    }
 }

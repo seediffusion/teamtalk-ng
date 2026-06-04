@@ -29,6 +29,11 @@
                Foreground="{DynamicResource TextBrush}"
                BorderBrush="{DynamicResource BorderBrush}"
                AutomationProperties.Name="Saved servers">
+        <ListBox.ItemContainerStyle>
+          <Style TargetType="{x:Type ListBoxItem}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+          </Style>
+        </ListBox.ItemContainerStyle>
         <ListBox.ItemTemplate>
           <DataTemplate>
             <StackPanel Margin="2">
