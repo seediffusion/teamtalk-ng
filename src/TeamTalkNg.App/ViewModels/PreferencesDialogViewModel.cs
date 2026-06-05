@@ -28,6 +28,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private string audioDeviceRefreshStatus = "Audio devices loaded";
     private string voiceActivationCalibrationStatus = "Voice activation calibration not run";
     private bool showInputMeter;
+    private bool enableNoiseSuppression;
+    private bool enableEchoCancellation;
+    private bool enableAutomaticGainControl;
     private readonly int inputVolume;
     private readonly int outputVolume;
     private readonly Func<Task<IReadOnlyList<AudioDeviceSummary>>> refreshAudioDevices;
@@ -93,6 +96,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         selectedOutputDeviceId = settings.AudioOutputDeviceId ?? AudioDeviceOptionViewModel.DefaultDeviceId;
         voiceActivationLevel = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
         showInputMeter = settings.ShowInputMeter;
+        enableNoiseSuppression = settings.EnableNoiseSuppression;
+        enableEchoCancellation = settings.EnableEchoCancellation;
+        enableAutomaticGainControl = settings.EnableAutomaticGainControl;
         defaultNickname = string.IsNullOrWhiteSpace(settings.DefaultNickname) ? Environment.UserName : settings.DefaultNickname;
         isAway = settings.IsAway;
         statusMessage = settings.StatusMessage;
@@ -246,6 +252,24 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref showInputMeter, value);
     }
 
+    public bool EnableNoiseSuppression
+    {
+        get => enableNoiseSuppression;
+        set => SetProperty(ref enableNoiseSuppression, value);
+    }
+
+    public bool EnableEchoCancellation
+    {
+        get => enableEchoCancellation;
+        set => SetProperty(ref enableEchoCancellation, value);
+    }
+
+    public bool EnableAutomaticGainControl
+    {
+        get => enableAutomaticGainControl;
+        set => SetProperty(ref enableAutomaticGainControl, value);
+    }
+
     public string DefaultNickname
     {
         get => defaultNickname;
@@ -289,6 +313,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             ShowInputMeter = ShowInputMeter,
             InputVolume = inputVolume,
             OutputVolume = outputVolume,
+            EnableNoiseSuppression = EnableNoiseSuppression,
+            EnableEchoCancellation = EnableEchoCancellation,
+            EnableAutomaticGainControl = EnableAutomaticGainControl,
             DefaultNickname = string.IsNullOrWhiteSpace(DefaultNickname) ? Environment.UserName : DefaultNickname.Trim(),
             IsAway = IsAway,
             StatusMessage = StatusMessage.Trim()

@@ -44,6 +44,12 @@ public sealed record AppSettings
 
     public int OutputVolume { get; init; } = 50;
 
+    public bool EnableNoiseSuppression { get; init; } = true;
+
+    public bool EnableEchoCancellation { get; init; } = true;
+
+    public bool EnableAutomaticGainControl { get; init; }
+
     public string DefaultNickname { get; init; } = Environment.UserName;
 
     public bool IsAway { get; init; }

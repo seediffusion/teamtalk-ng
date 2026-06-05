@@ -20,6 +20,8 @@ public interface ITeamTalkSession
 
     Task SetAudioVolumeAsync(int inputVolumePercent, int outputVolumePercent, CancellationToken cancellationToken = default);
 
+    Task SetAudioProcessingAsync(AudioProcessingSettings settings, CancellationToken cancellationToken = default);
+
     Task<AudioInputLevelSummary> GetAudioInputLevelAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<VideoCaptureDeviceSummary>> GetVideoCaptureDevicesAsync(CancellationToken cancellationToken = default);

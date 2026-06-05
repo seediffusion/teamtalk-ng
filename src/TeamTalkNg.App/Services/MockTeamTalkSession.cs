@@ -85,6 +85,11 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return Task.CompletedTask;
     }
 
+    public Task SetAudioProcessingAsync(AudioProcessingSettings settings, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
     public Task<AudioInputLevelSummary> GetAudioInputLevelAsync(CancellationToken cancellationToken = default)
     {
         if (Status != ConnectionStatus.InChannel)

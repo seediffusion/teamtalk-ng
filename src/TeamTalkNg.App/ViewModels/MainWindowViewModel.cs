@@ -593,6 +593,7 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+            await teamTalkSession.SetAudioProcessingAsync(CreateAudioProcessingSettings(settings));
             await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
             await teamTalkSession.ConnectAsync(effectiveProfile);
             RaiseCommandStateChanged();
@@ -766,6 +767,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.GetAudioDevicesAsync();
             await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+            await teamTalkSession.SetAudioProcessingAsync(CreateAudioProcessingSettings(settings));
             await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
             IsPushToTalkEnabled = false;
             IsVoiceActivationEnabled = false;
@@ -1454,6 +1456,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         await teamTalkSession.SetAudioDevicesAsync(settings.AudioInputDeviceId, settings.AudioOutputDeviceId);
+        await teamTalkSession.SetAudioProcessingAsync(CreateAudioProcessingSettings(settings));
         await teamTalkSession.SetAudioVolumeAsync((int)Math.Round(InputVolume), (int)Math.Round(OutputVolume));
         IsPushToTalkEnabled = false;
         IsVoiceActivationEnabled = false;
@@ -1493,6 +1496,14 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
+    }
+
+    private static AudioProcessingSettings CreateAudioProcessingSettings(AppSettings settings)
+    {
+        return new AudioProcessingSettings(
+            settings.EnableNoiseSuppression,
+            settings.EnableEchoCancellation,
+            settings.EnableAutomaticGainControl);
     }
 
     private void SimulateUserJoined()

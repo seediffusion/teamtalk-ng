@@ -68,6 +68,7 @@ internal enum TTType
     ClientErrorMsg = 28,
     TTBool = 29,
     Int32 = 30,
+    SoundDeviceEffects = 44,
     DesktopWindow = 45
 }
 
@@ -148,6 +149,18 @@ internal enum SoundSystem
     OpenSlesAndroid = 7,
     AudioUnit = 8,
     PulseAudio = 10
+}
+
+[Flags]
+internal enum SoundDeviceFeature : uint
+{
+    None = 0x0000,
+    AcousticEchoCancellation = 0x0001,
+    AutomaticGainControl = 0x0002,
+    Denoise = 0x0004,
+    ThreeDimensionalPosition = 0x0008,
+    DuplexMode = 0x0010,
+    DefaultCommunicationDevice = 0x0020
 }
 
 internal static class SoundLevel
@@ -238,6 +251,14 @@ internal struct NativeVideoFormat
 internal struct NativeVideoFormatArray
 {
     private NativeVideoFormat element0;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeSoundDeviceEffects
+{
+    public int EnableAutomaticGainControl;
+    public int EnableDenoise;
+    public int EnableEchoCancellation;
 }
 
 [StructLayout(LayoutKind.Sequential)]

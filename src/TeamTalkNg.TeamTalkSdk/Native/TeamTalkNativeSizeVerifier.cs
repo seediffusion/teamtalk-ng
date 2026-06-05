@@ -19,6 +19,7 @@ public static class TeamTalkNativeSizeVerifier
         Compare<NativeServerProperties>(TTType.ServerProperties, "ServerProperties", mismatches);
         Compare<NativeServerStatistics>(TTType.ServerStatistics, "ServerStatistics", mismatches);
         Compare<NativeSoundDevice>(TTType.SoundDevice, "SoundDevice", mismatches);
+        Compare<NativeSoundDeviceEffects>(TTType.SoundDeviceEffects, "SoundDeviceEffects", mismatches);
         Compare<NativeDesktopWindow>(TTType.DesktopWindow, "DesktopWindow", mismatches);
         return mismatches;
     }

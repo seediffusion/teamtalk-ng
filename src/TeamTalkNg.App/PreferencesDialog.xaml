@@ -71,6 +71,9 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
@@ -149,7 +152,28 @@
                     Margin="0,14,0,0"
                     AutomationProperties.Name="Show input level meter" />
 
-          <StackPanel Grid.Row="6"
+          <CheckBox Grid.Row="6"
+                    Grid.Column="1"
+                    Content="Noise suppression"
+                    IsChecked="{Binding EnableNoiseSuppression}"
+                    Margin="0,14,0,0"
+                    AutomationProperties.Name="Noise suppression" />
+
+          <CheckBox Grid.Row="7"
+                    Grid.Column="1"
+                    Content="Echo cancellation"
+                    IsChecked="{Binding EnableEchoCancellation}"
+                    Margin="0,8,0,0"
+                    AutomationProperties.Name="Echo cancellation" />
+
+          <CheckBox Grid.Row="8"
+                    Grid.Column="1"
+                    Content="Automatic gain control"
+                    IsChecked="{Binding EnableAutomaticGainControl}"
+                    Margin="0,8,0,0"
+                    AutomationProperties.Name="Automatic gain control" />
+
+          <StackPanel Grid.Row="9"
                       Grid.Column="1"
                       Orientation="Horizontal"
                       Margin="0,14,0,0"

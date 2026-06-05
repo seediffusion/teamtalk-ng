@@ -37,6 +37,10 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int InitSoundOutputDevice(IntPtr instance, int outputDeviceId);
 
+    [DllImport(LibraryName, EntryPoint = "TT_InitSoundDuplexDevices")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int InitSoundDuplexDevices(IntPtr instance, int inputDeviceId, int outputDeviceId);
+
     [DllImport(LibraryName, EntryPoint = "TT_CloseSoundInputDevice")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int CloseSoundInputDevice(IntPtr instance);
@@ -44,6 +48,14 @@ internal static partial class TeamTalkNativeMethods
     [DllImport(LibraryName, EntryPoint = "TT_CloseSoundOutputDevice")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int CloseSoundOutputDevice(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_CloseSoundDuplexDevices")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int CloseSoundDuplexDevices(IntPtr instance);
+
+    [DllImport(LibraryName, EntryPoint = "TT_SetSoundDeviceEffects")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int SetSoundDeviceEffects(IntPtr instance, ref NativeSoundDeviceEffects effects);
 
     [DllImport(LibraryName, EntryPoint = "TT_EnableVoiceTransmission")]
     [return: MarshalAs(UnmanagedType.I4)]

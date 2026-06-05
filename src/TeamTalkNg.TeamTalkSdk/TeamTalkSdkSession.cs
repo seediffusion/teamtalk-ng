@@ -34,6 +34,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int messageBufferSize;
     private bool soundInputInitialized;
     private bool soundOutputInitialized;
+    private bool soundDuplexInitialized;
     private bool voiceTransmissionEnabled;
     private bool voiceActivationEnabled;
     private bool videoCaptureInitialized;
@@ -43,6 +44,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int? configuredOutputDeviceId;
     private int configuredInputVolumePercent = 50;
     private int configuredOutputVolumePercent = 50;
+    private AudioProcessingSettings audioProcessingSettings = new(
+        EnableNoiseSuppression: true,
+        EnableEchoCancellation: true,
+        EnableAutomaticGainControl: false);
     private readonly Dictionary<int, string> userDisplayNames = [];
 
     public TeamTalkSdkSession(TeamTalkSdkOptions options)
@@ -108,6 +113,31 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
 
         ApplyConfiguredAudioVolume();
+        return Task.CompletedTask;
+    }
+
+    public Task SetAudioProcessingAsync(AudioProcessingSettings settings, CancellationToken cancellationToken = default)
+    {
+        audioProcessingSettings = settings;
+        if (instance == IntPtr.Zero || (!soundInputInitialized && !soundOutputInitialized))
+        {
+            return Task.CompletedTask;
+        }
+
+        lock (stateLock)
+        {
+            if (instance != IntPtr.Zero && (soundInputInitialized || soundOutputInitialized))
+            {
+                StopVoiceInput();
+                CloseSoundDevices();
+            }
+        }
+
+        if (Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
+        {
+            InitializeDefaultAudioDevices();
+        }
+
         return Task.CompletedTask;
     }
 
@@ -1756,6 +1786,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         inputDeviceId = configuredInputDeviceId ?? inputDeviceId;
         outputDeviceId = configuredOutputDeviceId ?? outputDeviceId;
 
+        IReadOnlyList<NativeSoundDevice> nativeDevices = ReadNativeSoundDevices(restartSoundSystem: false);
+        NativeSoundDevice? inputDevice = FindSoundDevice(nativeDevices, inputDeviceId);
+        NativeSoundDevice? outputDevice = FindSoundDevice(nativeDevices, outputDeviceId);
+
         int inputReady = soundInputInitialized ? 1 : 0;
         int outputReady = soundOutputInitialized ? 1 : 0;
         lock (stateLock)
@@ -1763,6 +1797,20 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             if (instance == IntPtr.Zero)
             {
                 return;
+            }
+
+            if (!soundInputInitialized && !soundOutputInitialized)
+            {
+                ApplySoundDeviceEffects(inputDevice);
+                if (CanUseDuplexAudio(inputDevice, outputDevice)
+                    && TeamTalkNativeMethods.InitSoundDuplexDevices(instance, inputDeviceId, outputDeviceId) != 0)
+                {
+                    soundInputInitialized = true;
+                    soundOutputInitialized = true;
+                    soundDuplexInitialized = true;
+                    inputReady = 1;
+                    outputReady = 1;
+                }
             }
 
             if (!soundInputInitialized)
@@ -1789,6 +1837,54 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
 
         ApplyConfiguredAudioVolume();
+    }
+
+    private void ApplySoundDeviceEffects(NativeSoundDevice? inputDevice)
+    {
+        if (instance == IntPtr.Zero || inputDevice is not { } device)
+        {
+            return;
+        }
+
+        SoundDeviceFeature features = (SoundDeviceFeature)device.SoundDeviceFeatures;
+        var effects = new NativeSoundDeviceEffects
+        {
+            EnableDenoise = audioProcessingSettings.EnableNoiseSuppression && features.HasFlag(SoundDeviceFeature.Denoise) ? 1 : 0,
+            EnableEchoCancellation = audioProcessingSettings.EnableEchoCancellation && features.HasFlag(SoundDeviceFeature.AcousticEchoCancellation) ? 1 : 0,
+            EnableAutomaticGainControl = audioProcessingSettings.EnableAutomaticGainControl && features.HasFlag(SoundDeviceFeature.AutomaticGainControl) ? 1 : 0
+        };
+
+        if (effects.EnableDenoise == 0
+            && effects.EnableEchoCancellation == 0
+            && effects.EnableAutomaticGainControl == 0)
+        {
+            return;
+        }
+
+        TeamTalkNativeMethods.SetSoundDeviceEffects(instance, ref effects);
+    }
+
+    private static bool CanUseDuplexAudio(NativeSoundDevice? inputDevice, NativeSoundDevice? outputDevice)
+    {
+        return inputDevice is { } input
+            && outputDevice is { } output
+            && input.SoundSystem == output.SoundSystem
+            && input.SoundSystem is SoundSystem.Wasapi or SoundSystem.DSound
+            && ((SoundDeviceFeature)input.SoundDeviceFeatures).HasFlag(SoundDeviceFeature.DuplexMode)
+            && ((SoundDeviceFeature)output.SoundDeviceFeatures).HasFlag(SoundDeviceFeature.DuplexMode);
+    }
+
+    private static NativeSoundDevice? FindSoundDevice(IReadOnlyList<NativeSoundDevice> devices, int deviceId)
+    {
+        foreach (NativeSoundDevice device in devices)
+        {
+            if (device.DeviceId == deviceId)
+            {
+                return device;
+            }
+        }
+
+        return null;
     }
 
     private void EnsureSoundInputInitialized()
@@ -1824,15 +1920,64 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             return;
         }
 
-        TeamTalkNativeMethods.CloseSoundInputDevice(instance);
-        TeamTalkNativeMethods.CloseSoundOutputDevice(instance);
+        if (soundDuplexInitialized)
+        {
+            TeamTalkNativeMethods.CloseSoundDuplexDevices(instance);
+        }
+        else
+        {
+            TeamTalkNativeMethods.CloseSoundInputDevice(instance);
+            TeamTalkNativeMethods.CloseSoundOutputDevice(instance);
+        }
+
         soundInputInitialized = false;
         soundOutputInitialized = false;
+        soundDuplexInitialized = false;
     }
 
     private static IReadOnlyList<AudioDeviceSummary> ReadAudioDevices()
     {
-        TeamTalkNativeMethods.RestartSoundSystem();
+        IReadOnlyList<NativeSoundDevice> nativeDevices = ReadNativeSoundDevices(restartSoundSystem: true);
+        if (nativeDevices.Count == 0)
+        {
+            return [];
+        }
+
+        TeamTalkNativeMethods.GetDefaultSoundDevices(out int defaultInputId, out int defaultOutputId);
+        List<AudioDeviceSummary> devices = [];
+        foreach (NativeSoundDevice nativeDevice in nativeDevices)
+        {
+            bool supportsInput = nativeDevice.MaxInputChannels > 0;
+            bool supportsOutput = nativeDevice.MaxOutputChannels > 0;
+            if (!supportsInput && !supportsOutput)
+            {
+                continue;
+            }
+
+            string name = nativeDevice.ReadName();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = $"Audio device {nativeDevice.DeviceId}";
+            }
+
+            devices.Add(new AudioDeviceSummary(
+                nativeDevice.DeviceId,
+                name,
+                supportsInput,
+                supportsOutput,
+                nativeDevice.DeviceId == defaultInputId,
+                nativeDevice.DeviceId == defaultOutputId));
+        }
+
+        return devices;
+    }
+
+    private static IReadOnlyList<NativeSoundDevice> ReadNativeSoundDevices(bool restartSoundSystem)
+    {
+        if (restartSoundSystem)
+        {
+            TeamTalkNativeMethods.RestartSoundSystem();
+        }
 
         int count = 0;
         if (TeamTalkNativeMethods.GetSoundDevices(IntPtr.Zero, ref count) == 0 || count <= 0)
@@ -1849,32 +1994,12 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 return [];
             }
 
-            TeamTalkNativeMethods.GetDefaultSoundDevices(out int defaultInputId, out int defaultOutputId);
-            List<AudioDeviceSummary> devices = [];
+            List<NativeSoundDevice> devices = [];
             for (int index = 0; index < count; index++)
             {
                 IntPtr deviceAddress = IntPtr.Add(buffer, index * size);
                 NativeSoundDevice nativeDevice = Marshal.PtrToStructure<NativeSoundDevice>(deviceAddress);
-                bool supportsInput = nativeDevice.MaxInputChannels > 0;
-                bool supportsOutput = nativeDevice.MaxOutputChannels > 0;
-                if (!supportsInput && !supportsOutput)
-                {
-                    continue;
-                }
-
-                string name = nativeDevice.ReadName();
-                if (string.IsNullOrWhiteSpace(name))
-                {
-                    name = $"Audio device {nativeDevice.DeviceId}";
-                }
-
-                devices.Add(new AudioDeviceSummary(
-                    nativeDevice.DeviceId,
-                    name,
-                    supportsInput,
-                    supportsOutput,
-                    nativeDevice.DeviceId == defaultInputId,
-                    nativeDevice.DeviceId == defaultOutputId));
+                devices.Add(nativeDevice);
             }
 
             return devices;
