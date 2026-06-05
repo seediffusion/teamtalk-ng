@@ -21,9 +21,11 @@ TeamTalk NG follows the official TeamTalk sound pack layout: the root `Sounds` f
 
 Official TeamTalk event file names:
 
+- `connecting.wav`
 - `newuser.wav`
 - `removeuser.wav`
 - `serverlost.wav`
+- `joinedchannel.wav`
 - `user_msg.wav`
 - `user_msg_sent.wav`
 - `channel_msg.wav`

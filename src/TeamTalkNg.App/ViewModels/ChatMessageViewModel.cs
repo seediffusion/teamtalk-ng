@@ -7,11 +7,10 @@ public sealed class ChatMessageViewModel
     public ChatMessageViewModel(ChatMessage message)
     {
         Time = message.Timestamp.ToLocalTime().ToString("HH:mm:ss");
-        Sender = message.IsDirect && !message.Sender.StartsWith("Direct", StringComparison.OrdinalIgnoreCase)
-            ? $"Direct {message.Sender}"
-            : message.Sender;
+        Sender = message.Sender;
         Text = message.Text;
         IsDirect = message.IsDirect;
+        DirectUserId = message.DirectUserId;
     }
 
     public string Time { get; }
@@ -22,12 +21,18 @@ public sealed class ChatMessageViewModel
 
     public bool IsDirect { get; }
 
+    public int? DirectUserId { get; }
+
+    private string DirectSender => Sender.StartsWith("Direct ", StringComparison.OrdinalIgnoreCase)
+        ? Sender
+        : $"Direct from {Sender}";
+
     public string DisplayText => IsDirect
-        ? $"{Time} Direct {Sender}: {Text}"
+        ? $"{Time} {DirectSender}: {Text}"
         : $"{Time} {Sender}: {Text}";
 
     public string AccessibleName => IsDirect
-        ? $"{Time}, direct message, {Sender}: {Text}"
+        ? $"{Time}, {DirectSender}: {Text}"
         : $"{Time}, {Sender}: {Text}";
 
     public override string ToString()

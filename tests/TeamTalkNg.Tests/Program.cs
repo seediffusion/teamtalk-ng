@@ -324,10 +324,22 @@ internal static class SoundPackTests
 {
     public static void RunAll()
     {
+        ExposesOfficialStyleSoundEventList();
         ResolvesOfficialDefaultSoundNames();
         DiscoversOfficialSoundPackFolders();
         TreatsOfficialDefaultPackNameAsRootSoundsFolder();
         Console.WriteLine("TeamTalk NG sound pack tests passed.");
+    }
+
+    private static void ExposesOfficialStyleSoundEventList()
+    {
+        var service = new SoundEventService();
+        IReadOnlyList<SoundEventDefinition> soundEvents = service.GetSoundEvents();
+
+        Assert(soundEvents.Count >= 31, "Expected at least the official TeamTalk sound event set.");
+        Assert(soundEvents.Any(item => item.Event == SoundEvent.BroadcastMessage), "Expected broadcast message sound event.");
+        Assert(soundEvents.Any(item => item.Event == SoundEvent.UserTypingDirectMessage), "Expected direct message typing sound event.");
+        Assert(soundEvents.Any(item => item.Event == SoundEvent.InterceptionStarted), "Expected interception sound event.");
     }
 
     private static void ResolvesOfficialDefaultSoundNames()
@@ -336,16 +348,33 @@ internal static class SoundPackTests
             "newuser.wav",
             "removeuser.wav",
             "serverlost.wav",
+            "logged_on.wav",
+            "logged_off.wav",
             "user_msg.wav",
             "user_msg_sent.wav",
+            "typing.wav",
             "channel_msg.wav",
             "channel_msg_sent.wav",
+            "broadcast_msg.wav",
             "filetx_complete.wav",
+            "fileupdate.wav",
+            "questionmode.wav",
             "hotkey.wav",
             "videosession.wav",
             "desktopsession.wav",
+            "desktopaccessreq.wav",
+            "vox_enable.wav",
+            "vox_disable.wav",
+            "voiceact_on.wav",
+            "voiceact_off.wav",
             "vox_me_enable.wav",
-            "vox_me_disable.wav");
+            "vox_me_disable.wav",
+            "mute_all.wav",
+            "unmute_all.wav",
+            "txqueue_start.wav",
+            "txqueue_stop.wav",
+            "intercept.wav",
+            "interceptEnd.wav");
 
         try
         {
@@ -355,16 +384,33 @@ internal static class SoundPackTests
             AssertEqual(Path.Combine(soundsRoot, "newuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserJoined));
             AssertEqual(Path.Combine(soundsRoot, "removeuser.wav"), service.ResolveSoundPathForTest(SoundEvent.UserLeft));
             AssertEqual(Path.Combine(soundsRoot, "serverlost.wav"), service.ResolveSoundPathForTest(SoundEvent.Disconnected));
+            AssertEqual(Path.Combine(soundsRoot, "logged_on.wav"), service.ResolveSoundPathForTest(SoundEvent.UserLoggedIn));
+            AssertEqual(Path.Combine(soundsRoot, "logged_off.wav"), service.ResolveSoundPathForTest(SoundEvent.UserLoggedOut));
             AssertEqual(Path.Combine(soundsRoot, "user_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.DirectMessage));
             AssertEqual(Path.Combine(soundsRoot, "user_msg_sent.wav"), service.ResolveSoundPathForTest(SoundEvent.DirectMessageSent));
+            AssertEqual(Path.Combine(soundsRoot, "typing.wav"), service.ResolveSoundPathForTest(SoundEvent.UserTypingDirectMessage));
             AssertEqual(Path.Combine(soundsRoot, "channel_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.ChannelMessage));
             AssertEqual(Path.Combine(soundsRoot, "channel_msg_sent.wav"), service.ResolveSoundPathForTest(SoundEvent.ChannelMessageSent));
+            AssertEqual(Path.Combine(soundsRoot, "broadcast_msg.wav"), service.ResolveSoundPathForTest(SoundEvent.BroadcastMessage));
+            AssertEqual(Path.Combine(soundsRoot, "fileupdate.wav"), service.ResolveSoundPathForTest(SoundEvent.FilesUpdated));
             AssertEqual(Path.Combine(soundsRoot, "filetx_complete.wav"), service.ResolveSoundPathForTest(SoundEvent.FileTransferFinished));
+            AssertEqual(Path.Combine(soundsRoot, "questionmode.wav"), service.ResolveSoundPathForTest(SoundEvent.QuestionModeEnabled));
             AssertEqual(Path.Combine(soundsRoot, "hotkey.wav"), service.ResolveSoundPathForTest(SoundEvent.PushToTalkEnabled));
             AssertEqual(Path.Combine(soundsRoot, "videosession.wav"), service.ResolveSoundPathForTest(SoundEvent.VideoStarted));
             AssertEqual(Path.Combine(soundsRoot, "desktopsession.wav"), service.ResolveSoundPathForTest(SoundEvent.DesktopShareStarted));
+            AssertEqual(Path.Combine(soundsRoot, "desktopaccessreq.wav"), service.ResolveSoundPathForTest(SoundEvent.DesktopAccessRequested));
+            AssertEqual(Path.Combine(soundsRoot, "vox_enable.wav"), service.ResolveSoundPathForTest(SoundEvent.RemoteVoiceActivationEnabled));
+            AssertEqual(Path.Combine(soundsRoot, "vox_disable.wav"), service.ResolveSoundPathForTest(SoundEvent.RemoteVoiceActivationDisabled));
+            AssertEqual(Path.Combine(soundsRoot, "voiceact_on.wav"), service.ResolveSoundPathForTest(SoundEvent.VoiceActivationTriggered));
+            AssertEqual(Path.Combine(soundsRoot, "voiceact_off.wav"), service.ResolveSoundPathForTest(SoundEvent.VoiceActivationStopped));
             AssertEqual(Path.Combine(soundsRoot, "vox_me_enable.wav"), service.ResolveSoundPathForTest(SoundEvent.VoiceActivationEnabled));
             AssertEqual(Path.Combine(soundsRoot, "vox_me_disable.wav"), service.ResolveSoundPathForTest(SoundEvent.VoiceActivationDisabled));
+            AssertEqual(Path.Combine(soundsRoot, "mute_all.wav"), service.ResolveSoundPathForTest(SoundEvent.MasterVolumeMuted));
+            AssertEqual(Path.Combine(soundsRoot, "unmute_all.wav"), service.ResolveSoundPathForTest(SoundEvent.MasterVolumeUnmuted));
+            AssertEqual(Path.Combine(soundsRoot, "txqueue_start.wav"), service.ResolveSoundPathForTest(SoundEvent.TransmitQueueReady));
+            AssertEqual(Path.Combine(soundsRoot, "txqueue_stop.wav"), service.ResolveSoundPathForTest(SoundEvent.TransmitQueueStopped));
+            AssertEqual(Path.Combine(soundsRoot, "intercept.wav"), service.ResolveSoundPathForTest(SoundEvent.InterceptionStarted));
+            AssertEqual(Path.Combine(soundsRoot, "interceptEnd.wav"), service.ResolveSoundPathForTest(SoundEvent.InterceptionEnded));
         }
         finally
         {
@@ -750,6 +796,18 @@ internal static unsafe class SdkDispatchTests
         ChatMessage? received = null;
         session.ChannelMessageReceived += (_, message) => received = message;
 
+        NativeUser user = CreateUser(7, "alex", "Alexoloopios", 1);
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserJoined,
+            Source: 0,
+            TTType.User,
+            user,
+            default,
+            default,
+            default,
+            0,
+            0));
+
         NativeTextMessage textMessage = default;
         textMessage.MessageType = TextMsgType.Channel;
         textMessage.FromUserId = 7;
@@ -769,7 +827,7 @@ internal static unsafe class SdkDispatchTests
             0));
 
         Assert(received is not null, "Expected channel message event.");
-        AssertEqual("alex", received!.Sender);
+        AssertEqual("Alexoloopios", received!.Sender);
         AssertEqual("hello from sdk", received.Text);
     }
 
@@ -778,6 +836,18 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
         ChatMessage? received = null;
         session.ChannelMessageReceived += (_, message) => received = message;
+
+        NativeUser user = CreateUser(7, "alex", "Alexoloopios", 1);
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserJoined,
+            Source: 0,
+            TTType.User,
+            user,
+            default,
+            default,
+            default,
+            0,
+            0));
 
         NativeTextMessage textMessage = default;
         textMessage.MessageType = TextMsgType.User;
@@ -798,8 +868,9 @@ internal static unsafe class SdkDispatchTests
 
         Assert(received is not null, "Expected direct message event.");
         Assert(received!.IsDirect, "Expected message to be marked as direct.");
-        AssertEqual("Direct from alex", received.Sender);
+        AssertEqual("Alexoloopios", received.Sender);
         AssertEqual("hello directly", received.Text);
+        AssertEqual<int?>(7, received.DirectUserId);
     }
 
     private static void DispatchesBroadcastTextMessage()

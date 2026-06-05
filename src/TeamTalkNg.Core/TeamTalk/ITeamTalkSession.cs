@@ -11,6 +11,7 @@ public interface ITeamTalkSession
     event EventHandler<UserSummary>? UserLeft;
     event EventHandler<FileTransferSummary>? FileTransferUpdated;
     event EventHandler<MediaFrameSummary>? MediaFrameReceived;
+    event EventHandler<ServerInformationSummary>? ServerInformationUpdated;
 
     ConnectionStatus Status { get; }
 

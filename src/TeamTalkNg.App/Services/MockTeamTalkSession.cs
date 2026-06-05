@@ -54,6 +54,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
     public event EventHandler<UserSummary>? UserLeft;
     public event EventHandler<FileTransferSummary>? FileTransferUpdated;
     public event EventHandler<MediaFrameSummary>? MediaFrameReceived;
+    public event EventHandler<ServerInformationSummary>? ServerInformationUpdated;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
@@ -217,17 +218,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
             throw new InvalidOperationException("You must be logged in before viewing server information.");
         }
 
-        TeamTalkServerProfile? profile = activeProfile;
-        return Task.FromResult(new ServerInformationSummary(
-            profile?.DisplayName ?? "Mock TeamTalk server",
-            "Mock server information for TeamTalk NG development.",
-            MaxUsers: 100,
-            profile?.TcpPort ?? 10333,
-            profile?.UdpPort ?? 10333,
-            UserTimeoutSeconds: 60,
-            ServerVersion: "Mock",
-            ProtocolVersion: "Mock",
-            LoginDelayMilliseconds: 0));
+        return Task.FromResult(CreateMockServerInformation(activeProfile));
     }
 
     public Task<ServerStatisticsSummary> GetServerStatisticsAsync(CancellationToken cancellationToken = default)
@@ -498,6 +489,7 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         await Task.Delay(250, cancellationToken);
         SetStatus(ConnectionStatus.InChannel);
         string channelPath = string.IsNullOrWhiteSpace(profileWithIdentity.ChannelPath) ? "/" : profileWithIdentity.ChannelPath;
+        ServerInformationUpdated?.Invoke(this, CreateMockServerInformation(profileWithIdentity));
         ChannelAddedOrUpdated?.Invoke(this, new ChannelSummary(1, GetChannelName(channelPath), channelPath, 1, IsProtected: false, IsPermanent: true));
         UserJoined?.Invoke(this, new UserSummary(1, GetSelfNickname(), profileWithIdentity.Username, channelPath, IsTalking: false, IsAway: false, IsOperator: true));
 
@@ -619,9 +611,10 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
 
         ChannelMessageReceived?.Invoke(this, new ChatMessage(
             DateTimeOffset.Now,
-            $"Direct to User {userId}",
+            $"Direct to {GetMockUserDisplayName(userId)}",
             text,
-            IsDirect: true));
+            IsDirect: true,
+            DirectUserId: userId));
         return Task.CompletedTask;
     }
 
@@ -790,11 +783,30 @@ public sealed class MockTeamTalkSession : ITeamTalkSession
         return profile with { Nickname = nickname };
     }
 
+    private static ServerInformationSummary CreateMockServerInformation(TeamTalkServerProfile? profile)
+    {
+        return new ServerInformationSummary(
+            profile?.DisplayName ?? "Mock TeamTalk server",
+            "Mock server information for TeamTalk NG development.",
+            MaxUsers: 100,
+            profile?.TcpPort ?? 10333,
+            profile?.UdpPort ?? 10333,
+            UserTimeoutSeconds: 60,
+            ServerVersion: "Mock",
+            ProtocolVersion: "Mock",
+            LoginDelayMilliseconds: 0);
+    }
+
     private string GetSelfNickname()
     {
         return string.IsNullOrWhiteSpace(activeProfile?.Nickname)
             ? Environment.UserName
             : activeProfile.Nickname.Trim();
+    }
+
+    private string GetMockUserDisplayName(int userId)
+    {
+        return userId == 1 ? GetSelfNickname() : $"User {userId}";
     }
 
     private static string GetProfileText(string? preferred, string fallback)

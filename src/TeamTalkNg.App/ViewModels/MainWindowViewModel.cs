@@ -47,6 +47,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private int inputLevelPercent;
     private int voiceActivationLevelPercent = 50;
     private ChannelTreeItemViewModel? selectedChannelItem;
+    private ChatMessageViewModel? selectedChatMessage;
     private bool pushToTalkEnabled;
     private bool voiceActivationEnabled;
     private bool isInputMeterVisible;
@@ -188,6 +189,7 @@ public sealed class MainWindowViewModel : ObservableObject
         teamTalkSession.UserLeft += OnUserLeft;
         teamTalkSession.FileTransferUpdated += OnFileTransferUpdated;
         teamTalkSession.MediaFrameReceived += OnMediaFrameReceived;
+        teamTalkSession.ServerInformationUpdated += OnServerInformationUpdated;
 
         BuildDisconnectedTree();
         ShowFilesPlaceholder("Join a channel to view files");
@@ -199,6 +201,12 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<ChannelTreeItemViewModel> Channels { get; } = [];
 
     public ObservableCollection<ChatMessageViewModel> ChatMessages { get; } = [];
+
+    public ChatMessageViewModel? SelectedChatMessage
+    {
+        get => selectedChatMessage;
+        set => SetProperty(ref selectedChatMessage, value);
+    }
 
     public ObservableCollection<FileTransferViewModel> Files { get; } = [];
 
@@ -565,6 +573,17 @@ public sealed class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(IsPushToTalkEnabled));
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
+    }
+
+    public async Task OpenSelectedDirectMessageReplyAsync()
+    {
+        if (SelectedChatMessage is not { IsDirect: true, DirectUserId: > 0 } message)
+        {
+            return;
+        }
+
+        string recipientName = GetUserDisplayName(message.DirectUserId.Value, message.Sender);
+        await SendDirectMessageToUserAsync(message.DirectUserId.Value, recipientName);
     }
 
     private async Task ConnectAsync()
@@ -1208,7 +1227,12 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         }
 
-        string? message = directMessageDialogService.ShowDirectMessageDialog(user.Name);
+        await SendDirectMessageToUserAsync(user.Id, user.Name);
+    }
+
+    private async Task SendDirectMessageToUserAsync(int userId, string recipientName)
+    {
+        string? message = directMessageDialogService.ShowDirectMessageDialog(recipientName);
         if (string.IsNullOrWhiteSpace(message))
         {
             await AnnounceAsync("Direct message canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
@@ -1217,13 +1241,13 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            await teamTalkSession.SendDirectMessageAsync(user.Id, message);
+            await teamTalkSession.SendDirectMessageAsync(userId, message);
             soundEvents.Play(SoundEvent.DirectMessageSent);
             await AnnounceAsync(
                 FormatAnnouncementTemplate(
                     AnnouncementTemplateKind.DirectMessageSent,
-                    ("user", user.Name),
-                    ("username", user.Name),
+                    ("user", recipientName),
+                    ("username", recipientName),
                     ("message", message)),
                 AnnouncementPriority.Low,
                 AnnouncementKind.System,
@@ -1613,6 +1637,23 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    private void OnServerInformationUpdated(object? sender, ServerInformationSummary serverInformation)
+    {
+        string serverName = serverInformation.ServerName.Trim();
+        if (string.IsNullOrWhiteSpace(serverName))
+        {
+            return;
+        }
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (serverTreeItem is not null)
+            {
+                serverTreeItem.Name = serverName;
+            }
+        });
+    }
+
     private async void OnInputLevelTimerTick(object? sender, EventArgs e)
     {
         if (!IsInputMeterVisible || isPollingInputLevel)
@@ -1670,6 +1711,10 @@ public sealed class MainWindowViewModel : ObservableObject
         if (!message.IsSystem)
         {
             soundEvents.Play(message.IsDirect ? SoundEvent.DirectMessage : SoundEvent.ChannelMessage);
+        }
+        else if (message.Sender.StartsWith("Broadcast from ", StringComparison.OrdinalIgnoreCase))
+        {
+            soundEvents.Play(SoundEvent.BroadcastMessage);
         }
 
         _ = AnnounceAsync(
@@ -2314,6 +2359,40 @@ public sealed class MainWindowViewModel : ObservableObject
         return message.Sender.StartsWith("Direct ", StringComparison.OrdinalIgnoreCase)
             ? message.Sender["Direct ".Length..]
             : message.Sender;
+    }
+
+    private string GetUserDisplayName(int userId, string fallback)
+    {
+        ChannelTreeItemViewModel? user = Descendants(serverTreeItem)
+            .FirstOrDefault(item => item.Kind == ChannelTreeItemKind.User && item.Id == userId);
+
+        if (user is not null && !string.IsNullOrWhiteSpace(user.Name))
+        {
+            return user.Name;
+        }
+
+        string cleanedFallback = GetDirectMessageParticipantName(fallback);
+        return string.IsNullOrWhiteSpace(cleanedFallback) ? $"User {userId}" : cleanedFallback;
+    }
+
+    private static string GetDirectMessageParticipantName(string value)
+    {
+        const string directFromPrefix = "Direct from ";
+        const string directToPrefix = "Direct to ";
+
+        if (value.StartsWith(directFromPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return value[directFromPrefix.Length..];
+        }
+
+        if (value.StartsWith(directToPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return value[directToPrefix.Length..];
+        }
+
+        return value.StartsWith("Direct ", StringComparison.OrdinalIgnoreCase)
+            ? value["Direct ".Length..]
+            : value;
     }
 
     private static string GetChannelName(string? channelPath)

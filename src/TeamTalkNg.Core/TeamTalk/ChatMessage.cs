@@ -5,4 +5,5 @@ public sealed record ChatMessage(
     string Sender,
     string Text,
     bool IsDirect = false,
-    bool IsSystem = false);
+    bool IsSystem = false,
+    int? DirectUserId = null);

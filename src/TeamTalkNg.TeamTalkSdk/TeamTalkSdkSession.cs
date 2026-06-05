@@ -65,6 +65,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     public event EventHandler<UserSummary>? UserLeft;
     public event EventHandler<FileTransferSummary>? FileTransferUpdated;
     public event EventHandler<MediaFrameSummary>? MediaFrameReceived;
+    public event EventHandler<ServerInformationSummary>? ServerInformationUpdated;
 
     public ConnectionStatus Status { get; private set; } = ConnectionStatus.Disconnected;
 
@@ -1196,9 +1197,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             ChannelMessageReceived?.Invoke(this, new ChatMessage(
                 DateTimeOffset.Now,
-                $"Direct to User {userId}",
+                $"Direct to {GetUserDisplayName(userId)}",
                 text,
-                IsDirect: true));
+                IsDirect: true,
+                DirectUserId: userId));
         }
 
         return Task.CompletedTask;
@@ -1622,6 +1624,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private void DispatchServerUpdate(NativeServerProperties properties)
     {
         ServerInformationSummary summary = CreateServerInformationSummary(properties);
+        ServerInformationUpdated?.Invoke(this, summary);
         string serverName = string.IsNullOrWhiteSpace(summary.ServerName)
             ? "server"
             : summary.ServerName;
@@ -2507,11 +2510,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
     private void DispatchTextMessage(NativeTextMessage textMessage)
     {
-        string sender = textMessage.ReadFromUsername();
-        if (string.IsNullOrWhiteSpace(sender))
-        {
-            sender = $"User {textMessage.FromUserId}";
-        }
+        string sender = GetTextMessageSenderDisplayName(textMessage);
 
         if (textMessage.MessageType == TextMsgType.Channel)
         {
@@ -2524,9 +2523,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         {
             ChannelMessageReceived?.Invoke(this, new ChatMessage(
                 DateTimeOffset.Now,
-                $"Direct from {sender}",
+                sender,
                 textMessage.ReadMessage(),
-                IsDirect: true));
+                IsDirect: true,
+                DirectUserId: textMessage.FromUserId > 0 ? textMessage.FromUserId : null));
         }
         else if (textMessage.MessageType == TextMsgType.Broadcast)
         {
@@ -2544,6 +2544,24 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 textMessage.ReadMessage(),
                 IsSystem: true));
         }
+    }
+
+    private string GetTextMessageSenderDisplayName(NativeTextMessage textMessage)
+    {
+        if (textMessage.FromUserId > 0
+            && userDisplayNames.TryGetValue(textMessage.FromUserId, out string? displayName)
+            && !string.IsNullOrWhiteSpace(displayName))
+        {
+            return displayName;
+        }
+
+        string username = textMessage.ReadFromUsername();
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        return textMessage.FromUserId > 0 ? $"User {textMessage.FromUserId}" : "A user";
     }
 
     private void DispatchFileTransfer(NativeFileTransfer fileTransfer)

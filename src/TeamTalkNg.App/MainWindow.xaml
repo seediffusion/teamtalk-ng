@@ -54,6 +54,8 @@
                   IsCheckable="True"
                   IsChecked="{Binding IsInputMeterVisible, Mode=OneWay}" />
         <Separator />
+        <MenuItem Header="_Preferences" Command="{Binding PreferencesCommand}" />
+        <Separator />
         <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
       </MenuItem>
       <MenuItem Header="_Server">
@@ -92,8 +94,7 @@
         <Separator />
         <MenuItem Header="_Create Channel" Command="{Binding CreateChannelCommand}" />
         <MenuItem Header="_Delete Selected Channel" Command="{Binding DeleteSelectedChannelCommand}" />
-      </MenuItem>
-      <MenuItem Header="_Files">
+        <Separator />
         <MenuItem Header="_Upload File" Command="{Binding UploadFileCommand}" />
         <MenuItem Header="_Download Selected File" Command="{Binding DownloadFileCommand}" />
         <MenuItem Header="_Delete Selected File" Command="{Binding DeleteFileCommand}" />
@@ -112,12 +113,6 @@
         <MenuItem Header="_Kick From Channel" Command="{Binding KickUserFromChannelCommand}" />
         <MenuItem Header="Kick From _Server" Command="{Binding KickUserFromServerCommand}" />
         <MenuItem Header="_Ban From Server" Command="{Binding BanUserFromServerCommand}" />
-      </MenuItem>
-      <MenuItem Header="_View">
-        <MenuItem Header="_Light Theme" Command="{Binding UseLightThemeCommand}" />
-        <MenuItem Header="_Dark Theme" Command="{Binding UseDarkThemeCommand}" />
-        <Separator />
-        <MenuItem Header="_Preferences" Command="{Binding PreferencesCommand}" />
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="_About TeamTalk NG" Command="{Binding AboutCommand}" />
@@ -355,7 +350,10 @@
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <ListView ItemsSource="{Binding ChatMessages}"
+            <ListView x:Name="ChatHistoryList"
+                      ItemsSource="{Binding ChatMessages}"
+                      SelectedItem="{Binding SelectedChatMessage, Mode=TwoWay}"
+                      KeyDown="ChatHistoryList_OnKeyDown"
                       Background="{DynamicResource ControlBackgroundBrush}"
                       Foreground="{DynamicResource TextBrush}"
                       BorderBrush="{DynamicResource BorderBrush}"

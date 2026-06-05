@@ -48,6 +48,20 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ChatHistoryList_OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            e.Handled = true;
+            await viewModel.OpenSelectedDirectMessageReplyAsync();
+        }
+    }
+
     private void MainToolBar_OnGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         if (ReferenceEquals(e.NewFocus, MainToolBar))
