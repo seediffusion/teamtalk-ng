@@ -218,39 +218,81 @@
       </TabItem>
 
       <TabItem Header="Screen reader">
-        <StackPanel Margin="8,14,8,8">
-          <CheckBox Content="Announce channel messages"
-                    IsChecked="{Binding AnnounceChannelMessages}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Announce channel messages" />
-          <CheckBox Content="Announce direct messages"
-                    IsChecked="{Binding AnnounceDirectMessages}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Announce direct messages" />
-          <CheckBox Content="Announce users joining and leaving"
-                    IsChecked="{Binding AnnounceUserJoinLeave}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Announce users joining and leaving" />
-          <CheckBox Content="Announce channel tree selection changes"
-                    IsChecked="{Binding AnnounceSelectionChanges}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Announce channel tree selection changes" />
-          <CheckBox Content="Send announcements to braille when available"
-                    IsChecked="{Binding SendAnnouncementsToBraille}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Send announcements to braille when available" />
-          <CheckBox Content="Interrupt speech for important announcements"
-                    IsChecked="{Binding InterruptImportantAnnouncements}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Interrupt speech for important announcements" />
-          <CheckBox Content="Show announcements in the status bar"
-                    IsChecked="{Binding ShowAnnouncementsInStatusBar}"
-                    Margin="0,0,0,10"
-                    AutomationProperties.Name="Show announcements in the status bar" />
-          <CheckBox Content="Show chat and direct message announcements in the status bar"
-                    IsChecked="{Binding ShowMessageAnnouncementsInStatusBar}"
-                    AutomationProperties.Name="Show chat and direct message announcements in the status bar" />
-        </StackPanel>
+        <ScrollViewer Margin="8,14,8,8"
+                      VerticalScrollBarVisibility="Auto"
+                      AutomationProperties.Name="Screen reader preferences">
+          <StackPanel>
+            <CheckBox Content="Announce channel messages"
+                      IsChecked="{Binding AnnounceChannelMessages}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Announce channel messages" />
+            <CheckBox Content="Announce direct messages"
+                      IsChecked="{Binding AnnounceDirectMessages}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Announce direct messages" />
+            <CheckBox Content="Announce users joining and leaving"
+                      IsChecked="{Binding AnnounceUserJoinLeave}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Announce users joining and leaving" />
+            <CheckBox Content="Announce channel tree selection changes"
+                      IsChecked="{Binding AnnounceSelectionChanges}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Announce channel tree selection changes" />
+            <CheckBox Content="Send announcements to braille when available"
+                      IsChecked="{Binding SendAnnouncementsToBraille}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Send announcements to braille when available" />
+            <CheckBox Content="Interrupt speech for important announcements"
+                      IsChecked="{Binding InterruptImportantAnnouncements}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Interrupt speech for important announcements" />
+            <CheckBox Content="Show announcements in the status bar"
+                      IsChecked="{Binding ShowAnnouncementsInStatusBar}"
+                      Margin="0,0,0,10"
+                      AutomationProperties.Name="Show announcements in the status bar" />
+            <CheckBox Content="Show chat and direct message announcements in the status bar"
+                      IsChecked="{Binding ShowMessageAnnouncementsInStatusBar}"
+                      Margin="0,0,0,16"
+                      AutomationProperties.Name="Show chat and direct message announcements in the status bar" />
+
+            <TextBlock Text="Announcement templates"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,8"
+                       AutomationProperties.Name="Announcement templates" />
+            <ListView ItemsSource="{Binding AnnouncementTemplates}"
+                      MinHeight="170"
+                      Background="{DynamicResource ControlBackgroundBrush}"
+                      Foreground="{DynamicResource TextBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      KeyboardNavigation.TabNavigation="Continue"
+                      AutomationProperties.Name="Announcement templates">
+              <ListView.ItemContainerStyle>
+                <Style TargetType="{x:Type ListViewItem}">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+                  <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+              </ListView.ItemContainerStyle>
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="Event" DisplayMemberBinding="{Binding Name}" Width="130" />
+                  <GridViewColumn Header="Template" Width="250">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBox Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}"
+                                 MinWidth="220"
+                                 Background="{DynamicResource ControlBackgroundBrush}"
+                                 Foreground="{DynamicResource TextBrush}"
+                                 BorderBrush="{DynamicResource BorderBrush}"
+                                 AutomationProperties.Name="{Binding Name, StringFormat={}{0} announcement template}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Placeholders" DisplayMemberBinding="{Binding PlaceholderSummary}" Width="170" />
+                </GridView>
+              </ListView.View>
+            </ListView>
+          </StackPanel>
+        </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Sounds">

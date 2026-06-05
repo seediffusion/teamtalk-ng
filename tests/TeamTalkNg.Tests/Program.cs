@@ -10,6 +10,7 @@ ParserTests.RunAll();
 SdkProbeTests.RunAll();
 SdkDispatchTests.RunAll();
 SoundPackTests.RunAll();
+AnnouncementTemplateTests.RunAll();
 AnnouncementBackendTests.RunAll();
 
 internal static class ParserTests
@@ -445,6 +446,98 @@ internal static class AnnouncementBackendTests
         }
 
         public sealed record OutputCall(string Message, bool Interrupt);
+    }
+}
+
+internal static class AnnouncementTemplateTests
+{
+    public static void RunAll()
+    {
+        FormatsOfficialStyleChannelMessage();
+        UsesTeamTalkNgDirectMessageTerminology();
+        AppliesCustomTemplateOverrides();
+        LeavesUnknownPlaceholdersIntact();
+        Console.WriteLine("TeamTalk NG announcement template tests passed.");
+    }
+
+    private static void FormatsOfficialStyleChannelMessage()
+    {
+        string announcement = AnnouncementTemplateFormatter.Format(
+            new AppSettings(),
+            AnnouncementTemplateKind.ChannelMessage,
+            new Dictionary<string, string>
+            {
+                ["user"] = "Alexoloopios",
+                ["message"] = "Test channel message"
+            });
+
+        AssertEqual("Channel message from Alexoloopios: Test channel message", announcement);
+    }
+
+    private static void UsesTeamTalkNgDirectMessageTerminology()
+    {
+        string announcement = AnnouncementTemplateFormatter.Format(
+            new AppSettings(),
+            AnnouncementTemplateKind.DirectMessage,
+            new Dictionary<string, string>
+            {
+                ["user"] = "Alex",
+                ["message"] = "Hello"
+            });
+
+        AssertEqual("Direct message from Alex: Hello", announcement);
+    }
+
+    private static void AppliesCustomTemplateOverrides()
+    {
+        var settings = new AppSettings
+        {
+            AnnouncementTemplates = new Dictionary<string, string>
+            {
+                ["channel-message"] = "{User} says {message}"
+            }
+        };
+
+        string announcement = AnnouncementTemplateFormatter.Format(
+            settings,
+            AnnouncementTemplateKind.ChannelMessage,
+            new Dictionary<string, string>
+            {
+                ["user"] = "Alex",
+                ["message"] = "Hello"
+            });
+
+        AssertEqual("Alex says Hello", announcement);
+    }
+
+    private static void LeavesUnknownPlaceholdersIntact()
+    {
+        var settings = new AppSettings
+        {
+            AnnouncementTemplates = new Dictionary<string, string>
+            {
+                ["user-joined-channel"] = "{user} joined {channel} from {unknown}"
+            }
+        };
+
+        string announcement = AnnouncementTemplateFormatter.Format(
+            settings,
+            AnnouncementTemplateKind.UserJoinedChannel,
+            new Dictionary<string, string>
+            {
+                ["user"] = "Alex",
+                ["channel"] = "Lobby"
+            });
+
+        AssertEqual("Alex joined Lobby from {unknown}", announcement);
+    }
+
+    private static void AssertEqual<T>(T expected, T actual)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"Expected {expected}, got {actual}.");
+        }
     }
 }
 

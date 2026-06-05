@@ -59,6 +59,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         InputDevices = [];
         OutputDevices = [];
         SoundPacks = new ObservableCollection<SoundPackOption>(soundPacks);
+        AnnouncementTemplates = new ObservableCollection<AnnouncementTemplateOptionViewModel>(
+            AnnouncementTemplateFormatter.Definitions.Select(definition =>
+            {
+                settings.AnnouncementTemplates.TryGetValue(definition.Id, out string? template);
+                return new AnnouncementTemplateOptionViewModel(definition, template);
+            }));
         SoundEvents = new ObservableCollection<SoundEventOptionViewModel>(soundEvents.Select(definition =>
             new SoundEventOptionViewModel(
                 definition,
@@ -105,6 +111,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public ObservableCollection<AudioDeviceOptionViewModel> OutputDevices { get; }
 
     public ObservableCollection<SoundPackOption> SoundPacks { get; }
+
+    public ObservableCollection<AnnouncementTemplateOptionViewModel> AnnouncementTemplates { get; }
 
     public ObservableCollection<SoundEventOptionViewModel> SoundEvents { get; }
 
@@ -267,6 +275,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             InterruptImportantAnnouncements = InterruptImportantAnnouncements,
             ShowAnnouncementsInStatusBar = ShowAnnouncementsInStatusBar,
             ShowMessageAnnouncementsInStatusBar = ShowMessageAnnouncementsInStatusBar,
+            AnnouncementTemplates = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.Template, StringComparer.OrdinalIgnoreCase),
             PlaySoundEvents = PlaySoundEvents,
             SoundPack = SelectedSoundPack,
             SoundEventVolume = SoundEventVolume,

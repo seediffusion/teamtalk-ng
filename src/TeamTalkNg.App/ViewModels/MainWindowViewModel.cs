@@ -892,7 +892,11 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.SendChannelMessageAsync(text);
             soundEvents.Play(SoundEvent.ChannelMessageSent);
-            await AnnounceAsync($"Sent message: {text}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            await AnnounceAsync(
+                FormatAnnouncementTemplate(AnnouncementTemplateKind.ChannelMessageSent, ("message", text)),
+                AnnouncementPriority.Low,
+                AnnouncementKind.System,
+                includeBraille: false);
         }
         catch (Exception ex)
         {
@@ -1208,7 +1212,15 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             await teamTalkSession.SendDirectMessageAsync(user.Id, message);
             soundEvents.Play(SoundEvent.DirectMessageSent);
-            await AnnounceAsync($"Sent direct message to {user.Name}", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+            await AnnounceAsync(
+                FormatAnnouncementTemplate(
+                    AnnouncementTemplateKind.DirectMessageSent,
+                    ("user", user.Name),
+                    ("username", user.Name),
+                    ("message", message)),
+                AnnouncementPriority.Low,
+                AnnouncementKind.System,
+                includeBraille: false);
         }
         catch (Exception ex)
         {
@@ -1613,7 +1625,11 @@ public sealed class MainWindowViewModel : ObservableObject
 
         string announcement = message.IsSystem
             ? message.Text
-            : $"{message.Sender}: {message.Text}";
+            : FormatAnnouncementTemplate(
+                message.IsDirect ? AnnouncementTemplateKind.DirectMessage : AnnouncementTemplateKind.ChannelMessage,
+                ("user", GetAnnouncementSender(message)),
+                ("username", GetAnnouncementSender(message)),
+                ("message", message.Text));
         if (!message.IsSystem)
         {
             soundEvents.Play(message.IsDirect ? SoundEvent.DirectMessage : SoundEvent.ChannelMessage);
@@ -1622,7 +1638,9 @@ public sealed class MainWindowViewModel : ObservableObject
         _ = AnnounceAsync(
             announcement,
             message.IsDirect ? AnnouncementPriority.High : AnnouncementPriority.Normal,
-            message.IsDirect ? AnnouncementKind.DirectMessage : AnnouncementKind.ChannelMessage);
+            message.IsSystem
+                ? AnnouncementKind.System
+                : message.IsDirect ? AnnouncementKind.DirectMessage : AnnouncementKind.ChannelMessage);
     }
 
     private void OnFileTransferUpdated(object? sender, FileTransferSummary transfer)
@@ -1730,7 +1748,14 @@ public sealed class MainWindowViewModel : ObservableObject
         if (ShouldPlayLiveUserJoinSound())
         {
             soundEvents.Play(SoundEvent.UserJoined);
-            _ = AnnounceAsync($"{user.Nickname} joined {GetChannelName(user.ChannelPath)}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+            _ = AnnounceAsync(
+                FormatAnnouncementTemplate(
+                    AnnouncementTemplateKind.UserJoinedChannel,
+                    ("user", user.Nickname),
+                    ("username", user.Username),
+                    ("channel", GetChannelName(user.ChannelPath))),
+                AnnouncementPriority.Normal,
+                AnnouncementKind.UserJoinLeave);
         }
     }
 
@@ -1758,7 +1783,14 @@ public sealed class MainWindowViewModel : ObservableObject
         });
 
         soundEvents.Play(SoundEvent.UserLeft);
-        _ = AnnounceAsync($"{user.Nickname} left {user.ChannelPath}", AnnouncementPriority.Normal, AnnouncementKind.UserJoinLeave);
+        _ = AnnounceAsync(
+            FormatAnnouncementTemplate(
+                AnnouncementTemplateKind.UserLeftChannel,
+                ("user", user.Nickname),
+                ("username", user.Username),
+                ("channel", GetChannelName(user.ChannelPath))),
+            AnnouncementPriority.Normal,
+            AnnouncementKind.UserJoinLeave);
     }
 
     private void AddOrUpdateUser(UserSummary user)
@@ -2195,6 +2227,45 @@ public sealed class MainWindowViewModel : ObservableObject
             AnnouncementKind.Selection => settings.AnnounceSelectionChanges,
             _ => true
         };
+    }
+
+    private string FormatAnnouncementTemplate(AnnouncementTemplateKind kind, params (string Key, string Value)[] values)
+    {
+        var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["server"] = activeProfile?.DisplayName ?? "server"
+        };
+
+        foreach ((string key, string value) in values)
+        {
+            replacements[key] = value;
+        }
+
+        return AnnouncementTemplateFormatter.Format(settings, kind, replacements);
+    }
+
+    private static string GetAnnouncementSender(ChatMessage message)
+    {
+        if (!message.IsDirect)
+        {
+            return message.Sender;
+        }
+
+        const string directFromPrefix = "Direct from ";
+        const string directToPrefix = "Direct to ";
+        if (message.Sender.StartsWith(directFromPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return message.Sender[directFromPrefix.Length..];
+        }
+
+        if (message.Sender.StartsWith(directToPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return message.Sender[directToPrefix.Length..];
+        }
+
+        return message.Sender.StartsWith("Direct ", StringComparison.OrdinalIgnoreCase)
+            ? message.Sender["Direct ".Length..]
+            : message.Sender;
     }
 
     private static string GetChannelName(string? channelPath)

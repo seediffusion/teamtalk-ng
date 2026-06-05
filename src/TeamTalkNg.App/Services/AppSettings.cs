@@ -20,6 +20,8 @@ public sealed record AppSettings
 
     public bool ShowMessageAnnouncementsInStatusBar { get; init; }
 
+    public Dictionary<string, string> AnnouncementTemplates { get; init; } = [];
+
     public bool PlaySoundEvents { get; init; } = true;
 
     public string SoundPack { get; init; } = SoundEventService.DefaultSoundPackId;
