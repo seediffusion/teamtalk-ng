@@ -426,7 +426,7 @@ internal struct NativeAudioPreprocessor
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeVideoCaptureDevice
 {
     public fixed char DeviceId[NativeConstants.StringLength];
@@ -474,7 +474,7 @@ internal struct NativeVideoCodec
     public NativeWebMVP8Codec WebMVp8;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeSoundDevice
 {
     public int DeviceId;
@@ -571,7 +571,7 @@ internal unsafe struct NativeAudioConfig
     public int GainLevel;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeChannel
 {
     public int ParentId;
@@ -634,7 +634,7 @@ internal unsafe struct NativeChannel
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeClientErrorMsg
 {
     public int ErrorNumber;
@@ -649,7 +649,7 @@ internal unsafe struct NativeClientErrorMsg
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeServerProperties
 {
     public fixed char ServerName[NativeConstants.StringLength];
@@ -750,7 +750,7 @@ internal struct NativeDesktopWindow
     public int FrameBufferSize;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeBannedUser
 {
     public fixed char IpAddress[NativeConstants.StringLength];
@@ -849,7 +849,7 @@ internal struct NativeAbusePrevention
     public int CommandsIntervalMilliseconds;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeUserAccount
 {
     public fixed char Username[NativeConstants.StringLength];
@@ -938,7 +938,7 @@ internal unsafe struct NativeUserAccount
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeRemoteFile
 {
     public int ChannelId;
@@ -973,7 +973,7 @@ internal unsafe struct NativeRemoteFile
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeFileTransfer
 {
     public NativeFileTransferStatus Status;
@@ -1002,7 +1002,7 @@ internal unsafe struct NativeFileTransfer
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeTextMessage
 {
     public TextMsgType MessageType;
@@ -1038,7 +1038,7 @@ internal unsafe struct NativeTextMessage
     }
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 internal unsafe struct NativeUser
 {
     public int UserId;

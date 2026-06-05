@@ -228,6 +228,7 @@ internal static class SdkProbeTests
     {
         ReportsMissingConfiguredLibrary();
         VerifiesAudioPreprocessorManagedSizes();
+        WritesNativeTextMessageStringsAsUtf16();
         VerifiesNativeSizesWhenSdkIsPresent();
         EnumeratesAudioDevicesWhenSdkIsPresent();
         Console.WriteLine("TeamTalk NG SDK probe tests passed.");
@@ -252,6 +253,29 @@ internal static class SdkProbeTests
         AssertEqual(12, System.Runtime.InteropServices.Marshal.SizeOf<NativeTeamTalkAudioPreprocessor>());
         AssertEqual(52, System.Runtime.InteropServices.Marshal.SizeOf<NativeWebRtcAudioPreprocessor>());
         AssertEqual(56, System.Runtime.InteropServices.Marshal.SizeOf<NativeAudioPreprocessor>());
+    }
+
+    private static void WritesNativeTextMessageStringsAsUtf16()
+    {
+        NativeTextMessage message = default;
+        message.WriteMessage("For real, its ridiculous");
+
+        int size = System.Runtime.InteropServices.Marshal.SizeOf<NativeTextMessage>();
+        IntPtr buffer = System.Runtime.InteropServices.Marshal.AllocHGlobal(size);
+        try
+        {
+            System.Runtime.InteropServices.Marshal.StructureToPtr(message, buffer, false);
+            IntPtr messageOffset = IntPtr.Add(
+                buffer,
+                (int)System.Runtime.InteropServices.Marshal.OffsetOf<NativeTextMessage>(nameof(NativeTextMessage.Message)));
+            string? marshaled = System.Runtime.InteropServices.Marshal.PtrToStringUni(messageOffset);
+
+            AssertEqual("For real, its ridiculous", marshaled);
+        }
+        finally
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal(buffer);
+        }
     }
 
     private static void VerifiesNativeSizesWhenSdkIsPresent()

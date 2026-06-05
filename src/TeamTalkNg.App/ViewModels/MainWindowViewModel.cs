@@ -471,11 +471,15 @@ public sealed class MainWindowViewModel : ObservableObject
     public int VoiceActivationLevelPercent
     {
         get => voiceActivationLevelPercent;
-        private set
+        set
         {
             if (SetProperty(ref voiceActivationLevelPercent, Math.Clamp(value, 0, 100)))
             {
                 OnPropertyChanged(nameof(VoiceActivationMarkerMargin));
+                if (!isPollingInputLevel)
+                {
+                    _ = ApplyVoiceActivationLevelAsync();
+                }
             }
         }
     }
@@ -1490,6 +1494,26 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             await teamTalkSession.SetAudioVolumeAsync(input, output);
+            await settingsStore.SaveAsync(settings);
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+    }
+
+    private async Task ApplyVoiceActivationLevelAsync()
+    {
+        int level = VoiceActivationLevelPercent;
+        settings = settings with { VoiceActivationLevel = level };
+
+        try
+        {
+            if (teamTalkSession.Status == ConnectionStatus.InChannel && IsVoiceActivationEnabled)
+            {
+                await teamTalkSession.SetVoiceActivationAsync(true, level);
+            }
+
             await settingsStore.SaveAsync(settings);
         }
         catch (Exception ex)

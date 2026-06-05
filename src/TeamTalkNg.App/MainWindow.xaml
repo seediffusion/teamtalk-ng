@@ -259,6 +259,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -289,7 +290,24 @@
                     AutomationProperties.LabeledBy="{Binding ElementName=OutputVolumeLabel}"
                     AutomationProperties.Name="Speaker output volume" />
 
-            <StackPanel Grid.Row="2"
+            <TextBlock x:Name="VoiceActivationLevelLabel"
+                       Grid.Row="2"
+                       Text="Voice activation"
+                       VerticalAlignment="Center"
+                       Margin="0,8,8,0" />
+            <Slider Grid.Row="2"
+                    Grid.Column="1"
+                    Minimum="0"
+                    Maximum="100"
+                    TickFrequency="1"
+                    SmallChange="1"
+                    LargeChange="5"
+                    Value="{Binding VoiceActivationLevelPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    Margin="0,8,0,0"
+                    AutomationProperties.LabeledBy="{Binding ElementName=VoiceActivationLevelLabel}"
+                    AutomationProperties.Name="Voice activation level" />
+
+            <StackPanel Grid.Row="3"
                         Grid.ColumnSpan="2"
                         Margin="0,12,0,0"
                         Visibility="{Binding IsInputMeterVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
