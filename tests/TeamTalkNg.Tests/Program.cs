@@ -7,6 +7,7 @@ using TeamTalkNg.TeamTalkSdk;
 using TeamTalkNg.TeamTalkSdk.Native;
 
 ParserTests.RunAll();
+AppSettingsTests.RunAll();
 SdkProbeTests.RunAll();
 SdkDispatchTests.RunAll();
 SoundPackTests.RunAll();
@@ -109,6 +110,97 @@ internal static class ParserTests
     private static string WriteTempFile(params string[] lines)
     {
         string path = Path.Combine(Path.GetTempPath(), $"teamtalk-ng-test-{Guid.NewGuid():N}.tt");
+        File.WriteAllLines(path, lines);
+        return path;
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static void AssertEqual<T>(T expected, T actual)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"Expected {expected}, got {actual}.");
+        }
+    }
+}
+
+internal static class AppSettingsTests
+{
+    public static void RunAll()
+    {
+        UsesOfficialStyleAudioDefaults();
+        MigratesOldVoiceActivationDefault();
+        PreservesOpenMicrophoneVoiceActivationLevel();
+
+        Console.WriteLine("TeamTalk NG settings tests passed.");
+    }
+
+    private static void UsesOfficialStyleAudioDefaults()
+    {
+        var settings = new AppSettings();
+
+        AssertEqual(AppSettings.CurrentSettingsVersion, settings.SettingsVersion);
+        AssertEqual(2, settings.VoiceActivationLevel);
+        Assert(!settings.EnableNoiseSuppression, "Expected noise suppression to be opt-in.");
+        Assert(!settings.EnableEchoCancellation, "Expected echo cancellation to be opt-in.");
+        Assert(!settings.EnableAutomaticGainControl, "Expected automatic gain control to be opt-in.");
+    }
+
+    private static void MigratesOldVoiceActivationDefault()
+    {
+        string path = WriteTempSettings(
+            "{",
+            "  \"VoiceActivationLevel\": 50,",
+            "  \"EnableNoiseSuppression\": true,",
+            "  \"EnableEchoCancellation\": true,",
+            "  \"EnableAutomaticGainControl\": false",
+            "}");
+
+        try
+        {
+            AppSettings settings = new JsonAppSettingsStore(path).LoadAsync().GetAwaiter().GetResult();
+
+            AssertEqual(AppSettings.CurrentSettingsVersion, settings.SettingsVersion);
+            AssertEqual(2, settings.VoiceActivationLevel);
+            Assert(!settings.EnableNoiseSuppression, "Expected old aggressive noise suppression default to be migrated off.");
+            Assert(!settings.EnableEchoCancellation, "Expected old aggressive echo cancellation default to be migrated off.");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static void PreservesOpenMicrophoneVoiceActivationLevel()
+    {
+        string path = WriteTempSettings(
+            "{",
+            $"  \"SettingsVersion\": {AppSettings.CurrentSettingsVersion},",
+            "  \"VoiceActivationLevel\": 0",
+            "}");
+
+        try
+        {
+            AppSettings settings = new JsonAppSettingsStore(path).LoadAsync().GetAwaiter().GetResult();
+
+            AssertEqual(0, settings.VoiceActivationLevel);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static string WriteTempSettings(params string[] lines)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"teamtalk-ng-settings-{Guid.NewGuid():N}.json");
         File.WriteAllLines(path, lines);
         return path;
     }

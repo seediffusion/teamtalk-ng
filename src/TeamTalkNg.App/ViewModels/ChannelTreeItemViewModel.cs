@@ -78,7 +78,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             if (SetProperty(ref isTalking, value))
             {
                 OnPropertyChanged(nameof(AccessibleName));
-                OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(VisualIndicator));
                 OnPropertyChanged(nameof(AccessibleHelpText));
             }
         }
@@ -92,7 +92,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             if (SetProperty(ref isAway, value))
             {
                 OnPropertyChanged(nameof(AccessibleName));
-                OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(VisualIndicator));
                 OnPropertyChanged(nameof(AccessibleHelpText));
             }
         }
@@ -143,6 +143,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             if (SetProperty(ref isVoiceMuted, value))
             {
                 OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(VisualIndicator));
                 OnPropertyChanged(nameof(AccessibleHelpText));
             }
         }
@@ -173,15 +174,16 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         }
     }
 
-    public string Icon => Kind switch
+    public string VisualIndicator => Kind switch
     {
-        ChannelTreeItemKind.Server => "Server",
         ChannelTreeItemKind.Channel => "#",
-        ChannelTreeItemKind.User when IsTalking => "Speaking",
-        ChannelTreeItemKind.User when IsAway => "Away",
-        ChannelTreeItemKind.User => "User",
+        ChannelTreeItemKind.User when IsVoiceMuted => "M",
+        ChannelTreeItemKind.User when IsTalking => ">",
+        ChannelTreeItemKind.User when IsAway => "-",
         _ => string.Empty
     };
+
+    public string Icon => VisualIndicator;
 
     public string AccessibleName
     {

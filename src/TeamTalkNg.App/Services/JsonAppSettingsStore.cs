@@ -34,9 +34,15 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
 
         try
         {
-            await using FileStream stream = File.OpenRead(settingsPath);
-            return await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken).ConfigureAwait(false)
+            string json = await File.ReadAllTextAsync(settingsPath, cancellationToken).ConfigureAwait(false);
+            using JsonDocument document = JsonDocument.Parse(json);
+            bool hasSettingsVersion = document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.EnumerateObject().Any(property =>
+                    string.Equals(property.Name, nameof(AppSettings.SettingsVersion), StringComparison.OrdinalIgnoreCase));
+
+            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
                 ?? new AppSettings();
+            return NormalizeSettings(settings, hasSettingsVersion);
         }
         catch (JsonException)
         {
@@ -49,5 +55,27 @@ public sealed class JsonAppSettingsStore : IAppSettingsStore
         Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
         await using FileStream stream = File.Create(settingsPath);
         await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static AppSettings NormalizeSettings(AppSettings settings, bool hasSettingsVersion)
+    {
+        if (hasSettingsVersion && settings.SettingsVersion >= AppSettings.CurrentSettingsVersion)
+        {
+            return settings;
+        }
+
+        bool oldAggressiveProcessingDefaults = settings.EnableNoiseSuppression
+            && settings.EnableEchoCancellation
+            && !settings.EnableAutomaticGainControl;
+
+        return settings with
+        {
+            SettingsVersion = AppSettings.CurrentSettingsVersion,
+            VoiceActivationLevel = settings.VoiceActivationLevel == 50
+                ? 2
+                : Math.Clamp(settings.VoiceActivationLevel, 0, 100),
+            EnableNoiseSuppression = oldAggressiveProcessingDefaults ? false : settings.EnableNoiseSuppression,
+            EnableEchoCancellation = oldAggressiveProcessingDefaults ? false : settings.EnableEchoCancellation
+        };
     }
 }

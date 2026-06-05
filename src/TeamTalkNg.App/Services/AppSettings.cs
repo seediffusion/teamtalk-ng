@@ -2,6 +2,10 @@ namespace TeamTalkNg.App.Services;
 
 public sealed record AppSettings
 {
+    public const int CurrentSettingsVersion = 2;
+
+    public int SettingsVersion { get; init; } = CurrentSettingsVersion;
+
     public AppTheme Theme { get; init; } = AppTheme.Light;
 
     public bool AnnounceChannelMessages { get; init; } = true;
@@ -36,7 +40,7 @@ public sealed record AppSettings
 
     public int? AudioOutputDeviceId { get; init; }
 
-    public int VoiceActivationLevel { get; init; } = 50;
+    public int VoiceActivationLevel { get; init; } = 2;
 
     public bool ShowInputMeter { get; init; }
 
@@ -44,9 +48,9 @@ public sealed record AppSettings
 
     public int OutputVolume { get; init; } = 50;
 
-    public bool EnableNoiseSuppression { get; init; } = true;
+    public bool EnableNoiseSuppression { get; init; }
 
-    public bool EnableEchoCancellation { get; init; } = true;
+    public bool EnableEchoCancellation { get; init; }
 
     public bool EnableAutomaticGainControl { get; init; }
 

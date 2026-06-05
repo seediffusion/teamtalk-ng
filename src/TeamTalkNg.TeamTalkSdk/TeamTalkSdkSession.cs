@@ -46,8 +46,8 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
     private int configuredInputVolumePercent = 50;
     private int configuredOutputVolumePercent = 50;
     private AudioProcessingSettings audioProcessingSettings = new(
-        EnableNoiseSuppression: true,
-        EnableEchoCancellation: true,
+        EnableNoiseSuppression: false,
+        EnableEchoCancellation: false,
         EnableAutomaticGainControl: false);
     private readonly Dictionary<int, string> userDisplayNames = [];
 

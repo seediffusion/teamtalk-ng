@@ -20,12 +20,19 @@
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <HierarchicalDataTemplate DataType="{x:Type vm:ChannelTreeItemViewModel}" ItemsSource="{Binding Children}">
-      <StackPanel Orientation="Horizontal">
-        <controls:PresentationTextBlock Text="{Binding Icon}"
-                                        Margin="0,0,6,0" />
-        <controls:PresentationTextBlock Text="{Binding Name}"
-                                        TextTrimming="None" />
-      </StackPanel>
+      <Grid ToolTip="{Binding AccessibleName}">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="22" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <controls:PresentationTextBlock Text="{Binding VisualIndicator}"
+                                        HorizontalAlignment="Center"
+                                        Margin="0,0,4,0" />
+        <controls:PresentationTextBlock Grid.Column="1"
+                                        Text="{Binding Name}"
+                                        TextTrimming="None"
+                                        TextWrapping="NoWrap" />
+      </Grid>
     </HierarchicalDataTemplate>
   </Window.Resources>
 
@@ -235,6 +242,7 @@
                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                 <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
                 <Setter Property="AutomationProperties.HelpText" Value="{Binding AccessibleHelpText}" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 <Setter Property="KeyboardNavigation.TabNavigation" Value="Continue" />
               </Style>
             </TreeView.ItemContainerStyle>
