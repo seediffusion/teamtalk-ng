@@ -28,7 +28,7 @@
       <Label Target="{Binding ElementName=RecipientBox}" Content="To" />
       <TextBox x:Name="RecipientBox"
                Grid.Column="1"
-               Text="{Binding RecipientName}"
+               Text="{Binding RecipientName, Mode=OneWay}"
                IsReadOnly="True"
                Background="{DynamicResource ControlBackgroundBrush}"
                Foreground="{DynamicResource TextBrush}"

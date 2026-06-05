@@ -28,7 +28,7 @@
       <Label Target="{Binding ElementName=ChannelNameBox}" Content="Channel" />
       <TextBox x:Name="ChannelNameBox"
                Grid.Column="1"
-               Text="{Binding ChannelName}"
+               Text="{Binding ChannelName, Mode=OneWay}"
                IsReadOnly="True"
                Background="{DynamicResource ControlBackgroundBrush}"
                Foreground="{DynamicResource TextBrush}"

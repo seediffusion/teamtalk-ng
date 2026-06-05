@@ -32,7 +32,7 @@
       <Label Target="{Binding ElementName=ParentPathBox}" Content="Parent channel" />
       <TextBox x:Name="ParentPathBox"
                Grid.Column="1"
-               Text="{Binding ParentPath}"
+               Text="{Binding ParentPath, Mode=OneWay}"
                IsReadOnly="True"
                Background="{DynamicResource ControlBackgroundBrush}"
                Foreground="{DynamicResource TextBrush}"

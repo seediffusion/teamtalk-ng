@@ -28,7 +28,7 @@
       <Label Target="{Binding ElementName=UserNameBox}" Content="User" />
       <TextBox x:Name="UserNameBox"
                Grid.Column="1"
-               Text="{Binding UserName}"
+               Text="{Binding UserName, Mode=OneWay}"
                IsReadOnly="True"
                Background="{DynamicResource ControlBackgroundBrush}"
                Foreground="{DynamicResource TextBrush}"

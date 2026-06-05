@@ -1232,15 +1232,15 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task SendDirectMessageToUserAsync(int userId, string recipientName)
     {
-        string? message = directMessageDialogService.ShowDirectMessageDialog(recipientName);
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            await AnnounceAsync("Direct message canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
-            return;
-        }
-
         try
         {
+            string? message = directMessageDialogService.ShowDirectMessageDialog(recipientName);
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                await AnnounceAsync("Direct message canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
+                return;
+            }
+
             await teamTalkSession.SendDirectMessageAsync(userId, message);
             soundEvents.Play(SoundEvent.DirectMessageSent);
             await AnnounceAsync(
