@@ -8,6 +8,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 {
     private const string ClientName = "TeamTalk NG";
     private const int MessageWaitMilliseconds = 100;
+    private const float WebRtcFixedGainMaximumDb = 49.9f;
     private static readonly TimeSpan ConnectionProgressTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan ServerStatisticsTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan BannedUsersTimeout = TimeSpan.FromSeconds(10);
@@ -2153,7 +2154,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
             if (soundInputInitialized)
             {
-                inputReady = TeamTalkNativeMethods.SetSoundInputGainLevel(instance, inputGainLevel);
+                inputReady = ApplyConfiguredSoundInput(inputGainLevel);
             }
 
             if (soundOutputInitialized)
@@ -2173,6 +2174,41 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
     }
 
+    private int ApplyConfiguredSoundInput(int inputGainLevel)
+    {
+        NativeAudioPreprocessor preprocessor = CreateConfiguredAudioPreprocessor(inputGainLevel);
+        int preprocessReady = TeamTalkNativeMethods.SetSoundInputPreprocess(instance, ref preprocessor);
+        if (preprocessReady == 0)
+        {
+            return TeamTalkNativeMethods.SetSoundInputGainLevel(instance, inputGainLevel);
+        }
+
+        int legacyGainLevel = preprocessor.Preprocessor == AudioPreprocessorType.WebRtc
+            && audioProcessingSettings.EnableAutomaticGainControl
+                ? SoundLevel.GainDefault
+                : inputGainLevel;
+        return TeamTalkNativeMethods.SetSoundInputGainLevel(instance, legacyGainLevel);
+    }
+
+    private NativeAudioPreprocessor CreateConfiguredAudioPreprocessor(int inputGainLevel)
+    {
+        bool enableEchoCancellation = audioProcessingSettings.EnableEchoCancellation && soundDuplexInitialized;
+        bool enableWebRtc = audioProcessingSettings.EnableNoiseSuppression
+            || audioProcessingSettings.EnableAutomaticGainControl
+            || enableEchoCancellation;
+
+        if (!enableWebRtc)
+        {
+            return NativeAudioPreprocessor.CreateTeamTalk(inputGainLevel);
+        }
+
+        return NativeAudioPreprocessor.CreateWebRtc(
+            audioProcessingSettings.EnableNoiseSuppression,
+            enableEchoCancellation,
+            audioProcessingSettings.EnableAutomaticGainControl,
+            PercentToWebRtcFixedGainDb(configuredInputVolumePercent));
+    }
+
     private static int PercentToTeamTalkSoundLevel(int percent, int defaultLevel, int maxLevel)
     {
         int clampedPercent = Math.Clamp(percent, 0, 100);
@@ -2183,6 +2219,12 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
         int boostedLevel = defaultLevel + (int)Math.Round(defaultLevel * ((clampedPercent - 50) / 50.0));
         return Math.Clamp(boostedLevel, 0, maxLevel);
+    }
+
+    private static float PercentToWebRtcFixedGainDb(int percent)
+    {
+        float clampedPercent = Math.Clamp(percent, 0, 100) / 100.0f;
+        return Math.Clamp(WebRtcFixedGainMaximumDb * clampedPercent, 0.0f, WebRtcFixedGainMaximumDb);
     }
 
     private static int UserVolumePercentToTeamTalkLevel(int percent)

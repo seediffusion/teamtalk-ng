@@ -20,6 +20,10 @@ public static class TeamTalkNativeSizeVerifier
         Compare<NativeServerStatistics>(TTType.ServerStatistics, "ServerStatistics", mismatches);
         Compare<NativeSoundDevice>(TTType.SoundDevice, "SoundDevice", mismatches);
         Compare<NativeSoundDeviceEffects>(TTType.SoundDeviceEffects, "SoundDeviceEffects", mismatches);
+        Compare<NativeSpeexDsp>(TTType.SpeexDsp, "SpeexDSP", mismatches);
+        Compare<NativeTeamTalkAudioPreprocessor>(TTType.TeamTalkAudioPreprocessor, "TTAudioPreprocessor", mismatches);
+        Compare<NativeWebRtcAudioPreprocessor>(TTType.WebRtcAudioPreprocessor, "WebRTCAudioPreprocessor", mismatches);
+        Compare<NativeAudioPreprocessor>(TTType.AudioPreprocessor, "AudioPreprocessor", mismatches);
         Compare<NativeDesktopWindow>(TTType.DesktopWindow, "DesktopWindow", mismatches);
         return mismatches;
     }

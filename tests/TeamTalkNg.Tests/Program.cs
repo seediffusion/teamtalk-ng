@@ -135,6 +135,7 @@ internal static class SdkProbeTests
     public static void RunAll()
     {
         ReportsMissingConfiguredLibrary();
+        VerifiesAudioPreprocessorManagedSizes();
         VerifiesNativeSizesWhenSdkIsPresent();
         EnumeratesAudioDevicesWhenSdkIsPresent();
         Console.WriteLine("TeamTalk NG SDK probe tests passed.");
@@ -151,6 +152,14 @@ internal static class SdkProbeTests
 
         Assert(!availability.IsAvailable, "Expected missing configured SDK library to be unavailable.");
         Assert(!string.IsNullOrWhiteSpace(availability.Reason), "Expected missing SDK library to provide a reason.");
+    }
+
+    private static void VerifiesAudioPreprocessorManagedSizes()
+    {
+        AssertEqual(40, System.Runtime.InteropServices.Marshal.SizeOf<NativeSpeexDsp>());
+        AssertEqual(12, System.Runtime.InteropServices.Marshal.SizeOf<NativeTeamTalkAudioPreprocessor>());
+        AssertEqual(52, System.Runtime.InteropServices.Marshal.SizeOf<NativeWebRtcAudioPreprocessor>());
+        AssertEqual(56, System.Runtime.InteropServices.Marshal.SizeOf<NativeAudioPreprocessor>());
     }
 
     private static void VerifiesNativeSizesWhenSdkIsPresent()
@@ -183,6 +192,14 @@ internal static class SdkProbeTests
         if (!condition)
         {
             throw new InvalidOperationException(message);
+        }
+    }
+
+    private static void AssertEqual<T>(T expected, T actual)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"Expected {expected}, got {actual}.");
         }
     }
 }
@@ -607,6 +624,7 @@ internal static unsafe class SdkDispatchTests
         RejectsChannelTopicChangeBeforeLogin();
         RejectsUserModerationBeforeLogin();
         StoresAudioVolumeBeforeNativeInstanceExists();
+        StoresAudioProcessingBeforeNativeInstanceExists();
         Console.WriteLine("TeamTalk NG SDK dispatch tests passed.");
     }
 
@@ -1298,6 +1316,16 @@ internal static unsafe class SdkDispatchTests
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
 
         session.SetAudioVolumeAsync(inputVolumePercent: 0, outputVolumePercent: 100).GetAwaiter().GetResult();
+    }
+
+    private static void StoresAudioProcessingBeforeNativeInstanceExists()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+
+        session.SetAudioProcessingAsync(new AudioProcessingSettings(
+            EnableNoiseSuppression: true,
+            EnableEchoCancellation: true,
+            EnableAutomaticGainControl: true)).GetAwaiter().GetResult();
     }
 
     private static NativeUser CreateUser(int id, string username, string nickname, int channelId)

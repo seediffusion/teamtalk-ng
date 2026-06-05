@@ -57,6 +57,10 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int SetSoundDeviceEffects(IntPtr instance, ref NativeSoundDeviceEffects effects);
 
+    [DllImport(LibraryName, EntryPoint = "TT_SetSoundInputPreprocessEx")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int SetSoundInputPreprocess(IntPtr instance, ref NativeAudioPreprocessor preprocessor);
+
     [DllImport(LibraryName, EntryPoint = "TT_EnableVoiceTransmission")]
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int EnableVoiceTransmission(IntPtr instance, [MarshalAs(UnmanagedType.I4)] int enabled);

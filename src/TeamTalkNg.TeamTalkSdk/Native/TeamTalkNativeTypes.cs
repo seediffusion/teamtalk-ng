@@ -68,6 +68,11 @@ internal enum TTType
     ClientErrorMsg = 28,
     TTBool = 29,
     Int32 = 30,
+    SpeexDsp = 32,
+    AudioPreprocessorType = 34,
+    AudioPreprocessor = 35,
+    TeamTalkAudioPreprocessor = 36,
+    WebRtcAudioPreprocessor = 42,
     SoundDeviceEffects = 44,
     DesktopWindow = 45
 }
@@ -149,6 +154,15 @@ internal enum SoundSystem
     OpenSlesAndroid = 7,
     AudioUnit = 8,
     PulseAudio = 10
+}
+
+internal enum AudioPreprocessorType
+{
+    None = 0,
+    SpeexDsp = 1,
+    TeamTalk = 2,
+    ObsoleteWebRtc = 3,
+    WebRtc = 4
 }
 
 [Flags]
@@ -259,6 +273,157 @@ internal struct NativeSoundDeviceEffects
     public int EnableAutomaticGainControl;
     public int EnableDenoise;
     public int EnableEchoCancellation;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeSpeexDsp
+{
+    public int EnableAutomaticGainControl;
+    public int GainLevel;
+    public int MaxIncreaseDbPerSecond;
+    public int MaxDecreaseDbPerSecond;
+    public int MaxGainDb;
+    public int EnableDenoise;
+    public int MaxNoiseSuppressDb;
+    public int EnableEchoCancellation;
+    public int EchoSuppress;
+    public int EchoSuppressActive;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeTeamTalkAudioPreprocessor
+{
+    public int GainLevel;
+    public int MuteLeftSpeaker;
+    public int MuteRightSpeaker;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcPreamplifier
+{
+    public int Enable;
+    public float FixedGainFactor;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcEchoCanceller
+{
+    public int Enable;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcNoiseSuppression
+{
+    public int Enable;
+    public int Level;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcFixedDigitalGain
+{
+    public float GainDb;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcAdaptiveDigitalGain
+{
+    public int Enable;
+    public float HeadRoomDb;
+    public float MaxGainDb;
+    public float InitialGainDb;
+    public float MaxGainChangeDbPerSecond;
+    public float MaxOutputNoiseLevelDbfs;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcGainController2
+{
+    public int Enable;
+    public NativeWebRtcFixedDigitalGain FixedDigital;
+    public NativeWebRtcAdaptiveDigitalGain AdaptiveDigital;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeWebRtcAudioPreprocessor
+{
+    public NativeWebRtcPreamplifier Preamplifier;
+    public NativeWebRtcEchoCanceller EchoCanceller;
+    public NativeWebRtcNoiseSuppression NoiseSuppression;
+    public NativeWebRtcGainController2 GainController2;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal struct NativeAudioPreprocessor
+{
+    [FieldOffset(0)]
+    public AudioPreprocessorType Preprocessor;
+
+    [FieldOffset(4)]
+    public NativeSpeexDsp SpeexDsp;
+
+    [FieldOffset(4)]
+    public NativeTeamTalkAudioPreprocessor TeamTalk;
+
+    [FieldOffset(4)]
+    public NativeWebRtcAudioPreprocessor WebRtc;
+
+    public static NativeAudioPreprocessor CreateTeamTalk(int gainLevel)
+    {
+        return new NativeAudioPreprocessor
+        {
+            Preprocessor = AudioPreprocessorType.TeamTalk,
+            TeamTalk = new NativeTeamTalkAudioPreprocessor
+            {
+                GainLevel = gainLevel
+            }
+        };
+    }
+
+    public static NativeAudioPreprocessor CreateWebRtc(
+        bool enableNoiseSuppression,
+        bool enableEchoCancellation,
+        bool enableAutomaticGainControl,
+        float fixedGainDb)
+    {
+        return new NativeAudioPreprocessor
+        {
+            Preprocessor = AudioPreprocessorType.WebRtc,
+            WebRtc = new NativeWebRtcAudioPreprocessor
+            {
+                Preamplifier = new NativeWebRtcPreamplifier
+                {
+                    Enable = 0,
+                    FixedGainFactor = 1.0f
+                },
+                EchoCanceller = new NativeWebRtcEchoCanceller
+                {
+                    Enable = enableEchoCancellation ? 1 : 0
+                },
+                NoiseSuppression = new NativeWebRtcNoiseSuppression
+                {
+                    Enable = enableNoiseSuppression ? 1 : 0,
+                    Level = 2
+                },
+                GainController2 = new NativeWebRtcGainController2
+                {
+                    Enable = enableAutomaticGainControl ? 1 : 0,
+                    FixedDigital = new NativeWebRtcFixedDigitalGain
+                    {
+                        GainDb = fixedGainDb
+                    },
+                    AdaptiveDigital = new NativeWebRtcAdaptiveDigitalGain
+                    {
+                        Enable = 1,
+                        HeadRoomDb = 5.0f,
+                        MaxGainDb = 50.0f,
+                        InitialGainDb = 15.0f,
+                        MaxGainChangeDbPerSecond = 6.0f,
+                        MaxOutputNoiseLevelDbfs = -50.0f
+                    }
+                }
+            }
+        };
+    }
 }
 
 [StructLayout(LayoutKind.Sequential)]
