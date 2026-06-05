@@ -10,8 +10,17 @@ internal enum ClientEvent
     ConnectionCryptError = 15,
     ConnectionFailed = 20,
     ConnectionLost = 30,
+    UserStateChange = 500,
     UserVideoCapture = 510,
+    UserMediaFileVideo = 520,
     UserDesktopWindow = 530,
+    UserDesktopCursor = 540,
+    UserRecordMediaFile = 560,
+    UserAudioBlock = 570,
+    InternalError = 1000,
+    DesktopWindowTransfer = 1050,
+    AudioInput = 1080,
+    UserFirstVoiceStreamPacket = 1090,
     SoundDeviceAdded = 1100,
     SoundDeviceRemoved = 1110,
     SoundDeviceUnplugged = 1120,
@@ -34,11 +43,11 @@ internal enum ClientEvent
     CommandChannelNew = 320,
     CommandChannelUpdate = 330,
     CommandChannelRemove = 340,
+    CommandServerUpdate = 350,
     CommandServerStatistics = 360,
     CommandUserAccount = 390,
     CommandBannedUser = 400,
-    FileTransfer = 1040,
-    InternalError = 1000
+    FileTransfer = 1040
 }
 
 internal enum TTType
@@ -51,6 +60,7 @@ internal enum TTType
     TextMessage = 14,
     ServerProperties = 10,
     ServerStatistics = 11,
+    SoundDevice = 12,
     TTMessage = 16,
     User = 17,
     UserAccount = 18,
@@ -299,6 +309,14 @@ internal unsafe struct NativeSoundDevice
         fixed (char* value = DeviceName)
         {
             return NativeConstants.ReadString(value);
+        }
+    }
+
+    public void WriteName(string value)
+    {
+        fixed (char* target = DeviceName)
+        {
+            NativeConstants.WriteString(target, value);
         }
     }
 }
@@ -902,4 +920,6 @@ internal sealed record TeamTalkMessage(
     NativeFileTransfer FileTransfer = default,
     NativeServerStatistics ServerStatistics = default,
     NativeBannedUser BannedUser = default,
-    NativeUserAccount UserAccount = default);
+    NativeUserAccount UserAccount = default,
+    NativeServerProperties ServerProperties = default,
+    NativeSoundDevice SoundDevice = default);

@@ -63,7 +63,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             AnnouncementTemplateFormatter.Definitions.Select(definition =>
             {
                 settings.AnnouncementTemplates.TryGetValue(definition.Id, out string? template);
-                return new AnnouncementTemplateOptionViewModel(definition, template);
+                bool isEnabled = !settings.AnnouncementEventEnabled.TryGetValue(definition.Id, out bool enabled)
+                    || enabled;
+                return new AnnouncementTemplateOptionViewModel(definition, isEnabled, template);
             }));
         SoundEvents = new ObservableCollection<SoundEventOptionViewModel>(soundEvents.Select(definition =>
             new SoundEventOptionViewModel(
@@ -276,6 +278,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             ShowAnnouncementsInStatusBar = ShowAnnouncementsInStatusBar,
             ShowMessageAnnouncementsInStatusBar = ShowMessageAnnouncementsInStatusBar,
             AnnouncementTemplates = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.Template, StringComparer.OrdinalIgnoreCase),
+            AnnouncementEventEnabled = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.IsEnabled, StringComparer.OrdinalIgnoreCase),
             PlaySoundEvents = PlaySoundEvents,
             SoundPack = SelectedSoundPack,
             SoundEventVolume = SoundEventVolume,

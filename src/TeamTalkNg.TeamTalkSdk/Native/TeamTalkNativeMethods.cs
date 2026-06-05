@@ -154,6 +154,13 @@ internal static partial class TeamTalkNativeMethods
     [return: MarshalAs(UnmanagedType.I4)]
     internal static extern int ReleaseUserVideoCaptureFrame(IntPtr instance, IntPtr videoFrame);
 
+    [DllImport(LibraryName, EntryPoint = "TT_AcquireUserMediaVideoFrame")]
+    internal static extern IntPtr AcquireUserMediaVideoFrame(IntPtr instance, int userId);
+
+    [DllImport(LibraryName, EntryPoint = "TT_ReleaseUserMediaVideoFrame")]
+    [return: MarshalAs(UnmanagedType.I4)]
+    internal static extern int ReleaseUserMediaVideoFrame(IntPtr instance, IntPtr videoFrame);
+
     [DllImport(LibraryName, EntryPoint = "TT_AcquireUserDesktopWindowEx")]
     internal static extern IntPtr AcquireUserDesktopWindowEx(IntPtr instance, int userId, BitmapFormat bitmapFormat);
 

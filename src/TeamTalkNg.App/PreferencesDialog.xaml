@@ -274,12 +274,21 @@
               </ListView.ItemContainerStyle>
               <ListView.View>
                 <GridView>
-                  <GridViewColumn Header="Event" DisplayMemberBinding="{Binding Name}" Width="130" />
-                  <GridViewColumn Header="Template" Width="250">
+                  <GridViewColumn Header="Enabled" Width="76">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <CheckBox IsChecked="{Binding IsEnabled}"
+                                  HorizontalAlignment="Center"
+                                  AutomationProperties.Name="{Binding Name, StringFormat={}{0} screen reader announcement enabled}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Event" DisplayMemberBinding="{Binding Name}" Width="120" />
+                  <GridViewColumn Header="Template" Width="240">
                     <GridViewColumn.CellTemplate>
                       <DataTemplate>
                         <TextBox Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}"
-                                 MinWidth="220"
+                                 MinWidth="210"
                                  Background="{DynamicResource ControlBackgroundBrush}"
                                  Foreground="{DynamicResource TextBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
@@ -287,7 +296,7 @@
                       </DataTemplate>
                     </GridViewColumn.CellTemplate>
                   </GridViewColumn>
-                  <GridViewColumn Header="Placeholders" DisplayMemberBinding="{Binding PlaceholderSummary}" Width="170" />
+                  <GridViewColumn Header="Placeholders" DisplayMemberBinding="{Binding PlaceholderSummary}" Width="150" />
                 </GridView>
               </ListView.View>
             </ListView>

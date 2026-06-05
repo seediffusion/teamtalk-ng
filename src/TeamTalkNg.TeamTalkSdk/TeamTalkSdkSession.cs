@@ -364,7 +364,12 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             throw new InvalidOperationException("TeamTalk server information is not available.");
         }
 
-        return Task.FromResult(new ServerInformationSummary(
+        return Task.FromResult(CreateServerInformationSummary(properties));
+    }
+
+    private static ServerInformationSummary CreateServerInformationSummary(NativeServerProperties properties)
+    {
+        return new ServerInformationSummary(
             properties.ReadServerName(),
             properties.ReadMotd(),
             properties.MaxUsers,
@@ -373,7 +378,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             properties.UserTimeout,
             properties.ReadServerVersion(),
             properties.ReadServerProtocolVersion(),
-            properties.LoginDelayMilliseconds));
+            properties.LoginDelayMilliseconds);
     }
 
     public async Task<ServerStatisticsSummary> GetServerStatisticsAsync(CancellationToken cancellationToken = default)
@@ -1491,7 +1496,10 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.SoundDeviceNewDefaultOutput:
             case ClientEvent.SoundDeviceNewDefaultInputCommunication:
             case ClientEvent.SoundDeviceNewDefaultOutputCommunication:
-                HandleSoundDeviceChanged(message.ClientEvent);
+                HandleSoundDeviceChanged(message.ClientEvent, message.SoundDevice);
+                break;
+            case ClientEvent.InternalError:
+                DispatchInternalError(message);
                 break;
             case ClientEvent.CommandProcessing:
                 HandleCommandProcessing(message);
@@ -1511,10 +1519,17 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.CommandMyselfKicked:
                 HandleDisconnected("Logged out.");
                 break;
+            case ClientEvent.CommandUserLoggedIn:
+                DispatchUserLoggedIn(message.User);
+                break;
+            case ClientEvent.CommandUserLoggedOut:
+                DispatchUserLoggedOut(message.User);
+                break;
             case ClientEvent.CommandUserJoined:
                 DispatchUserJoined(message.User);
                 break;
             case ClientEvent.CommandUserUpdate:
+            case ClientEvent.UserStateChange:
                 DispatchUserUpdated(message.User);
                 break;
             case ClientEvent.CommandUserLeft:
@@ -1526,8 +1541,14 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             case ClientEvent.UserVideoCapture:
                 DispatchVideoFrame(message.Source);
                 break;
+            case ClientEvent.UserMediaFileVideo:
+                DispatchVideoFrame(message.Source, isMediaFile: true);
+                break;
             case ClientEvent.UserDesktopWindow:
                 DispatchDesktopFrame(message.Source);
+                break;
+            case ClientEvent.DesktopWindowTransfer:
+                DispatchDesktopTransfer(message);
                 break;
             case ClientEvent.CommandChannelNew:
             case ClientEvent.CommandChannelUpdate:
@@ -1535,6 +1556,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 break;
             case ClientEvent.CommandChannelRemove:
                 ChannelRemoved?.Invoke(this, message.Source);
+                break;
+            case ClientEvent.CommandServerUpdate:
+                DispatchServerUpdate(message.ServerProperties);
                 break;
             case ClientEvent.CommandServerStatistics:
                 CompleteServerStatistics(message);
@@ -1549,6 +1573,33 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 DispatchFileTransfer(message.FileTransfer);
                 break;
         }
+    }
+
+    private void DispatchInternalError(TeamTalkMessage message)
+    {
+        string errorMessage = message.ClientError.ReadMessage();
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            errorMessage = message.IntValue != 0
+                ? $"error {message.IntValue}"
+                : "unknown error";
+        }
+
+        RaiseSystemMessage($"TeamTalk SDK internal error: {errorMessage}.");
+    }
+
+    private void DispatchServerUpdate(NativeServerProperties properties)
+    {
+        ServerInformationSummary summary = CreateServerInformationSummary(properties);
+        string serverName = string.IsNullOrWhiteSpace(summary.ServerName)
+            ? "server"
+            : summary.ServerName;
+        RaiseSystemMessage($"Server information updated for {serverName}.");
+    }
+
+    private void DispatchDesktopTransfer(TeamTalkMessage message)
+    {
+        _ = message;
     }
 
     private void HandleConnectionSuccess()
@@ -2042,6 +2093,24 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
     }
 
+    private void DispatchUserLoggedIn(NativeUser user)
+    {
+        UserSummary summary = CreateUserSummary(user, user.ChannelId);
+        RememberUserDisplayName(summary);
+        RaiseSystemMessage($"{summary.Nickname} logged in.");
+    }
+
+    private void DispatchUserLoggedOut(NativeUser user)
+    {
+        string displayName = GetNativeUserDisplayName(user);
+        if (user.UserId > 0)
+        {
+            userDisplayNames.Remove(user.UserId);
+        }
+
+        RaiseSystemMessage($"{displayName} logged out.");
+    }
+
     private void DispatchUserLeft(NativeUser user, int previousChannelId)
     {
         UserSummary summary = CreateUserSummary(user, previousChannelId);
@@ -2065,7 +2134,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
 
     private void EnsureMediaSubscriptions(NativeUser user)
     {
-        const Subscription desiredSubscriptions = Subscription.Voice | Subscription.VideoCapture | Subscription.Desktop;
+        const Subscription desiredSubscriptions = Subscription.Voice | Subscription.VideoCapture | Subscription.Desktop | Subscription.MediaFile;
         Subscription localSubscriptions = (Subscription)user.LocalSubscriptions;
         Subscription missingSubscriptions = desiredSubscriptions & ~localSubscriptions;
 
@@ -2102,7 +2171,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         }
     }
 
-    private void DispatchVideoFrame(int userId)
+    private void DispatchVideoFrame(int userId, bool isMediaFile = false)
     {
         if (userId <= 0 || instance == IntPtr.Zero)
         {
@@ -2120,7 +2189,9 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 return;
             }
 
-            IntPtr framePointer = TeamTalkNativeMethods.AcquireUserVideoCaptureFrame(instance, userId);
+            IntPtr framePointer = isMediaFile
+                ? TeamTalkNativeMethods.AcquireUserMediaVideoFrame(instance, userId)
+                : TeamTalkNativeMethods.AcquireUserVideoCaptureFrame(instance, userId);
             if (framePointer == IntPtr.Zero)
             {
                 return;
@@ -2141,13 +2212,26 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             }
             finally
             {
-                TeamTalkNativeMethods.ReleaseUserVideoCaptureFrame(instance, framePointer);
+                if (isMediaFile)
+                {
+                    TeamTalkNativeMethods.ReleaseUserMediaVideoFrame(instance, framePointer);
+                }
+                else
+                {
+                    TeamTalkNativeMethods.ReleaseUserVideoCaptureFrame(instance, framePointer);
+                }
             }
+        }
+
+        string displayName = GetUserDisplayName(userId);
+        if (isMediaFile)
+        {
+            displayName = $"{displayName} media file";
         }
 
         MediaFrameReceived?.Invoke(this, new MediaFrameSummary(
             userId,
-            GetUserDisplayName(userId),
+            displayName,
             MediaStreamKind.Video,
             frame.Width,
             frame.Height,
@@ -2237,6 +2321,23 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             : $"User {userId}";
     }
 
+    private string GetNativeUserDisplayName(NativeUser user)
+    {
+        string displayName = user.ReadNickname();
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            return displayName;
+        }
+
+        displayName = user.ReadUsername();
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            return displayName;
+        }
+
+        return user.UserId > 0 ? GetUserDisplayName(user.UserId) : "A user";
+    }
+
     private void DispatchTextMessage(NativeTextMessage textMessage)
     {
         string sender = textMessage.ReadFromUsername();
@@ -2259,6 +2360,22 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
                 $"Direct from {sender}",
                 textMessage.ReadMessage(),
                 IsDirect: true));
+        }
+        else if (textMessage.MessageType == TextMsgType.Broadcast)
+        {
+            ChannelMessageReceived?.Invoke(this, new ChatMessage(
+                DateTimeOffset.Now,
+                $"Broadcast from {sender}",
+                textMessage.ReadMessage(),
+                IsSystem: true));
+        }
+        else if (textMessage.MessageType == TextMsgType.Custom)
+        {
+            ChannelMessageReceived?.Invoke(this, new ChatMessage(
+                DateTimeOffset.Now,
+                $"Custom message from {sender}",
+                textMessage.ReadMessage(),
+                IsSystem: true));
         }
     }
 
@@ -2387,7 +2504,7 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
         SetStatus(ConnectionStatus.Disconnected);
     }
 
-    private void HandleSoundDeviceChanged(ClientEvent clientEvent)
+    private void HandleSoundDeviceChanged(ClientEvent clientEvent, NativeSoundDevice soundDevice)
     {
         if (Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel) || instance == IntPtr.Zero)
         {
@@ -2439,7 +2556,28 @@ public sealed class TeamTalkSdkSession : ITeamTalkSession, IDisposable
             TryRestoreVoiceActivation(activationLevel);
         }
 
-        RaiseSystemMessage("Audio devices changed; TeamTalk NG refreshed the microphone and speaker.");
+        RaiseSystemMessage($"{DescribeSoundDeviceEvent(clientEvent, soundDevice)} TeamTalk NG refreshed the microphone and speaker.");
+    }
+
+    private static string DescribeSoundDeviceEvent(ClientEvent clientEvent, NativeSoundDevice soundDevice)
+    {
+        string name = soundDevice.ReadName();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = "audio device";
+        }
+
+        return clientEvent switch
+        {
+            ClientEvent.SoundDeviceAdded => $"Audio device added: {name}.",
+            ClientEvent.SoundDeviceRemoved => $"Audio device removed: {name}.",
+            ClientEvent.SoundDeviceUnplugged => $"Audio device unplugged: {name}.",
+            ClientEvent.SoundDeviceNewDefaultInput => $"Default microphone changed to {name}.",
+            ClientEvent.SoundDeviceNewDefaultOutput => $"Default speaker changed to {name}.",
+            ClientEvent.SoundDeviceNewDefaultInputCommunication => $"Default communications microphone changed to {name}.",
+            ClientEvent.SoundDeviceNewDefaultOutputCommunication => $"Default communications speaker changed to {name}.",
+            _ => "Audio devices changed."
+        };
     }
 
     private void TryRestoreVoiceTransmission()

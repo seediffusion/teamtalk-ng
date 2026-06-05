@@ -896,7 +896,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 FormatAnnouncementTemplate(AnnouncementTemplateKind.ChannelMessageSent, ("message", text)),
                 AnnouncementPriority.Low,
                 AnnouncementKind.System,
-                includeBraille: false);
+                includeBraille: false,
+                eventKind: AnnouncementTemplateKind.ChannelMessageSent);
         }
         catch (Exception ex)
         {
@@ -1220,7 +1221,8 @@ public sealed class MainWindowViewModel : ObservableObject
                     ("message", message)),
                 AnnouncementPriority.Low,
                 AnnouncementKind.System,
-                includeBraille: false);
+                includeBraille: false,
+                eventKind: AnnouncementTemplateKind.DirectMessageSent);
         }
         catch (Exception ex)
         {
@@ -1640,7 +1642,10 @@ public sealed class MainWindowViewModel : ObservableObject
             message.IsDirect ? AnnouncementPriority.High : AnnouncementPriority.Normal,
             message.IsSystem
                 ? AnnouncementKind.System
-                : message.IsDirect ? AnnouncementKind.DirectMessage : AnnouncementKind.ChannelMessage);
+                : message.IsDirect ? AnnouncementKind.DirectMessage : AnnouncementKind.ChannelMessage,
+            eventKind: message.IsSystem
+                ? null
+                : message.IsDirect ? AnnouncementTemplateKind.DirectMessage : AnnouncementTemplateKind.ChannelMessage);
     }
 
     private void OnFileTransferUpdated(object? sender, FileTransferSummary transfer)
@@ -1755,7 +1760,8 @@ public sealed class MainWindowViewModel : ObservableObject
                     ("username", user.Username),
                     ("channel", GetChannelName(user.ChannelPath))),
                 AnnouncementPriority.Normal,
-                AnnouncementKind.UserJoinLeave);
+                AnnouncementKind.UserJoinLeave,
+                eventKind: AnnouncementTemplateKind.UserJoinedChannel);
         }
     }
 
@@ -1790,7 +1796,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 ("username", user.Username),
                 ("channel", GetChannelName(user.ChannelPath))),
             AnnouncementPriority.Normal,
-            AnnouncementKind.UserJoinLeave);
+            AnnouncementKind.UserJoinLeave,
+            eventKind: AnnouncementTemplateKind.UserLeftChannel);
     }
 
     private void AddOrUpdateUser(UserSummary user)
@@ -2186,9 +2193,10 @@ public sealed class MainWindowViewModel : ObservableObject
         AnnouncementPriority priority,
         AnnouncementKind kind,
         bool interrupt = false,
-        bool? includeBraille = null)
+        bool? includeBraille = null,
+        AnnouncementTemplateKind? eventKind = null)
     {
-        if (!ShouldAnnounce(kind))
+        if (!ShouldAnnounce(kind) || !ShouldAnnounceEvent(eventKind))
         {
             return Task.CompletedTask;
         }
@@ -2227,6 +2235,11 @@ public sealed class MainWindowViewModel : ObservableObject
             AnnouncementKind.Selection => settings.AnnounceSelectionChanges,
             _ => true
         };
+    }
+
+    private bool ShouldAnnounceEvent(AnnouncementTemplateKind? eventKind)
+    {
+        return eventKind is null || AnnouncementTemplateFormatter.IsEnabled(settings, eventKind.Value);
     }
 
     private string FormatAnnouncementTemplate(AnnouncementTemplateKind kind, params (string Key, string Value)[] values)

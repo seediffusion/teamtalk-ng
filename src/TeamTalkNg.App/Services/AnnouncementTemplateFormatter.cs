@@ -71,6 +71,13 @@ public static partial class AnnouncementTemplateFormatter
         return Definitions.First(definition => definition.Kind == kind);
     }
 
+    public static bool IsEnabled(AppSettings settings, AnnouncementTemplateKind kind)
+    {
+        AnnouncementTemplateDefinition definition = GetDefinition(kind);
+        return !settings.AnnouncementEventEnabled.TryGetValue(definition.Id, out bool enabled)
+            || enabled;
+    }
+
     [GeneratedRegex(@"\{(?<name>[A-Za-z0-9_]+)\}")]
     private static partial Regex PlaceholderPattern();
 }

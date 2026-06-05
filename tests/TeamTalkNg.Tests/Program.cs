@@ -457,6 +457,8 @@ internal static class AnnouncementTemplateTests
         UsesTeamTalkNgDirectMessageTerminology();
         AppliesCustomTemplateOverrides();
         LeavesUnknownPlaceholdersIntact();
+        TreatsAnnouncementEventsAsEnabledByDefault();
+        RespectsDisabledAnnouncementEvents();
         Console.WriteLine("TeamTalk NG announcement template tests passed.");
     }
 
@@ -532,6 +534,33 @@ internal static class AnnouncementTemplateTests
         AssertEqual("Alex joined Lobby from {unknown}", announcement);
     }
 
+    private static void TreatsAnnouncementEventsAsEnabledByDefault()
+    {
+        Assert(AnnouncementTemplateFormatter.IsEnabled(new AppSettings(), AnnouncementTemplateKind.ChannelMessage), "Expected channel message announcements to be enabled by default.");
+    }
+
+    private static void RespectsDisabledAnnouncementEvents()
+    {
+        var settings = new AppSettings
+        {
+            AnnouncementEventEnabled = new Dictionary<string, bool>
+            {
+                ["direct-message-sent"] = false
+            }
+        };
+
+        Assert(!AnnouncementTemplateFormatter.IsEnabled(settings, AnnouncementTemplateKind.DirectMessageSent), "Expected disabled direct message sent event.");
+        Assert(AnnouncementTemplateFormatter.IsEnabled(settings, AnnouncementTemplateKind.DirectMessage), "Expected other events to remain enabled.");
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
     private static void AssertEqual<T>(T expected, T actual)
     {
         if (!EqualityComparer<T>.Default.Equals(expected, actual))
@@ -547,10 +576,16 @@ internal static unsafe class SdkDispatchTests
     {
         DispatchesChannelTextMessage();
         DispatchesDirectTextMessage();
+        DispatchesBroadcastTextMessage();
+        DispatchesCustomTextMessage();
         DispatchesUserJoinedAndLeft();
         DispatchesUserUpdated();
+        DispatchesUserStateChange();
+        DispatchesUserLoggedInAndOutMessages();
         DispatchesChannelAddedOrUpdated();
         DispatchesChannelRemoved();
+        DispatchesServerUpdateMessage();
+        DispatchesInternalErrorMessage();
         DispatchesFileTransferUpdate();
         DispatchesServerStatisticsResponse();
         DispatchesBannedUserListResponse();
@@ -633,6 +668,64 @@ internal static unsafe class SdkDispatchTests
         AssertEqual("hello directly", received.Text);
     }
 
+    private static void DispatchesBroadcastTextMessage()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        ChatMessage? received = null;
+        session.ChannelMessageReceived += (_, message) => received = message;
+
+        NativeTextMessage textMessage = default;
+        textMessage.MessageType = TextMsgType.Broadcast;
+        textMessage.FromUserId = 7;
+        WriteString(textMessage.FromUsername, "admin");
+        textMessage.WriteMessage("server-wide notice");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserTextMessage,
+            Source: 0,
+            TTType.TextMessage,
+            default,
+            textMessage,
+            default,
+            default,
+            0,
+            0));
+
+        Assert(received is not null, "Expected broadcast message event.");
+        Assert(received!.IsSystem, "Expected broadcast message to be marked as system text.");
+        AssertEqual("Broadcast from admin", received.Sender);
+        AssertEqual("server-wide notice", received.Text);
+    }
+
+    private static void DispatchesCustomTextMessage()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        ChatMessage? received = null;
+        session.ChannelMessageReceived += (_, message) => received = message;
+
+        NativeTextMessage textMessage = default;
+        textMessage.MessageType = TextMsgType.Custom;
+        textMessage.FromUserId = 7;
+        WriteString(textMessage.FromUsername, "integration");
+        textMessage.WriteMessage("custom payload");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserTextMessage,
+            Source: 0,
+            TTType.TextMessage,
+            default,
+            textMessage,
+            default,
+            default,
+            0,
+            0));
+
+        Assert(received is not null, "Expected custom message event.");
+        Assert(received!.IsSystem, "Expected custom message to be marked as system text.");
+        AssertEqual("Custom message from integration", received.Sender);
+        AssertEqual("custom payload", received.Text);
+    }
+
     private static void DispatchesUserJoinedAndLeft()
     {
         using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
@@ -702,6 +795,66 @@ internal static unsafe class SdkDispatchTests
         AssertEqual("Stepped away", updated.StatusMessage);
         AssertEqual(150, updated.VoiceVolumePercent);
         Assert(!updated.IsVoiceMuted, "Expected non-zero voice volume to be unmuted.");
+    }
+
+    private static void DispatchesUserStateChange()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        UserSummary? updated = null;
+        session.UserUpdated += (_, user) => updated = user;
+
+        NativeUser user = CreateUser(42, "alex", "Alex", channelId: 12);
+        user.UserState = 0x00000001;
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.UserStateChange,
+            Source: 42,
+            TTType.User,
+            user,
+            default,
+            default,
+            default,
+            0,
+            0));
+
+        Assert(updated is not null, "Expected user state change to dispatch a user update.");
+        AssertEqual(42, updated!.Id);
+        Assert(updated.IsTalking, "Expected talking state to be mapped from user state change.");
+    }
+
+    private static void DispatchesUserLoggedInAndOutMessages()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        List<ChatMessage> received = [];
+        session.ChannelMessageReceived += (_, message) => received.Add(message);
+
+        NativeUser user = CreateUser(42, "alex", "Alex", channelId: 0);
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserLoggedIn,
+            Source: 42,
+            TTType.User,
+            user,
+            default,
+            default,
+            default,
+            0,
+            0));
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandUserLoggedOut,
+            Source: 42,
+            TTType.User,
+            user,
+            default,
+            default,
+            default,
+            0,
+            0));
+
+        AssertEqual(2, received.Count);
+        Assert(received.All(message => message.IsSystem), "Expected login and logout messages to be system text.");
+        AssertEqual("Alex logged in.", received[0].Text);
+        AssertEqual("Alex logged out.", received[1].Text);
     }
 
     private static void DispatchesConnectionLost()
@@ -775,6 +928,61 @@ internal static unsafe class SdkDispatchTests
             45));
 
         AssertEqual(45, removedChannelId);
+    }
+
+    private static void DispatchesServerUpdateMessage()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        ChatMessage? received = null;
+        session.ChannelMessageReceived += (_, message) => received = message;
+
+        NativeServerProperties properties = default;
+        WriteString(properties.ServerName, "Test Server");
+        WriteString(properties.Motd, "Welcome");
+        properties.MaxUsers = 100;
+        properties.TcpPort = 10333;
+        properties.UdpPort = 10333;
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.CommandServerUpdate,
+            Source: 0,
+            TTType.ServerProperties,
+            default,
+            default,
+            default,
+            default,
+            0,
+            0,
+            ServerProperties: properties));
+
+        Assert(received is not null, "Expected server update message.");
+        Assert(received!.IsSystem, "Expected server update to be marked as system text.");
+        AssertEqual("Server information updated for Test Server.", received.Text);
+    }
+
+    private static void DispatchesInternalErrorMessage()
+    {
+        using var session = new TeamTalkSdkSession(new TeamTalkSdkOptions());
+        ChatMessage? received = null;
+        session.ChannelMessageReceived += (_, message) => received = message;
+
+        NativeClientErrorMsg error = default;
+        WriteString(error.ErrorMessage, "decoder failed");
+
+        session.DispatchMessageForTest(new TeamTalkMessage(
+            ClientEvent.InternalError,
+            Source: 0,
+            TTType.ClientErrorMsg,
+            default,
+            default,
+            error,
+            default,
+            0,
+            0));
+
+        Assert(received is not null, "Expected internal error message.");
+        Assert(received!.IsSystem, "Expected internal error to be marked as system text.");
+        AssertEqual("TeamTalk SDK internal error: decoder failed.", received.Text);
     }
 
     private static void DispatchesFileTransferUpdate()

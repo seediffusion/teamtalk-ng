@@ -4,11 +4,13 @@ namespace TeamTalkNg.App.ViewModels;
 
 public sealed class AnnouncementTemplateOptionViewModel : ObservableObject
 {
+    private bool isEnabled;
     private string template;
 
-    public AnnouncementTemplateOptionViewModel(AnnouncementTemplateDefinition definition, string? template)
+    public AnnouncementTemplateOptionViewModel(AnnouncementTemplateDefinition definition, bool isEnabled, string? template)
     {
         Definition = definition;
+        this.isEnabled = isEnabled;
         this.template = string.IsNullOrWhiteSpace(template)
             ? definition.DefaultTemplate
             : template;
@@ -21,6 +23,18 @@ public sealed class AnnouncementTemplateOptionViewModel : ObservableObject
     public string Name => Definition.Name;
 
     public string PlaceholderSummary => Definition.PlaceholderSummary;
+
+    public bool IsEnabled
+    {
+        get => isEnabled;
+        set
+        {
+            if (SetProperty(ref isEnabled, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+            }
+        }
+    }
 
     public string Template
     {
@@ -38,5 +52,5 @@ public sealed class AnnouncementTemplateOptionViewModel : ObservableObject
         }
     }
 
-    public string AccessibleName => $"{Name} announcement template. Placeholders: {PlaceholderSummary}. Current template: {Template}";
+    public string AccessibleName => $"{Name} announcement, {(IsEnabled ? "enabled" : "disabled")}. Placeholders: {PlaceholderSummary}. Current template: {Template}";
 }

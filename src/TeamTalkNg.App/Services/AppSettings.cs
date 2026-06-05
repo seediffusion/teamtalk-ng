@@ -22,6 +22,8 @@ public sealed record AppSettings
 
     public Dictionary<string, string> AnnouncementTemplates { get; init; } = [];
 
+    public Dictionary<string, bool> AnnouncementEventEnabled { get; init; } = [];
+
     public bool PlaySoundEvents { get; init; } = true;
 
     public string SoundPack { get; init; } = SoundEventService.DefaultSoundPackId;
