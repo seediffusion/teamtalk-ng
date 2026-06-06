@@ -24,7 +24,7 @@ TeamTalk NG uses two complementary accessibility paths:
 - Standard WPF controls expose Name, Role, Value, State, keyboard focus, and control patterns through Windows UI Automation.
 - Intentional TeamTalk events such as channel messages, joins/leaves, connection changes, and transmission state changes go through the announcement service and Prismatoid when available.
 
-The announcement service falls back to debug output when Prismatoid is not present, so the app can still build and run during early development.
+The announcement service prefers Prismatoid when it is present. When Prismatoid is not available, it falls back to WPF UI Automation notification events so NVDA, JAWS, and Narrator still receive TeamTalk announcements, with debug output kept as a developer trace.
 
 ## Build
 

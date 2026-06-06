@@ -1,5 +1,6 @@
 using System.Windows;
 using TeamTalkNg.Accessibility;
+using TeamTalkNg.App.Accessibility;
 using TeamTalkNg.App.Services;
 using TeamTalkNg.App.ViewModels;
 using TeamTalkNg.Core.Accessibility;
@@ -20,7 +21,7 @@ public partial class App : Application
         {
             IScreenReaderOutput screenReaderOutput = PrismatoidScreenReaderOutput.TryCreate(out IScreenReaderOutput prismatoidOutput)
                 ? new CompositeScreenReaderOutput(prismatoidOutput, new DebugScreenReaderOutput())
-                : new DebugScreenReaderOutput();
+                : new CompositeScreenReaderOutput(new WpfAutomationScreenReaderOutput(), new DebugScreenReaderOutput());
 
             announcementService = new QueuedAnnouncementService(screenReaderOutput);
             ITeamTalkSession teamTalkSession = TeamTalkSessionFactory.CreateDefaultSession();
