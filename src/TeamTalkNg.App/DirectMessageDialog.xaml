@@ -1,6 +1,7 @@
 <Window x:Class="TeamTalkNg.App.DirectMessageDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TeamTalkNg.App.Controls"
         Title="Send Direct Message"
         Width="520"
         Height="440"
@@ -72,18 +73,16 @@
              Target="{Binding ElementName=MessageBox}"
              Content="Message"
              Margin="0,12,0,0" />
-      <TextBox x:Name="MessageBox"
-               Grid.Row="2"
-               Grid.Column="1"
-               Text="{Binding Message, UpdateSourceTrigger=PropertyChanged}"
-               AcceptsReturn="True"
-               Margin="0,12,0,0"
-               TextWrapping="Wrap"
-               VerticalScrollBarVisibility="Auto"
-               Background="{DynamicResource ControlBackgroundBrush}"
-               Foreground="{DynamicResource TextBrush}"
-               BorderBrush="{DynamicResource BorderBrush}"
-               AutomationProperties.Name="Direct message text" />
+      <controls:NativeTextBox x:Name="MessageBox"
+                              Grid.Row="2"
+                              Grid.Column="1"
+                              Text="{Binding Message, UpdateSourceTrigger=PropertyChanged}"
+                              SendRequested="MessageBox_OnSendRequested"
+                              IsMultiline="True"
+                              Margin="0,12,0,0"
+                              TextBackground="{DynamicResource ControlBackgroundBrush}"
+                              TextForeground="{DynamicResource TextBrush}"
+                              AutomationProperties.Name="Direct message text" />
     </Grid>
 
     <DockPanel Grid.Row="1"

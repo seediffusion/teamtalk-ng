@@ -1,6 +1,7 @@
 <Window x:Class="TeamTalkNg.App.StatusDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TeamTalkNg.App.Controls"
         Title="Set Status"
         Width="460"
         Height="240"
@@ -33,14 +34,13 @@
                 AutomationProperties.Name="Away status" />
 
       <Label Grid.Row="1" Target="{Binding ElementName=StatusMessageBox}" Content="Status message" />
-      <TextBox x:Name="StatusMessageBox"
-               Grid.Row="1"
-               Grid.Column="1"
-               Text="{Binding StatusMessage, UpdateSourceTrigger=PropertyChanged}"
-               Background="{DynamicResource ControlBackgroundBrush}"
-               Foreground="{DynamicResource TextBrush}"
-               BorderBrush="{DynamicResource BorderBrush}"
-               AutomationProperties.Name="Status message" />
+      <controls:NativeTextBox x:Name="StatusMessageBox"
+                              Grid.Row="1"
+                              Grid.Column="1"
+                              Text="{Binding StatusMessage, UpdateSourceTrigger=PropertyChanged}"
+                              TextBackground="{DynamicResource ControlBackgroundBrush}"
+                              TextForeground="{DynamicResource TextBrush}"
+                              AutomationProperties.Name="Status message" />
     </Grid>
 
     <DockPanel Grid.Row="1"

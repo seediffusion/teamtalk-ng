@@ -1,6 +1,7 @@
 <Window x:Class="TeamTalkNg.App.ChannelTopicDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TeamTalkNg.App.Controls"
         Title="Edit Channel Topic"
         Width="520"
         Height="280"
@@ -36,17 +37,14 @@
                AutomationProperties.Name="Channel name" />
 
       <Label Grid.Row="1" Target="{Binding ElementName=TopicBox}" Content="Topic" />
-      <TextBox x:Name="TopicBox"
-               Grid.Row="1"
-               Grid.Column="1"
-               Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}"
-               AcceptsReturn="True"
-               TextWrapping="Wrap"
-               VerticalScrollBarVisibility="Auto"
-               Background="{DynamicResource ControlBackgroundBrush}"
-               Foreground="{DynamicResource TextBrush}"
-               BorderBrush="{DynamicResource BorderBrush}"
-               AutomationProperties.Name="Channel topic" />
+      <controls:NativeTextBox x:Name="TopicBox"
+                              Grid.Row="1"
+                              Grid.Column="1"
+                              Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}"
+                              AcceptsReturn="True"
+                              TextBackground="{DynamicResource ControlBackgroundBrush}"
+                              TextForeground="{DynamicResource TextBrush}"
+                              AutomationProperties.Name="Channel topic" />
     </Grid>
 
     <DockPanel Grid.Row="1"

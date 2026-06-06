@@ -30,6 +30,18 @@ public sealed class NativeTextBox : WindowsFormsHost
         typeof(NativeTextBox),
         new PropertyMetadata(System.Windows.SystemColors.ControlTextBrush, OnColorPropertyChanged));
 
+    public static readonly DependencyProperty AcceptsReturnProperty = DependencyProperty.Register(
+        nameof(AcceptsReturn),
+        typeof(bool),
+        typeof(NativeTextBox),
+        new PropertyMetadata(false, OnTextModePropertyChanged));
+
+    public static readonly DependencyProperty IsMultilineProperty = DependencyProperty.Register(
+        nameof(IsMultiline),
+        typeof(bool),
+        typeof(NativeTextBox),
+        new PropertyMetadata(false, OnTextModePropertyChanged));
+
     private readonly Forms.TextBox textBox = new();
     private bool syncingText;
 
@@ -44,6 +56,7 @@ public sealed class NativeTextBox : WindowsFormsHost
         Child = textBox;
         Loaded += (_, _) =>
         {
+            ApplyTextMode();
             ApplyColors();
             ApplyAccessibleProperties();
         };
@@ -69,9 +82,49 @@ public sealed class NativeTextBox : WindowsFormsHost
         set => SetValue(TextForegroundProperty, value);
     }
 
+    public bool AcceptsReturn
+    {
+        get => (bool)GetValue(AcceptsReturnProperty);
+        set => SetValue(AcceptsReturnProperty, value);
+    }
+
+    public bool IsMultiline
+    {
+        get => (bool)GetValue(IsMultilineProperty);
+        set => SetValue(IsMultilineProperty, value);
+    }
+
+    public new bool Focus()
+    {
+        bool hostFocused = base.Focus();
+        return textBox.Focus() || hostFocused;
+    }
+
     public bool FocusNativeEdit()
     {
-        return textBox.Focus();
+        return Focus();
+    }
+
+    public void SelectAll()
+    {
+        textBox.SelectAll();
+    }
+
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnGotKeyboardFocus(e);
+        textBox.Focus();
+    }
+
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+
+        if (e.Property == AutomationProperties.NameProperty
+            || e.Property == AutomationProperties.HelpTextProperty)
+        {
+            ApplyAccessibleProperties();
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -112,6 +165,11 @@ public sealed class NativeTextBox : WindowsFormsHost
         ((NativeTextBox)dependencyObject).ApplyColors();
     }
 
+    private static void OnTextModePropertyChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs e)
+    {
+        ((NativeTextBox)dependencyObject).ApplyTextMode();
+    }
+
     private void TextBox_OnTextChanged(object? sender, EventArgs e)
     {
         if (syncingText)
@@ -124,7 +182,7 @@ public sealed class NativeTextBox : WindowsFormsHost
 
     private void TextBox_OnKeyDown(object? sender, Forms.KeyEventArgs e)
     {
-        if (e.KeyCode != Forms.Keys.Enter || e.Shift || e.Control || e.Alt)
+        if (AcceptsReturn || SendRequested is null || e.KeyCode != Forms.Keys.Enter || e.Shift || e.Control || e.Alt)
         {
             return;
         }
@@ -132,6 +190,15 @@ public sealed class NativeTextBox : WindowsFormsHost
         e.Handled = true;
         e.SuppressKeyPress = true;
         SendRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyTextMode()
+    {
+        bool multiline = AcceptsReturn || IsMultiline;
+        textBox.AcceptsReturn = AcceptsReturn;
+        textBox.Multiline = multiline;
+        textBox.WordWrap = multiline;
+        textBox.ScrollBars = multiline ? Forms.ScrollBars.Vertical : Forms.ScrollBars.None;
     }
 
     private void ApplyColors()
