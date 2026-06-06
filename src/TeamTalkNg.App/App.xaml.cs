@@ -9,7 +9,7 @@ using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
 
 namespace TeamTalkNg.App;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     private IAnnouncementService? announcementService;
 

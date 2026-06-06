@@ -384,15 +384,13 @@
                       MinWidth="92"
                       Margin="8,0,0,0"
                       AutomationProperties.Name="Send channel message" />
-              <TextBox x:Name="MessageTextBox"
-                       Text="{Binding MessageText, UpdateSourceTrigger=LostFocus}"
-                       KeyDown="MessageTextBox_OnKeyDown"
-                       MinHeight="34"
-                       VerticalContentAlignment="Center"
-                       Background="{DynamicResource ControlBackgroundBrush}"
-                       Foreground="{DynamicResource TextBrush}"
-                       BorderBrush="{DynamicResource BorderBrush}"
-                       AutomationProperties.Name="Channel message" />
+              <controls:NativeTextBox x:Name="MessageTextBox"
+                                      Text="{Binding MessageText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      SendRequested="MessageTextBox_OnSendRequested"
+                                      MinHeight="34"
+                                      TextBackground="{DynamicResource ControlBackgroundBrush}"
+                                      TextForeground="{DynamicResource TextBrush}"
+                                      AutomationProperties.Name="Channel message" />
             </DockPanel>
           </Grid>
         </TabItem>

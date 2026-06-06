@@ -23,7 +23,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ChannelsTree_OnKeyDown(object sender, KeyEventArgs e)
+    private async void ChannelsTree_OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
         {
@@ -48,7 +48,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ChatHistoryList_OnKeyDown(object sender, KeyEventArgs e)
+    private async void ChatHistoryList_OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
         {
@@ -62,19 +62,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MessageTextBox_OnKeyDown(object sender, KeyEventArgs e)
+    private void MessageTextBox_OnSendRequested(object? sender, EventArgs e)
     {
-        if (e.Key != Key.Enter)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        if (sender is TextBox textBox)
-        {
-            textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
-        }
-
         if (DataContext is MainWindowViewModel viewModel
             && viewModel.SendMessageCommand.CanExecute(null))
         {
@@ -90,7 +79,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MainToolBar_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    private void MainToolBar_OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key is Key.Right or Key.Down)
         {
@@ -119,7 +108,7 @@ public partial class MainWindow : Window
 
     private void FocusToolbarButton(FocusNavigationDirection direction)
     {
-        List<ButtonBase> buttons = GetToolbarButtons()
+        List<System.Windows.Controls.Primitives.ButtonBase> buttons = GetToolbarButtons()
             .Where(button => button.IsEnabled && button.Focusable)
             .ToList();
 
@@ -136,9 +125,9 @@ public partial class MainWindow : Window
         buttons[nextIndex].Focus();
     }
 
-    private IEnumerable<ButtonBase> GetToolbarButtons()
+    private IEnumerable<System.Windows.Controls.Primitives.ButtonBase> GetToolbarButtons()
     {
-        return Descendants<ButtonBase>(MainToolBar)
+        return Descendants<System.Windows.Controls.Primitives.ButtonBase>(MainToolBar)
             .Where(button => Equals(button.Tag, "ToolbarButton"));
     }
 
