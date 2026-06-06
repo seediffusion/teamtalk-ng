@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Forms.Integration;
 using Drawing = System.Drawing;
 using Media = System.Windows.Media;
@@ -41,7 +42,11 @@ public sealed class NativeTextBox : WindowsFormsHost
         textBox.TextChanged += TextBox_OnTextChanged;
         textBox.KeyDown += TextBox_OnKeyDown;
         Child = textBox;
-        Loaded += (_, _) => ApplyColors();
+        Loaded += (_, _) =>
+        {
+            ApplyColors();
+            ApplyAccessibleProperties();
+        };
     }
 
     public event EventHandler? SendRequested;
@@ -139,6 +144,21 @@ public sealed class NativeTextBox : WindowsFormsHost
         if (TryGetColor(TextForeground, out Drawing.Color foreground))
         {
             textBox.ForeColor = foreground;
+        }
+    }
+
+    private void ApplyAccessibleProperties()
+    {
+        string name = AutomationProperties.GetName(this);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            textBox.AccessibleName = name;
+        }
+
+        string helpText = AutomationProperties.GetHelpText(this);
+        if (!string.IsNullOrWhiteSpace(helpText))
+        {
+            textBox.AccessibleDescription = helpText;
         }
     }
 
