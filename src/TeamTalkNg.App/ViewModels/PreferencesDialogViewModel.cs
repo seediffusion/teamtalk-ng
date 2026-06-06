@@ -26,6 +26,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private string defaultNickname = Environment.UserName;
     private bool isAway;
     private string statusMessage = string.Empty;
+    private int inactivityTimeoutSeconds;
+    private bool disableVoiceActivationDuringInactivity;
+    private string inactivityStatusMessage = string.Empty;
     private string audioDeviceRefreshStatus = "Audio devices loaded";
     private string voiceActivationCalibrationStatus = "Voice activation calibration not run";
     private bool showInputMeter;
@@ -104,6 +107,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         defaultNickname = string.IsNullOrWhiteSpace(settings.DefaultNickname) ? Environment.UserName : settings.DefaultNickname;
         isAway = settings.IsAway;
         statusMessage = settings.StatusMessage;
+        inactivityTimeoutSeconds = Math.Max(0, settings.InactivityTimeoutSeconds);
+        disableVoiceActivationDuringInactivity = settings.DisableVoiceActivationDuringInactivity;
+        inactivityStatusMessage = settings.InactivityStatusMessage;
         ReplaceAudioDevices(audioDevices);
 
         SaveCommand = new RelayCommand(() => RequestClose?.Invoke(this, true));
@@ -296,6 +302,24 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref statusMessage, value);
     }
 
+    public int InactivityTimeoutSeconds
+    {
+        get => inactivityTimeoutSeconds;
+        set => SetProperty(ref inactivityTimeoutSeconds, Math.Max(0, value));
+    }
+
+    public bool DisableVoiceActivationDuringInactivity
+    {
+        get => disableVoiceActivationDuringInactivity;
+        set => SetProperty(ref disableVoiceActivationDuringInactivity, value);
+    }
+
+    public string InactivityStatusMessage
+    {
+        get => inactivityStatusMessage;
+        set => SetProperty(ref inactivityStatusMessage, value);
+    }
+
     public AppSettings ToSettings()
     {
         return new AppSettings
@@ -327,7 +351,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             EnableAutomaticGainControl = EnableAutomaticGainControl,
             DefaultNickname = string.IsNullOrWhiteSpace(DefaultNickname) ? Environment.UserName : DefaultNickname.Trim(),
             IsAway = IsAway,
-            StatusMessage = StatusMessage.Trim()
+            StatusMessage = StatusMessage.Trim(),
+            InactivityTimeoutSeconds = Math.Max(0, InactivityTimeoutSeconds),
+            DisableVoiceActivationDuringInactivity = DisableVoiceActivationDuringInactivity,
+            InactivityStatusMessage = string.IsNullOrWhiteSpace(InactivityStatusMessage)
+                ? string.Empty
+                : InactivityStatusMessage.Trim()
         };
     }
 

@@ -39,6 +39,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly INicknameDialogService nicknameDialogService;
     private readonly ISoundEventService soundEvents;
     private readonly DispatcherTimer inputLevelTimer;
+    private readonly DispatcherTimer inactivityTimer;
     private readonly Dictionary<int, ObservableCollection<ChatMessageViewModel>> directMessageConversations = [];
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
@@ -53,9 +54,15 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool voiceActivationEnabled;
     private bool isInputMeterVisible;
     private bool isPollingInputLevel;
+    private bool isApplyingInactivityState;
     private bool isAway;
     private string currentNickname = Environment.UserName;
     private string currentChannelPath = "/";
+    private DateTimeOffset lastUserActivityUtc = DateTimeOffset.UtcNow;
+    private bool inactivityAwayApplied;
+    private bool inactivityVoiceActivationDisabled;
+    private bool preInactivityAway;
+    private string preInactivityStatusMessage = string.Empty;
     private bool appliedInitialStatus;
     private TeamTalkServerProfile? activeProfile;
     private AppSettings settings;
@@ -135,6 +142,11 @@ public sealed class MainWindowViewModel : ObservableObject
             Interval = TimeSpan.FromMilliseconds(150)
         };
         inputLevelTimer.Tick += OnInputLevelTimerTick;
+        inactivityTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(5)
+        };
+        inactivityTimer.Tick += OnInactivityTimerTick;
 
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
         OpenConnectionTargetCommand = new AsyncRelayCommand(OpenConnectionTargetAsync, () => teamTalkSession.Status == ConnectionStatus.Disconnected);
@@ -196,6 +208,7 @@ public sealed class MainWindowViewModel : ObservableObject
         BuildDisconnectedTree();
         ShowFilesPlaceholder("Join a channel to view files");
         UpdateInputLevelTimer();
+        UpdateInactivityTimer();
     }
 
     public string WindowTitle => $"TeamTalk NG - {ConnectionStatusText}";
@@ -431,7 +444,13 @@ public sealed class MainWindowViewModel : ObservableObject
     public string MessageText
     {
         get => messageText;
-        set => SetProperty(ref messageText, value);
+        set
+        {
+            if (SetProperty(ref messageText, value))
+            {
+                NotifyUserActivity();
+            }
+        }
     }
 
     public double InputVolume
@@ -535,6 +554,15 @@ public sealed class MainWindowViewModel : ObservableObject
             }
 
             RaiseChannelCommandStateChanged();
+        }
+    }
+
+    public void NotifyUserActivity()
+    {
+        lastUserActivityUtc = DateTimeOffset.UtcNow;
+        if (inactivityAwayApplied || inactivityVoiceActivationDisabled)
+        {
+            _ = RestoreFromInactivityAsync();
         }
     }
 
@@ -1397,6 +1425,7 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             await teamTalkSession.SetVoiceActivationAsync(target, settings.VoiceActivationLevel);
+            inactivityVoiceActivationDisabled = false;
             IsVoiceActivationEnabled = target;
             if (target)
             {
@@ -1425,6 +1454,7 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             await teamTalkSession.SetUserStatusAsync(request);
+            inactivityAwayApplied = false;
             IsAway = request.IsAway;
             settings = settings with { IsAway = request.IsAway, StatusMessage = request.Message };
             await settingsStore.SaveAsync(settings);
@@ -1483,6 +1513,12 @@ public sealed class MainWindowViewModel : ObservableObject
         ApplyChatHistoryPrivacySetting();
         IsInputMeterVisible = settings.ShowInputMeter;
         VoiceActivationLevelPercent = settings.VoiceActivationLevel;
+        UpdateInactivityTimer();
+        if (settings.InactivityTimeoutSeconds <= 0)
+        {
+            await RestoreFromInactivityAsync();
+        }
+
         if (teamTalkSession.Status == ConnectionStatus.Disconnected)
         {
             currentNickname = GetDefaultNickname();
@@ -1607,6 +1643,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 if (status == ConnectionStatus.Disconnected)
                 {
                     currentChannelPath = "/";
+                    ClearInactivityState();
                 }
 
                 IsPushToTalkEnabled = false;
@@ -1624,6 +1661,7 @@ public sealed class MainWindowViewModel : ObservableObject
             }
 
             UpdateInputLevelTimer();
+            UpdateInactivityTimer();
             RaiseCommandStateChanged();
             RaiseChannelCommandStateChanged();
         });
@@ -1703,6 +1741,143 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             inputLevelTimer.Stop();
         }
+    }
+
+    private async void OnInactivityTimerTick(object? sender, EventArgs e)
+    {
+        if (settings.InactivityTimeoutSeconds <= 0
+            || isApplyingInactivityState
+            || (inactivityAwayApplied && inactivityVoiceActivationDisabled)
+            || teamTalkSession.Status is not (ConnectionStatus.LoggedIn or ConnectionStatus.InChannel))
+        {
+            return;
+        }
+
+        TimeSpan idleTime = DateTimeOffset.UtcNow - lastUserActivityUtc;
+        if (idleTime < TimeSpan.FromSeconds(settings.InactivityTimeoutSeconds))
+        {
+            return;
+        }
+
+        await ApplyInactivityAsync();
+    }
+
+    private void UpdateInactivityTimer()
+    {
+        bool shouldRun = settings.InactivityTimeoutSeconds > 0
+            && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel;
+
+        if (shouldRun)
+        {
+            if (!inactivityTimer.IsEnabled)
+            {
+                inactivityTimer.Start();
+            }
+        }
+        else if (inactivityTimer.IsEnabled)
+        {
+            inactivityTimer.Stop();
+        }
+    }
+
+    private async Task ApplyInactivityAsync()
+    {
+        if (isApplyingInactivityState)
+        {
+            return;
+        }
+
+        isApplyingInactivityState = true;
+        bool changed = false;
+        try
+        {
+            if (!IsAway && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
+            {
+                preInactivityAway = IsAway;
+                preInactivityStatusMessage = settings.StatusMessage;
+                string inactivityMessage = GetEffectiveInactivityStatusMessage(settings.InactivityStatusMessage, settings.StatusMessage);
+                await teamTalkSession.SetUserStatusAsync(new UserStatusRequest(true, inactivityMessage));
+                IsAway = true;
+                inactivityAwayApplied = true;
+                changed = true;
+            }
+
+            if (settings.DisableVoiceActivationDuringInactivity
+                && IsVoiceActivationEnabled
+                && teamTalkSession.Status == ConnectionStatus.InChannel)
+            {
+                await teamTalkSession.SetVoiceActivationAsync(false, settings.VoiceActivationLevel);
+                IsVoiceActivationEnabled = false;
+                inactivityVoiceActivationDisabled = true;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await AnnounceAsync("Inactivity status applied", AnnouncementPriority.Normal, AnnouncementKind.System);
+            }
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync($"Could not apply inactivity status: {ex.Message}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+        finally
+        {
+            isApplyingInactivityState = false;
+        }
+    }
+
+    private async Task RestoreFromInactivityAsync()
+    {
+        if (isApplyingInactivityState || (!inactivityAwayApplied && !inactivityVoiceActivationDisabled))
+        {
+            return;
+        }
+
+        isApplyingInactivityState = true;
+        bool changed = false;
+        try
+        {
+            if (inactivityAwayApplied && teamTalkSession.Status is ConnectionStatus.LoggedIn or ConnectionStatus.InChannel)
+            {
+                await teamTalkSession.SetUserStatusAsync(new UserStatusRequest(preInactivityAway, preInactivityStatusMessage));
+                IsAway = preInactivityAway;
+                inactivityAwayApplied = false;
+                changed = true;
+            }
+
+            if (inactivityVoiceActivationDisabled && teamTalkSession.Status == ConnectionStatus.InChannel)
+            {
+                await teamTalkSession.SetVoiceActivationAsync(true, settings.VoiceActivationLevel);
+                IsVoiceActivationEnabled = true;
+                IsPushToTalkEnabled = false;
+                inactivityVoiceActivationDisabled = false;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await AnnounceAsync("Returned from inactivity", AnnouncementPriority.Normal, AnnouncementKind.System);
+            }
+        }
+        catch (Exception ex)
+        {
+            await AnnounceAsync($"Could not restore inactivity status: {ex.Message}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
+        }
+        finally
+        {
+            isApplyingInactivityState = false;
+        }
+    }
+
+    private void ClearInactivityState()
+    {
+        inactivityAwayApplied = false;
+        inactivityVoiceActivationDisabled = false;
+        isApplyingInactivityState = false;
+        preInactivityAway = false;
+        preInactivityStatusMessage = string.Empty;
+        lastUserActivityUtc = DateTimeOffset.UtcNow;
     }
 
     private void OnChannelMessageReceived(object? sender, ChatMessage message)
@@ -2242,6 +2417,16 @@ public sealed class MainWindowViewModel : ObservableObject
             NormalizeChannelPath(currentChannelPath),
             NormalizeChannelPath(userChannelPath),
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static string GetEffectiveInactivityStatusMessage(string? inactivityStatusMessage, string? currentStatusMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(inactivityStatusMessage))
+        {
+            return inactivityStatusMessage.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(currentStatusMessage) ? string.Empty : currentStatusMessage.Trim();
     }
 
     private async Task SaveRecentProfileAsync(IReadOnlyList<TeamTalkServerProfile> profiles, TeamTalkServerProfile selectedProfile)

@@ -141,6 +141,7 @@ internal static class AppSettingsTests
         DoesNotHideDirectMessageTextByDefault();
         MigratesOldVoiceActivationDefault();
         PreservesOpenMicrophoneVoiceActivationLevel();
+        DisablesAutoAwayByDefault();
 
         Console.WriteLine("TeamTalk NG settings tests passed.");
     }
@@ -161,6 +162,15 @@ internal static class AppSettingsTests
         Assert(!settings.EnableNoiseSuppression, "Expected noise suppression to be opt-in.");
         Assert(!settings.EnableEchoCancellation, "Expected echo cancellation to be opt-in.");
         Assert(!settings.EnableAutomaticGainControl, "Expected automatic gain control to be opt-in.");
+    }
+
+    private static void DisablesAutoAwayByDefault()
+    {
+        var settings = new AppSettings();
+
+        AssertEqual(0, settings.InactivityTimeoutSeconds);
+        Assert(!settings.DisableVoiceActivationDuringInactivity, "Expected inactivity voice activation disabling to be opt-in.");
+        AssertEqual("Away due to inactivity", settings.InactivityStatusMessage);
     }
 
     private static void MigratesOldVoiceActivationDefault()
@@ -240,6 +250,7 @@ internal static class AppViewModelTests
         HidesDirectMessageTextInChatHistoryWhenPrivacyModeIsOn();
         KeepsFullDirectMessageTextAvailableForThreadView();
         ScopesLiveUserChannelEventsToExactCurrentChannel();
+        FormatsInactivityStatusMessage();
 
         Console.WriteLine("TeamTalk NG app view-model tests passed.");
     }
@@ -308,6 +319,23 @@ internal static class AppViewModelTests
         Assert(!Matches("/Root/Side Room", "/Root"), "Expected child and parent channels to be distinct.");
         Assert(Matches("/", "/"), "Expected root channel to match itself.");
         Assert(!Matches("/", "/Lobby"), "Expected root channel and Lobby to be distinct.");
+    }
+
+    private static void FormatsInactivityStatusMessage()
+    {
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "GetEffectiveInactivityStatusMessage",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert(method is not null, "Expected inactivity status message helper.");
+
+        string Format(string? inactivityStatusMessage, string? currentStatusMessage)
+        {
+            return (string)method!.Invoke(null, [inactivityStatusMessage, currentStatusMessage])!;
+        }
+
+        AssertEqual("Stepped away", Format("  Stepped away  ", "Available"));
+        AssertEqual("Available", Format("", "  Available  "));
+        AssertEqual(string.Empty, Format("", ""));
     }
 
     private static void Assert(bool condition, string message)

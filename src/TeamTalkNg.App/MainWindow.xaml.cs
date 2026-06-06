@@ -13,6 +13,25 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Loaded += (_, _) => ChannelsTree.Focus();
+        InputManager.Current.PreProcessInput += InputManager_OnPreProcessInput;
+        Closed += (_, _) => InputManager.Current.PreProcessInput -= InputManager_OnPreProcessInput;
+    }
+
+    private void InputManager_OnPreProcessInput(object sender, PreProcessInputEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        InputEventArgs input = e.StagingItem.Input;
+        if (input is KeyEventArgs
+            or TextCompositionEventArgs
+            or MouseButtonEventArgs
+            or MouseWheelEventArgs)
+        {
+            viewModel.NotifyUserActivity();
+        }
     }
 
     private void ChannelsTree_OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
