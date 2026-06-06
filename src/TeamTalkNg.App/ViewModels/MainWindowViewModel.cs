@@ -55,6 +55,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool isPollingInputLevel;
     private bool isAway;
     private string currentNickname = Environment.UserName;
+    private string currentChannelPath = "/";
     private bool appliedInitialStatus;
     private TeamTalkServerProfile? activeProfile;
     private AppSettings settings;
@@ -544,6 +545,7 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         }
 
+        string previousChannelPath = currentChannelPath;
         try
         {
             string password = string.Empty;
@@ -559,12 +561,14 @@ public sealed class MainWindowViewModel : ObservableObject
                 password = enteredPassword;
             }
 
+            SetCurrentChannelPath(channel.Path);
             await AnnounceAsync($"Joining {channel.Name}", AnnouncementPriority.Normal, AnnouncementKind.System);
             await teamTalkSession.JoinChannelAsync(channel.Path, password);
             ExpandChannelPath(channel.Path);
         }
         catch (Exception ex)
         {
+            SetCurrentChannelPath(previousChannelPath);
             OnPropertyChanged(nameof(IsPushToTalkEnabled));
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
         }
@@ -603,6 +607,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         TeamTalkServerProfile effectiveProfile = ApplyIdentityDefaults(profile);
         activeProfile = effectiveProfile;
+        SetCurrentChannelPath(effectiveProfile.ChannelPath);
         currentNickname = effectiveProfile.Nickname;
         appliedInitialStatus = false;
         await AnnounceAsync($"Connecting to {effectiveProfile.DisplayName}", AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
@@ -619,6 +624,7 @@ public sealed class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             activeProfile = null;
+            currentChannelPath = "/";
             BuildDisconnectedTree();
             await AnnounceAsync(ex.Message, AnnouncementPriority.High, AnnouncementKind.System, interrupt: true);
             RaiseCommandStateChanged();
@@ -650,6 +656,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         await teamTalkSession.DisconnectAsync();
         activeProfile = null;
+        currentChannelPath = "/";
         appliedInitialStatus = false;
         BuildDisconnectedTree();
         ChatMessages.Clear();
@@ -1590,13 +1597,18 @@ public sealed class MainWindowViewModel : ObservableObject
                 ConnectionStatus.Connecting => "Connecting",
                 ConnectionStatus.Connected => "Connected; logging in",
                 ConnectionStatus.LoggedIn => "Logged in",
-                ConnectionStatus.InChannel => activeProfile?.ChannelPath is { Length: > 0 } channel ? $"In {channel}" : "In channel",
+                ConnectionStatus.InChannel => $"In {currentChannelPath}",
                 _ => status.ToString()
             };
 
             if (status != ConnectionStatus.InChannel)
             {
                 suppressUserJoinSoundsUntil = DateTimeOffset.MinValue;
+                if (status == ConnectionStatus.Disconnected)
+                {
+                    currentChannelPath = "/";
+                }
+
                 IsPushToTalkEnabled = false;
                 IsVoiceActivationEnabled = false;
                 IsVideoCaptureActive = false;
@@ -1607,7 +1619,7 @@ public sealed class MainWindowViewModel : ObservableObject
             }
             else
             {
-                ExpandChannelPath(activeProfile?.ChannelPath);
+                ExpandChannelPath(currentChannelPath);
                 _ = RefreshFilesAsync(announce: false);
             }
 
@@ -1831,7 +1843,7 @@ public sealed class MainWindowViewModel : ObservableObject
             AddOrUpdateUser(user);
         });
 
-        if (ShouldPlayLiveUserJoinSound())
+        if (ShouldPlayLiveUserChannelEvent(user.ChannelPath))
         {
             soundEvents.Play(SoundEvent.UserJoined);
             _ = AnnounceAsync(
@@ -1869,16 +1881,19 @@ public sealed class MainWindowViewModel : ObservableObject
             RemoveMediaStreamsForUser(user.Id);
         });
 
-        soundEvents.Play(SoundEvent.UserLeft);
-        _ = AnnounceAsync(
-            FormatAnnouncementTemplate(
-                AnnouncementTemplateKind.UserLeftChannel,
-                ("user", user.Nickname),
-                ("username", user.Username),
-                ("channel", GetChannelName(user.ChannelPath))),
-            AnnouncementPriority.Normal,
-            AnnouncementKind.UserJoinLeave,
-            eventKind: AnnouncementTemplateKind.UserLeftChannel);
+        if (ShouldPlayLiveUserChannelEvent(user.ChannelPath))
+        {
+            soundEvents.Play(SoundEvent.UserLeft);
+            _ = AnnounceAsync(
+                FormatAnnouncementTemplate(
+                    AnnouncementTemplateKind.UserLeftChannel,
+                    ("user", user.Nickname),
+                    ("username", user.Username),
+                    ("channel", GetChannelName(user.ChannelPath))),
+                AnnouncementPriority.Normal,
+                AnnouncementKind.UserJoinLeave,
+                eventKind: AnnouncementTemplateKind.UserLeftChannel);
+        }
     }
 
     private void AddOrUpdateUser(UserSummary user)
@@ -1911,10 +1926,11 @@ public sealed class MainWindowViewModel : ObservableObject
         channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
     }
 
-    private bool ShouldPlayLiveUserJoinSound()
+    private bool ShouldPlayLiveUserChannelEvent(string userChannelPath)
     {
         return teamTalkSession.Status == ConnectionStatus.InChannel
-            && DateTimeOffset.UtcNow >= suppressUserJoinSoundsUntil;
+            && DateTimeOffset.UtcNow >= suppressUserJoinSoundsUntil
+            && IsSameChannelPathForLiveUserEvent(currentChannelPath, userChannelPath);
     }
 
     private void OnChannelAddedOrUpdated(object? sender, ChannelSummary channel)
@@ -2207,6 +2223,25 @@ public sealed class MainWindowViewModel : ObservableObject
 
         string trimmed = channelPath.Trim();
         return "/" + trimmed.Trim('/');
+    }
+
+    private void SetCurrentChannelPath(string? channelPath)
+    {
+        currentChannelPath = NormalizeChannelPath(channelPath);
+        activeProfile = activeProfile is null ? null : activeProfile with { ChannelPath = currentChannelPath };
+
+        if (teamTalkSession.Status == ConnectionStatus.InChannel)
+        {
+            ConnectionStatusText = $"In {currentChannelPath}";
+        }
+    }
+
+    internal static bool IsSameChannelPathForLiveUserEvent(string? currentChannelPath, string? userChannelPath)
+    {
+        return string.Equals(
+            NormalizeChannelPath(currentChannelPath),
+            NormalizeChannelPath(userChannelPath),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task SaveRecentProfileAsync(IReadOnlyList<TeamTalkServerProfile> profiles, TeamTalkServerProfile selectedProfile)

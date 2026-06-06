@@ -239,6 +239,7 @@ internal static class AppViewModelTests
         ShowsDirectMessageTextWhenPrivacyModeIsOff();
         HidesDirectMessageTextInChatHistoryWhenPrivacyModeIsOn();
         KeepsFullDirectMessageTextAvailableForThreadView();
+        ScopesLiveUserChannelEventsToExactCurrentChannel();
 
         Console.WriteLine("TeamTalk NG app view-model tests passed.");
     }
@@ -287,6 +288,26 @@ internal static class AppViewModelTests
 
         Assert(viewModel.FullDisplayText.Contains("Secret stream note", StringComparison.Ordinal), "Expected thread view text to keep the full direct message.");
         Assert(viewModel.FullAccessibleName.Contains("Secret stream note", StringComparison.Ordinal), "Expected thread view accessible name to keep the full direct message.");
+    }
+
+    private static void ScopesLiveUserChannelEventsToExactCurrentChannel()
+    {
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "IsSameChannelPathForLiveUserEvent",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert(method is not null, "Expected live user channel matching helper.");
+
+        bool Matches(string? currentChannelPath, string? userChannelPath)
+        {
+            return (bool)method!.Invoke(null, [currentChannelPath, userChannelPath])!;
+        }
+
+        Assert(Matches("/Root", "Root"), "Expected equivalent channel paths to match.");
+        Assert(Matches("/Root/Side Room", "Root/Side Room"), "Expected nested channel paths to match exactly.");
+        Assert(!Matches("/Root", "/Root/Side Room"), "Expected parent and child channels to be distinct.");
+        Assert(!Matches("/Root/Side Room", "/Root"), "Expected child and parent channels to be distinct.");
+        Assert(Matches("/", "/"), "Expected root channel to match itself.");
+        Assert(!Matches("/", "/Lobby"), "Expected root channel and Lobby to be distinct.");
     }
 
     private static void Assert(bool condition, string message)
