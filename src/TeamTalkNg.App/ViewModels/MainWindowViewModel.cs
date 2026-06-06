@@ -195,7 +195,7 @@ public sealed class MainWindowViewModel : ObservableObject
         UseDarkThemeCommand = new AsyncRelayCommand(() => SetThemeAsync(AppTheme.Dark));
         PreferencesCommand = new AsyncRelayCommand(ShowPreferencesAsync);
         AboutCommand = new RelayCommand(ShowAbout);
-        ExitCommand = new RelayCommand(() => Application.Current.Shutdown());
+        ExitCommand = new RelayCommand(RequestExit);
 
         announcements.AnnouncementRaised += OnAnnouncementRaised;
         teamTalkSession.ConnectionStatusChanged += OnConnectionStatusChanged;
@@ -548,6 +548,14 @@ public sealed class MainWindowViewModel : ObservableObject
             }
         }
     }
+
+    public bool StartMinimized => settings.StartMinimized;
+
+    public bool MinimizeToTray => settings.MinimizeToTray;
+
+    public bool ConfirmExit => settings.ConfirmExit;
+
+    public bool IsAlwaysOnTop => settings.AlwaysOnTop;
 
     public bool IsPushToTalkEnabled
     {
@@ -1638,6 +1646,11 @@ public sealed class MainWindowViewModel : ObservableObject
             MessageBoxImage.Information);
     }
 
+    private static void RequestExit()
+    {
+        Application.Current.MainWindow?.Close();
+    }
+
     private static bool ConfirmUserAction(string message, string title)
     {
         return MessageBox.Show(
@@ -2204,6 +2217,10 @@ public sealed class MainWindowViewModel : ObservableObject
     private void ApplyDisplayPreferences()
     {
         IsVoiceActivationSliderVisible = settings.ShowVoiceActivationSlider;
+        OnPropertyChanged(nameof(StartMinimized));
+        OnPropertyChanged(nameof(MinimizeToTray));
+        OnPropertyChanged(nameof(ConfirmExit));
+        OnPropertyChanged(nameof(IsAlwaysOnTop));
         foreach (ChannelTreeItemViewModel item in EnumerateTreeItems())
         {
             ApplyDisplaySettings(item);

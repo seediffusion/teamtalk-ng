@@ -8,6 +8,7 @@
         Height="760"
         MinWidth="920"
         MinHeight="600"
+        Topmost="{Binding IsAlwaysOnTop}"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextBrush}">
   <Window.InputBindings>

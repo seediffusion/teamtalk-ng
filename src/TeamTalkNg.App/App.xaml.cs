@@ -82,13 +82,21 @@ public partial class App : System.Windows.Application
                 appSettings);
             var window = new MainWindow
             {
-                DataContext = viewModel
+                DataContext = viewModel,
+                WindowState = appSettings.StartMinimized ? WindowState.Minimized : WindowState.Normal
             };
 
             MainWindow = window;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             window.Show();
-            window.Activate();
+            if (appSettings.StartMinimized)
+            {
+                window.ApplyInitialWindowBehavior();
+            }
+            else
+            {
+                window.Activate();
+            }
 
             if (TryReadStartupConnectionTarget(e.Args, out TeamTalkServerProfile startupProfile, out string startupError))
             {

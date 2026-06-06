@@ -144,6 +144,7 @@ internal static class AppSettingsTests
         DisablesAutoAwayByDefault();
         UsesAccessibleDisplayDefaults();
         UsesChatHistoryDefaults();
+        UsesWindowBehaviourDefaults();
 
         Console.WriteLine("TeamTalk NG settings tests passed.");
     }
@@ -194,6 +195,16 @@ internal static class AppSettingsTests
         AssertEqual(ChatHistoryViewMode.List, settings.ChatHistoryViewMode);
         AssertEqual(ChatMessageViewModel.DefaultTimestampFormat, settings.ChatTimestampFormat);
         Assert(!settings.ShowStatusEventsInChatHistory, "Expected status events to stay out of chat history by default.");
+    }
+
+    private static void UsesWindowBehaviourDefaults()
+    {
+        var settings = new AppSettings();
+
+        Assert(!settings.StartMinimized, "Expected start minimized to be off by default.");
+        Assert(!settings.MinimizeToTray, "Expected minimize to tray to be off by default.");
+        Assert(!settings.ConfirmExit, "Expected exit confirmation to be off by default.");
+        Assert(!settings.AlwaysOnTop, "Expected always on top to be off by default.");
     }
 
     private static void MigratesOldVoiceActivationDefault()

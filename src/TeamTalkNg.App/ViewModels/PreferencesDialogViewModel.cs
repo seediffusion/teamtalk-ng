@@ -33,6 +33,10 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool disableVoiceActivationDuringInactivity;
     private string inactivityStatusMessage = string.Empty;
     private bool showVoiceActivationSlider = true;
+    private bool startMinimized;
+    private bool minimizeToTray;
+    private bool confirmExit;
+    private bool alwaysOnTop;
     private bool showChannelUserCounts = true;
     private bool showUsernamesInsteadOfNicknames;
     private bool showChannelIcons = true;
@@ -136,6 +140,10 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         disableVoiceActivationDuringInactivity = settings.DisableVoiceActivationDuringInactivity;
         inactivityStatusMessage = settings.InactivityStatusMessage;
         showVoiceActivationSlider = settings.ShowVoiceActivationSlider;
+        startMinimized = settings.StartMinimized;
+        minimizeToTray = settings.MinimizeToTray;
+        confirmExit = settings.ConfirmExit;
+        alwaysOnTop = settings.AlwaysOnTop;
         showChannelUserCounts = settings.ShowChannelUserCounts;
         showUsernamesInsteadOfNicknames = settings.ShowUsernamesInsteadOfNicknames;
         showChannelIcons = settings.ShowChannelIcons;
@@ -379,6 +387,30 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref showVoiceActivationSlider, value);
     }
 
+    public bool StartMinimized
+    {
+        get => startMinimized;
+        set => SetProperty(ref startMinimized, value);
+    }
+
+    public bool MinimizeToTray
+    {
+        get => minimizeToTray;
+        set => SetProperty(ref minimizeToTray, value);
+    }
+
+    public bool ConfirmExit
+    {
+        get => confirmExit;
+        set => SetProperty(ref confirmExit, value);
+    }
+
+    public bool AlwaysOnTop
+    {
+        get => alwaysOnTop;
+        set => SetProperty(ref alwaysOnTop, value);
+    }
+
     public bool ShowChannelUserCounts
     {
         get => showChannelUserCounts;
@@ -452,6 +484,10 @@ public sealed class PreferencesDialogViewModel : ObservableObject
                 ? string.Empty
                 : InactivityStatusMessage.Trim(),
             ShowVoiceActivationSlider = ShowVoiceActivationSlider,
+            StartMinimized = StartMinimized,
+            MinimizeToTray = MinimizeToTray,
+            ConfirmExit = ConfirmExit,
+            AlwaysOnTop = AlwaysOnTop,
             ShowChannelUserCounts = ShowChannelUserCounts,
             ShowUsernamesInsteadOfNicknames = ShowUsernamesInsteadOfNicknames,
             ShowChannelIcons = ShowChannelIcons,

@@ -1,20 +1,85 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using TeamTalkNg.App.ViewModels;
+using Drawing = System.Drawing;
+using Forms = System.Windows.Forms;
 
 namespace TeamTalkNg.App;
 
 public partial class MainWindow : Window
 {
+    private Forms.NotifyIcon? notifyIcon;
+    private bool isRestoringFromTray;
+
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += (_, _) => ChannelsTree.Focus();
+        Loaded += MainWindow_OnLoaded;
+        StateChanged += MainWindow_OnStateChanged;
+        Closing += MainWindow_OnClosing;
         InputManager.Current.PreProcessInput += InputManager_OnPreProcessInput;
-        Closed += (_, _) => InputManager.Current.PreProcessInput -= InputManager_OnPreProcessInput;
+        Closed += MainWindow_OnClosed;
+    }
+
+    public void ApplyInitialWindowBehavior()
+    {
+        if (DataContext is MainWindowViewModel { StartMinimized: true, MinimizeToTray: true })
+        {
+            HideToTray();
+        }
+    }
+
+    private void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (WindowState != WindowState.Minimized && IsVisible)
+        {
+            ChannelsTree.Focus();
+        }
+    }
+
+    private void MainWindow_OnStateChanged(object? sender, EventArgs e)
+    {
+        if (isRestoringFromTray)
+        {
+            return;
+        }
+
+        if (WindowState == WindowState.Minimized
+            && DataContext is MainWindowViewModel { MinimizeToTray: true })
+        {
+            HideToTray();
+        }
+    }
+
+    private void MainWindow_OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel { ConfirmExit: true })
+        {
+            MessageBoxResult result = MessageBox.Show(
+                this,
+                "Exit TeamTalk NG?",
+                "Exit TeamTalk NG",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question,
+                MessageBoxResult.No);
+            if (result != MessageBoxResult.Yes)
+            {
+                e.Cancel = true;
+                return;
+            }
+        }
+
+        DisposeTrayIcon();
+    }
+
+    private void MainWindow_OnClosed(object? sender, EventArgs e)
+    {
+        InputManager.Current.PreProcessInput -= InputManager_OnPreProcessInput;
+        DisposeTrayIcon();
     }
 
     private void InputManager_OnPreProcessInput(object sender, PreProcessInputEventArgs e)
@@ -88,6 +153,78 @@ public partial class MainWindow : Window
         {
             viewModel.SendMessageCommand.Execute(null);
         }
+    }
+
+    private void HideToTray()
+    {
+        EnsureTrayIcon();
+        ShowInTaskbar = false;
+        Hide();
+    }
+
+    private void RestoreFromTray()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            isRestoringFromTray = true;
+            ShowInTaskbar = true;
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            ChannelsTree.Focus();
+            isRestoringFromTray = false;
+            HideTrayIcon();
+        });
+    }
+
+    private void EnsureTrayIcon()
+    {
+        if (notifyIcon is not null)
+        {
+            notifyIcon.Visible = true;
+            return;
+        }
+
+        var openItem = new Forms.ToolStripMenuItem("Open TeamTalk NG");
+        openItem.Click += (_, _) => RestoreFromTray();
+
+        var exitItem = new Forms.ToolStripMenuItem("Exit");
+        exitItem.Click += (_, _) => Dispatcher.Invoke(Close);
+
+        var contextMenu = new Forms.ContextMenuStrip();
+        contextMenu.Items.Add(openItem);
+        contextMenu.Items.Add(exitItem);
+
+        notifyIcon = new Forms.NotifyIcon
+        {
+            Icon = Drawing.SystemIcons.Application,
+            Text = "TeamTalk NG",
+            Visible = true,
+            ContextMenuStrip = contextMenu
+        };
+        notifyIcon.DoubleClick += (_, _) => RestoreFromTray();
+    }
+
+    private void HideTrayIcon()
+    {
+        if (notifyIcon is not null)
+        {
+            notifyIcon.Visible = false;
+        }
+    }
+
+    private void DisposeTrayIcon()
+    {
+        if (notifyIcon is null)
+        {
+            return;
+        }
+
+        Forms.ContextMenuStrip? contextMenu = notifyIcon.ContextMenuStrip;
+        notifyIcon.Visible = false;
+        notifyIcon.Dispose();
+        contextMenu?.Dispose();
+        notifyIcon = null;
     }
 
     private void MainToolBar_OnGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)

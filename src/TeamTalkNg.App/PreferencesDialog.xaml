@@ -80,6 +80,11 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="200" />
@@ -100,17 +105,52 @@
 
             <TextBlock Grid.Row="2"
                        Grid.ColumnSpan="2"
+                       Text="Window behaviour"
+                       FontWeight="SemiBold"
+                       Margin="0,18,0,0"
+                       AutomationProperties.Name="Window behaviour display settings" />
+
+            <CheckBox Grid.Row="3"
+                      Grid.Column="1"
+                      Content="Start minimized"
+                      IsChecked="{Binding StartMinimized}"
+                      Margin="0,12,0,0"
+                      AutomationProperties.Name="Start minimized" />
+
+            <CheckBox Grid.Row="4"
+                      Grid.Column="1"
+                      Content="Minimize to tray icon"
+                      IsChecked="{Binding MinimizeToTray}"
+                      Margin="0,8,0,0"
+                      AutomationProperties.Name="Minimize to tray icon" />
+
+            <CheckBox Grid.Row="5"
+                      Grid.Column="1"
+                      Content="Ask confirmation when exiting"
+                      IsChecked="{Binding ConfirmExit}"
+                      Margin="0,8,0,0"
+                      AutomationProperties.Name="Ask confirmation when exiting" />
+
+            <CheckBox Grid.Row="6"
+                      Grid.Column="1"
+                      Content="Always on top"
+                      IsChecked="{Binding AlwaysOnTop}"
+                      Margin="0,8,0,0"
+                      AutomationProperties.Name="Always on top" />
+
+            <TextBlock Grid.Row="7"
+                       Grid.ColumnSpan="2"
                        Text="Chat history"
                        FontWeight="SemiBold"
                        Margin="0,18,0,0"
                        AutomationProperties.Name="Chat history display settings" />
 
-            <Label Grid.Row="3"
+            <Label Grid.Row="8"
                    Target="{Binding ElementName=ChatHistoryViewModeBox}"
                    Content="Chat history view"
                    Margin="0,12,0,0" />
             <ComboBox x:Name="ChatHistoryViewModeBox"
-                      Grid.Row="3"
+                      Grid.Row="8"
                       Grid.Column="1"
                       ItemsSource="{Binding ChatHistoryViewModes}"
                       SelectedValue="{Binding SelectedChatHistoryViewMode}"
@@ -128,12 +168,12 @@
               </ComboBox.ItemContainerStyle>
             </ComboBox>
 
-            <Label Grid.Row="4"
+            <Label Grid.Row="9"
                    Target="{Binding ElementName=ChatTimestampFormatBox}"
                    Content="Timestamp format"
                    Margin="0,12,0,0" />
             <controls:NativeTextBox x:Name="ChatTimestampFormatBox"
-                                    Grid.Row="4"
+                                    Grid.Row="9"
                                     Grid.Column="1"
                                     Text="{Binding ChatTimestampFormat, UpdateSourceTrigger=PropertyChanged}"
                                     Margin="0,12,0,0"
@@ -142,35 +182,35 @@
                                     AutomationProperties.Name="Chat timestamp format"
                                     AutomationProperties.HelpText="Use .NET time formatting. Invalid formats fall back to HH:mm:ss." />
 
-            <CheckBox Grid.Row="5"
+            <CheckBox Grid.Row="10"
                       Grid.Column="1"
                       Content="Show status bar events in chat history"
                       IsChecked="{Binding ShowStatusEventsInChatHistory}"
                       Margin="0,12,0,0"
                       AutomationProperties.Name="Show status bar events in chat history" />
 
-            <TextBlock Grid.Row="6"
+            <TextBlock Grid.Row="11"
                        Grid.ColumnSpan="2"
                        Text="Channels and users"
                        FontWeight="SemiBold"
                        Margin="0,18,0,0"
                        AutomationProperties.Name="Channels and users display settings" />
 
-            <CheckBox Grid.Row="7"
+            <CheckBox Grid.Row="12"
                       Grid.Column="1"
                       Content="Show number of users in channel"
                       IsChecked="{Binding ShowChannelUserCounts}"
                       Margin="0,12,0,0"
                       AutomationProperties.Name="Show number of users in channel" />
 
-            <CheckBox Grid.Row="8"
+            <CheckBox Grid.Row="13"
                       Grid.Column="1"
                       Content="Show usernames instead of nicknames"
                       IsChecked="{Binding ShowUsernamesInsteadOfNicknames}"
                       Margin="0,8,0,0"
                       AutomationProperties.Name="Show usernames instead of nicknames" />
 
-            <StackPanel Grid.Row="9"
+            <StackPanel Grid.Row="14"
                         Grid.Column="1"
                         Margin="0,8,0,0">
               <CheckBox Content="Show icons for users and channels"
@@ -182,12 +222,12 @@
                         AutomationProperties.Name="Show channel topic in channel list" />
             </StackPanel>
 
-            <Label Grid.Row="10"
+            <Label Grid.Row="15"
                    Target="{Binding ElementName=ChannelSortModeBox}"
                    Content="Sort channels by"
                    Margin="0,12,0,0" />
             <ComboBox x:Name="ChannelSortModeBox"
-                      Grid.Row="10"
+                      Grid.Row="15"
                       Grid.Column="1"
                       ItemsSource="{Binding ChannelSortModes}"
                       SelectedValue="{Binding SelectedChannelSortMode}"
