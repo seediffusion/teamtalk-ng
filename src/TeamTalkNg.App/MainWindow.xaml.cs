@@ -62,6 +62,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private void MessageTextBox_OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (sender is TextBox textBox)
+        {
+            textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        }
+
+        if (DataContext is MainWindowViewModel viewModel
+            && viewModel.SendMessageCommand.CanExecute(null))
+        {
+            viewModel.SendMessageCommand.Execute(null);
+        }
+    }
+
     private void MainToolBar_OnGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         if (ReferenceEquals(e.NewFocus, MainToolBar))

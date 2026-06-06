@@ -384,7 +384,9 @@
                       MinWidth="92"
                       Margin="8,0,0,0"
                       AutomationProperties.Name="Send channel message" />
-              <TextBox Text="{Binding MessageText, UpdateSourceTrigger=PropertyChanged}"
+              <TextBox x:Name="MessageTextBox"
+                       Text="{Binding MessageText, UpdateSourceTrigger=LostFocus}"
+                       KeyDown="MessageTextBox_OnKeyDown"
                        MinHeight="34"
                        VerticalContentAlignment="Center"
                        Background="{DynamicResource ControlBackgroundBrush}"

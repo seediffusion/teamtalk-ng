@@ -162,7 +162,7 @@ public sealed class MainWindowViewModel : ObservableObject
         DeleteFileCommand = new AsyncRelayCommand(DeleteFileAsync, CanUseSelectedFile);
         CancelTransferCommand = new AsyncRelayCommand(CancelTransferAsync, CanCancelSelectedTransfer);
         RefreshFilesCommand = new AsyncRelayCommand(() => RefreshFilesAsync(), CanRefreshFiles);
-        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, () => !string.IsNullOrWhiteSpace(MessageText));
+        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync);
         TogglePushToTalkCommand = new AsyncRelayCommand(TogglePushToTalkAsync, CanUseVoiceControls);
         ToggleVoiceActivationCommand = new AsyncRelayCommand(ToggleVoiceActivationAsync, CanUseVoiceControls);
         RefreshVideoDevicesCommand = new AsyncRelayCommand(RefreshVideoDevicesAsync);
@@ -430,13 +430,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public string MessageText
     {
         get => messageText;
-        set
-        {
-            if (SetProperty(ref messageText, value) && SendMessageCommand is AsyncRelayCommand command)
-            {
-                command.RaiseCanExecuteChanged();
-            }
-        }
+        set => SetProperty(ref messageText, value);
     }
 
     public double InputVolume
