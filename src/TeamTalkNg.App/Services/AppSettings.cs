@@ -2,7 +2,7 @@ namespace TeamTalkNg.App.Services;
 
 public sealed record AppSettings
 {
-    public const int CurrentSettingsVersion = 3;
+    public const int CurrentSettingsVersion = 4;
 
     public int SettingsVersion { get; init; } = CurrentSettingsVersion;
 
@@ -67,4 +67,16 @@ public sealed record AppSettings
     public bool DisableVoiceActivationDuringInactivity { get; init; }
 
     public string InactivityStatusMessage { get; init; } = "Away due to inactivity";
+
+    public bool ShowVoiceActivationSlider { get; init; } = true;
+
+    public bool ShowChannelUserCounts { get; init; } = true;
+
+    public bool ShowUsernamesInsteadOfNicknames { get; init; }
+
+    public bool ShowChannelIcons { get; init; } = true;
+
+    public bool ShowChannelTopicsInChannelList { get; init; }
+
+    public ChannelSortMode ChannelSortMode { get; init; } = ChannelSortMode.ServerOrder;
 }

@@ -17,13 +17,18 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     private int voiceVolumePercent = 100;
     private bool isVoiceMuted;
     private bool isExpanded;
+    private bool showUserCount = true;
+    private bool showUsername;
+    private bool showIcon = true;
+    private bool showChannelTopic;
 
-    public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
+    public ChannelTreeItemViewModel(string name, ChannelTreeItemKind kind, int id = 0, string path = "", int sortOrder = 0)
     {
         this.name = name;
         Kind = kind;
         Id = id;
         Path = path;
+        SortOrder = sortOrder;
     }
 
     private int id;
@@ -36,6 +41,8 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
 
     public string Path { get; }
 
+    public int SortOrder { get; }
+
     public string Name
     {
         get => name;
@@ -44,6 +51,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             if (SetProperty(ref name, value))
             {
                 OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(DisplayText));
             }
         }
     }
@@ -66,6 +74,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             if (SetProperty(ref userCount, value))
             {
                 OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(DisplayText));
             }
         }
     }
@@ -114,13 +123,27 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     public string Topic
     {
         get => topic;
-        set => SetProperty(ref topic, value);
+        set
+        {
+            if (SetProperty(ref topic, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(DisplayText));
+            }
+        }
     }
 
     public string Username
     {
         get => username;
-        set => SetProperty(ref username, value);
+        set
+        {
+            if (SetProperty(ref username, value))
+            {
+                OnPropertyChanged(nameof(AccessibleName));
+                OnPropertyChanged(nameof(DisplayText));
+            }
+        }
     }
 
     public bool IsOperator
@@ -174,7 +197,7 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
         }
     }
 
-    public string VisualIndicator => Kind switch
+    public string VisualIndicator => !showIcon ? string.Empty : Kind switch
     {
         ChannelTreeItemKind.Channel => "#",
         ChannelTreeItemKind.User when IsVoiceMuted => "M",
@@ -185,6 +208,29 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
 
     public string Icon => VisualIndicator;
 
+    public string DisplayName => Kind == ChannelTreeItemKind.User && showUsername && !string.IsNullOrWhiteSpace(Username)
+        ? Username
+        : Name;
+
+    public string DisplayText
+    {
+        get
+        {
+            string text = DisplayName;
+            if (Kind == ChannelTreeItemKind.Channel && showUserCount)
+            {
+                text += $" ({UserCount})";
+            }
+
+            if (Kind == ChannelTreeItemKind.Channel && showChannelTopic && !string.IsNullOrWhiteSpace(Topic))
+            {
+                text += $": {Topic}";
+            }
+
+            return text;
+        }
+    }
+
     public string AccessibleName
     {
         get
@@ -194,8 +240,9 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
             string mute = Kind == ChannelTreeItemKind.User && IsVoiceMuted ? ", muted" : string.Empty;
             string message = string.IsNullOrWhiteSpace(StatusMessage) ? string.Empty : $", status: {StatusMessage}";
             string protection = Kind == ChannelTreeItemKind.Channel && IsProtected ? ", password protected" : string.Empty;
-            string count = Kind == ChannelTreeItemKind.Channel ? $", {UserCount} users" : string.Empty;
-            return $"{Name}, {type}{count}{protection}{state}{mute}{message}";
+            string count = Kind == ChannelTreeItemKind.Channel && showUserCount ? $", {UserCount} users" : string.Empty;
+            string topicText = Kind == ChannelTreeItemKind.Channel && showChannelTopic && !string.IsNullOrWhiteSpace(Topic) ? $", topic: {Topic}" : string.Empty;
+            return $"{DisplayName}, {type}{count}{protection}{topicText}{state}{mute}{message}";
         }
     }
 
@@ -217,5 +264,18 @@ public sealed class ChannelTreeItemViewModel : ObservableObject
     public override string ToString()
     {
         return AccessibleName;
+    }
+
+    public void ApplyDisplaySettings(bool showUserCounts, bool showUsernamesInsteadOfNicknames, bool showChannelIcons, bool showChannelTopics)
+    {
+        showUserCount = showUserCounts;
+        showUsername = showUsernamesInsteadOfNicknames;
+        showIcon = showChannelIcons;
+        showChannelTopic = showChannelTopics;
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(DisplayText));
+        OnPropertyChanged(nameof(VisualIndicator));
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(AccessibleName));
     }
 }

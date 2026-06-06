@@ -63,6 +63,96 @@
         </Grid>
       </TabItem>
 
+      <TabItem Header="Display">
+        <ScrollViewer Margin="8,14,8,8"
+                      VerticalScrollBarVisibility="Auto"
+                      AutomationProperties.Name="Display preferences">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="200" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.ColumnSpan="2"
+                       Text="User interface"
+                       FontWeight="SemiBold"
+                       AutomationProperties.Name="User interface display settings" />
+
+            <CheckBox Grid.Row="1"
+                      Grid.Column="1"
+                      Content="Show voice activation slider"
+                      IsChecked="{Binding ShowVoiceActivationSlider}"
+                      Margin="0,12,0,0"
+                      AutomationProperties.Name="Show voice activation slider" />
+
+            <TextBlock Grid.Row="2"
+                       Grid.ColumnSpan="2"
+                       Text="Channels and users"
+                       FontWeight="SemiBold"
+                       Margin="0,18,0,0"
+                       AutomationProperties.Name="Channels and users display settings" />
+
+            <CheckBox Grid.Row="3"
+                      Grid.Column="1"
+                      Content="Show number of users in channel"
+                      IsChecked="{Binding ShowChannelUserCounts}"
+                      Margin="0,12,0,0"
+                      AutomationProperties.Name="Show number of users in channel" />
+
+            <CheckBox Grid.Row="4"
+                      Grid.Column="1"
+                      Content="Show usernames instead of nicknames"
+                      IsChecked="{Binding ShowUsernamesInsteadOfNicknames}"
+                      Margin="0,8,0,0"
+                      AutomationProperties.Name="Show usernames instead of nicknames" />
+
+            <StackPanel Grid.Row="5"
+                        Grid.Column="1"
+                        Margin="0,8,0,0">
+              <CheckBox Content="Show icons for users and channels"
+                        IsChecked="{Binding ShowChannelIcons}"
+                        AutomationProperties.Name="Show icons for users and channels" />
+              <CheckBox Content="Show channel topic in channel list"
+                        IsChecked="{Binding ShowChannelTopicsInChannelList}"
+                        Margin="0,8,0,0"
+                        AutomationProperties.Name="Show channel topic in channel list" />
+            </StackPanel>
+
+            <Label Grid.Row="6"
+                   Target="{Binding ElementName=ChannelSortModeBox}"
+                   Content="Sort channels by"
+                   Margin="0,12,0,0" />
+            <ComboBox x:Name="ChannelSortModeBox"
+                      Grid.Row="6"
+                      Grid.Column="1"
+                      ItemsSource="{Binding ChannelSortModes}"
+                      SelectedValue="{Binding SelectedChannelSortMode}"
+                      SelectedValuePath="Value"
+                      DisplayMemberPath="Name"
+                      Margin="0,12,0,0"
+                      Background="{DynamicResource ControlBackgroundBrush}"
+                      Foreground="{DynamicResource TextBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      AutomationProperties.Name="Sort channels by">
+              <ComboBox.ItemContainerStyle>
+                <Style TargetType="{x:Type ComboBoxItem}">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                </Style>
+              </ComboBox.ItemContainerStyle>
+            </ComboBox>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
       <TabItem Header="Audio">
         <Grid Margin="8,14,8,8">
           <Grid.RowDefinitions>

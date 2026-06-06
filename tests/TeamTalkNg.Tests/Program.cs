@@ -142,6 +142,7 @@ internal static class AppSettingsTests
         MigratesOldVoiceActivationDefault();
         PreservesOpenMicrophoneVoiceActivationLevel();
         DisablesAutoAwayByDefault();
+        UsesAccessibleDisplayDefaults();
 
         Console.WriteLine("TeamTalk NG settings tests passed.");
     }
@@ -171,6 +172,18 @@ internal static class AppSettingsTests
         AssertEqual(0, settings.InactivityTimeoutSeconds);
         Assert(!settings.DisableVoiceActivationDuringInactivity, "Expected inactivity voice activation disabling to be opt-in.");
         AssertEqual("Away due to inactivity", settings.InactivityStatusMessage);
+    }
+
+    private static void UsesAccessibleDisplayDefaults()
+    {
+        var settings = new AppSettings();
+
+        Assert(settings.ShowVoiceActivationSlider, "Expected voice activation slider to be visible by default.");
+        Assert(settings.ShowChannelUserCounts, "Expected channel user counts to be visible by default.");
+        Assert(!settings.ShowUsernamesInsteadOfNicknames, "Expected nicknames to be shown by default.");
+        Assert(settings.ShowChannelIcons, "Expected channel tree indicators to be visible by default.");
+        Assert(!settings.ShowChannelTopicsInChannelList, "Expected channel topics to be hidden by default.");
+        AssertEqual(ChannelSortMode.ServerOrder, settings.ChannelSortMode);
     }
 
     private static void MigratesOldVoiceActivationDefault()
@@ -251,6 +264,7 @@ internal static class AppViewModelTests
         KeepsFullDirectMessageTextAvailableForThreadView();
         ScopesLiveUserChannelEventsToExactCurrentChannel();
         FormatsInactivityStatusMessage();
+        AppliesChannelTreeDisplaySettingsToVisibleAndAccessibleText();
 
         Console.WriteLine("TeamTalk NG app view-model tests passed.");
     }
@@ -336,6 +350,35 @@ internal static class AppViewModelTests
         AssertEqual("Stepped away", Format("  Stepped away  ", "Available"));
         AssertEqual("Available", Format("", "  Available  "));
         AssertEqual(string.Empty, Format("", ""));
+    }
+
+    private static void AppliesChannelTreeDisplaySettingsToVisibleAndAccessibleText()
+    {
+        var channel = new ChannelTreeItemViewModel("Lobby", ChannelTreeItemKind.Channel, path: "/Lobby")
+        {
+            UserCount = 3,
+            Topic = "General chat"
+        };
+
+        AssertEqual("Lobby (3)", channel.DisplayText);
+        Assert(channel.AccessibleName.Contains("3 users", StringComparison.Ordinal), "Expected channel user count in accessible name.");
+        Assert(!channel.AccessibleName.Contains("General chat", StringComparison.Ordinal), "Expected channel topic to be hidden by default.");
+
+        channel.ApplyDisplaySettings(showUserCounts: false, showUsernamesInsteadOfNicknames: false, showChannelIcons: false, showChannelTopics: true);
+
+        AssertEqual("Lobby: General chat", channel.DisplayText);
+        AssertEqual(string.Empty, channel.VisualIndicator);
+        Assert(!channel.AccessibleName.Contains("3 users", StringComparison.Ordinal), "Expected hidden user count to be omitted from accessible name.");
+        Assert(channel.AccessibleName.Contains("topic: General chat", StringComparison.Ordinal), "Expected visible topic in accessible name.");
+
+        var user = new ChannelTreeItemViewModel("Alex", ChannelTreeItemKind.User)
+        {
+            Username = "alex"
+        };
+        user.ApplyDisplaySettings(showUserCounts: true, showUsernamesInsteadOfNicknames: true, showChannelIcons: true, showChannelTopics: false);
+
+        AssertEqual("alex", user.DisplayText);
+        Assert(user.AccessibleName.StartsWith("alex, user", StringComparison.Ordinal), "Expected username in accessible name when username display is enabled.");
     }
 
     private static void Assert(bool condition, string message)

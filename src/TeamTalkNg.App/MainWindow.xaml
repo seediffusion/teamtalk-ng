@@ -29,7 +29,7 @@
                                         HorizontalAlignment="Center"
                                         Margin="0,0,4,0" />
         <controls:PresentationTextBlock Grid.Column="1"
-                                        Text="{Binding Name}"
+                                        Text="{Binding DisplayText}"
                                         TextTrimming="None"
                                         TextWrapping="NoWrap" />
       </Grid>
@@ -289,7 +289,8 @@
                        Grid.Row="2"
                        Text="Voice activation"
                        VerticalAlignment="Center"
-                       Margin="0,8,8,0" />
+                       Margin="0,8,8,0"
+                       Visibility="{Binding IsVoiceActivationSliderVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <Slider Grid.Row="2"
                     Grid.Column="1"
                     Minimum="0"
@@ -299,6 +300,7 @@
                     LargeChange="5"
                     Value="{Binding VoiceActivationLevelPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                     Margin="0,8,0,0"
+                    Visibility="{Binding IsVoiceActivationSliderVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                     AutomationProperties.LabeledBy="{Binding ElementName=VoiceActivationLevelLabel}"
                     AutomationProperties.Name="Voice activation level" />
 

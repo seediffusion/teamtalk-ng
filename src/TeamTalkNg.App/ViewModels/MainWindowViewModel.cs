@@ -48,6 +48,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private double outputVolume = 50;
     private int inputLevelPercent;
     private int voiceActivationLevelPercent = 50;
+    private bool isVoiceActivationSliderVisible = true;
     private ChannelTreeItemViewModel? selectedChannelItem;
     private ChatMessageViewModel? selectedChatMessage;
     private bool pushToTalkEnabled;
@@ -76,6 +77,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool isDesktopSharingActive;
     private DateTimeOffset suppressUserJoinSoundsUntil = DateTimeOffset.MinValue;
     private readonly IFileDialogService fileDialogService;
+    private int nextTreeItemSortOrder;
 
     public MainWindowViewModel(
         ITeamTalkSession teamTalkSession,
@@ -135,6 +137,7 @@ public sealed class MainWindowViewModel : ObservableObject
         outputVolume = Math.Clamp(settings.OutputVolume, 0, 100);
         voiceActivationLevelPercent = Math.Clamp(settings.VoiceActivationLevel, 0, 100);
         isInputMeterVisible = settings.ShowInputMeter;
+        isVoiceActivationSliderVisible = settings.ShowVoiceActivationSlider;
         currentNickname = GetDefaultNickname();
         isAway = settings.IsAway;
         inputLevelTimer = new DispatcherTimer
@@ -512,6 +515,12 @@ public sealed class MainWindowViewModel : ObservableObject
     public Thickness VoiceActivationMarkerMargin => new(VoiceActivationLevelPercent * 1.8, 0, 0, 0);
 
     public string InputLevelText => $"Input level {InputLevelPercent} percent";
+
+    public bool IsVoiceActivationSliderVisible
+    {
+        get => isVoiceActivationSliderVisible;
+        private set => SetProperty(ref isVoiceActivationSliderVisible, value);
+    }
 
     public bool IsInputMeterVisible
     {
@@ -1512,6 +1521,7 @@ public sealed class MainWindowViewModel : ObservableObject
         soundEvents.Configure(settings.PlaySoundEvents, settings.SoundPack, settings.SoundEventVolume, settings.SoundEventEnabled);
         ApplyChatHistoryPrivacySetting();
         IsInputMeterVisible = settings.ShowInputMeter;
+        ApplyDisplayPreferences();
         VoiceActivationLevelPercent = settings.VoiceActivationLevel;
         UpdateInactivityTimer();
         if (settings.InactivityTimeoutSeconds <= 0)
@@ -2086,8 +2096,9 @@ public sealed class MainWindowViewModel : ObservableObject
 
         if (existingUser is null)
         {
-            existingUser = new ChannelTreeItemViewModel(user.Nickname, ChannelTreeItemKind.User, user.Id, user.ChannelPath);
+            existingUser = CreateTreeItem(user.Nickname, ChannelTreeItemKind.User, user.Id, user.ChannelPath);
             channel.Children.Add(existingUser);
+            SortTreeChildren(channel.Children);
         }
 
         existingUser.Name = user.Nickname;
@@ -2099,6 +2110,10 @@ public sealed class MainWindowViewModel : ObservableObject
         existingUser.VoiceVolumePercent = user.VoiceVolumePercent;
         existingUser.IsVoiceMuted = user.IsVoiceMuted;
         channel.UserCount = channel.Children.Count(item => item.Kind == ChannelTreeItemKind.User);
+        if (settings.ChannelSortMode == ChannelSortMode.UserCount)
+        {
+            SortAllTreeChildren();
+        }
     }
 
     private bool ShouldPlayLiveUserChannelEvent(string userChannelPath)
@@ -2118,6 +2133,10 @@ public sealed class MainWindowViewModel : ObservableObject
             item.IsPermanent = channel.IsPermanent;
             item.Topic = channel.Topic;
             item.UserCount = channel.UserCount > 0 ? channel.UserCount : item.Children.Count(child => child.Kind == ChannelTreeItemKind.User);
+            if (settings.ChannelSortMode == ChannelSortMode.UserCount)
+            {
+                SortAllTreeChildren();
+            }
         });
     }
 
@@ -2157,15 +2176,42 @@ public sealed class MainWindowViewModel : ObservableObject
     private void BuildDisconnectedTree()
     {
         Channels.Clear();
-        serverTreeItem = new ChannelTreeItemViewModel("Not connected", ChannelTreeItemKind.Server);
+        serverTreeItem = CreateTreeItem("Not connected", ChannelTreeItemKind.Server);
         Channels.Add(serverTreeItem);
     }
 
     private void BuildConnectingTree(TeamTalkServerProfile profile)
     {
         Channels.Clear();
-        serverTreeItem = new ChannelTreeItemViewModel(profile.DisplayName, ChannelTreeItemKind.Server);
+        serverTreeItem = CreateTreeItem(profile.DisplayName, ChannelTreeItemKind.Server);
         Channels.Add(serverTreeItem);
+    }
+
+    private void ApplyDisplayPreferences()
+    {
+        IsVoiceActivationSliderVisible = settings.ShowVoiceActivationSlider;
+        foreach (ChannelTreeItemViewModel item in EnumerateTreeItems())
+        {
+            ApplyDisplaySettings(item);
+        }
+
+        SortAllTreeChildren();
+    }
+
+    private ChannelTreeItemViewModel CreateTreeItem(string name, ChannelTreeItemKind kind, int id = 0, string path = "")
+    {
+        var item = new ChannelTreeItemViewModel(name, kind, id, path, nextTreeItemSortOrder++);
+        ApplyDisplaySettings(item);
+        return item;
+    }
+
+    private void ApplyDisplaySettings(ChannelTreeItemViewModel item)
+    {
+        item.ApplyDisplaySettings(
+            settings.ShowChannelUserCounts,
+            settings.ShowUsernamesInsteadOfNicknames,
+            settings.ShowChannelIcons,
+            settings.ShowChannelTopicsInChannelList);
     }
 
     private void ShowFilesPlaceholder(string text)
@@ -2225,7 +2271,7 @@ public sealed class MainWindowViewModel : ObservableObject
         serverTreeItem ??= Channels.FirstOrDefault();
         if (serverTreeItem is null)
         {
-            serverTreeItem = new ChannelTreeItemViewModel(activeProfile?.DisplayName ?? "Connected server", ChannelTreeItemKind.Server);
+            serverTreeItem = CreateTreeItem(activeProfile?.DisplayName ?? "Connected server", ChannelTreeItemKind.Server);
             Channels.Add(serverTreeItem);
         }
 
@@ -2249,8 +2295,9 @@ public sealed class MainWindowViewModel : ObservableObject
                 && string.Equals(item.Path, currentPath, StringComparison.OrdinalIgnoreCase));
             if (child is null)
             {
-                child = new ChannelTreeItemViewModel(segment, ChannelTreeItemKind.Channel, currentPath == normalizedPath ? id : 0, currentPath);
+                child = CreateTreeItem(segment, ChannelTreeItemKind.Channel, currentPath == normalizedPath ? id : 0, currentPath);
                 parent.Children.Add(child);
+                SortTreeChildren(parent.Children);
             }
             else if (currentPath == normalizedPath && id > 0 && child.Id == 0)
             {
@@ -2265,9 +2312,10 @@ public sealed class MainWindowViewModel : ObservableObject
             ChannelTreeItemViewModel? rootChannel = serverTreeItem.Children.FirstOrDefault(item => item.Kind == ChannelTreeItemKind.Channel && item.Path == "/");
             if (rootChannel is null)
             {
-                rootChannel = new ChannelTreeItemViewModel("Root", ChannelTreeItemKind.Channel, id, "/");
+                rootChannel = CreateTreeItem("Root", ChannelTreeItemKind.Channel, id, "/");
                 rootChannel.IsPermanent = true;
                 serverTreeItem.Children.Add(rootChannel);
+                SortTreeChildren(serverTreeItem.Children);
             }
 
             return rootChannel;
@@ -2340,6 +2388,11 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             channel.UserCount = channel.Children.Count(child => child.Kind == ChannelTreeItemKind.User);
         }
+
+        if (settings.ChannelSortMode == ChannelSortMode.UserCount)
+        {
+            SortAllTreeChildren();
+        }
     }
 
     private IReadOnlyList<MoveUserDestinationViewModel> BuildMoveUserDestinations(string currentChannelPath)
@@ -2387,6 +2440,63 @@ public sealed class MainWindowViewModel : ObservableObject
                 yield return descendant;
             }
         }
+    }
+
+    private IEnumerable<ChannelTreeItemViewModel> EnumerateTreeItems()
+    {
+        if (serverTreeItem is null)
+        {
+            yield break;
+        }
+
+        yield return serverTreeItem;
+        foreach (ChannelTreeItemViewModel item in Descendants(serverTreeItem))
+        {
+            yield return item;
+        }
+    }
+
+    private void SortAllTreeChildren()
+    {
+        foreach (ChannelTreeItemViewModel item in EnumerateTreeItems())
+        {
+            SortTreeChildren(item.Children);
+        }
+    }
+
+    private void SortTreeChildren(ObservableCollection<ChannelTreeItemViewModel> children)
+    {
+        if (children.Count < 2)
+        {
+            return;
+        }
+
+        List<ChannelTreeItemViewModel> sorted = settings.ChannelSortMode == ChannelSortMode.ServerOrder
+            ? children.OrderBy(item => item.SortOrder).ToList()
+            : children
+                .OrderBy(item => item.Kind == ChannelTreeItemKind.Channel ? 0 : 1)
+                .ThenBy(item => GetChannelSortValue(item), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(item => item.SortOrder)
+                .ToList();
+
+        for (int targetIndex = 0; targetIndex < sorted.Count; targetIndex++)
+        {
+            ChannelTreeItemViewModel item = sorted[targetIndex];
+            int currentIndex = children.IndexOf(item);
+            if (currentIndex >= 0 && currentIndex != targetIndex)
+            {
+                children.Move(currentIndex, targetIndex);
+            }
+        }
+    }
+
+    private string GetChannelSortValue(ChannelTreeItemViewModel item)
+    {
+        return settings.ChannelSortMode switch
+        {
+            ChannelSortMode.UserCount when item.Kind == ChannelTreeItemKind.Channel => (int.MaxValue - item.UserCount).ToString("D10", CultureInfo.InvariantCulture),
+            _ => item.DisplayName
+        };
     }
 
     private static string NormalizeChannelPath(string? channelPath)

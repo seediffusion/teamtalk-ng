@@ -29,6 +29,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private int inactivityTimeoutSeconds;
     private bool disableVoiceActivationDuringInactivity;
     private string inactivityStatusMessage = string.Empty;
+    private bool showVoiceActivationSlider = true;
+    private bool showChannelUserCounts = true;
+    private bool showUsernamesInsteadOfNicknames;
+    private bool showChannelIcons = true;
+    private bool showChannelTopicsInChannelList;
+    private ChannelSortMode selectedChannelSortMode;
     private string audioDeviceRefreshStatus = "Audio devices loaded";
     private string voiceActivationCalibrationStatus = "Voice activation calibration not run";
     private bool showInputMeter;
@@ -66,6 +72,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         InputDevices = [];
         OutputDevices = [];
         SoundPacks = new ObservableCollection<SoundPackOption>(soundPacks);
+        ChannelSortModes =
+        [
+            new ChannelSortOptionViewModel(ChannelSortMode.ServerOrder, "Server order"),
+            new ChannelSortOptionViewModel(ChannelSortMode.Name, "Name"),
+            new ChannelSortOptionViewModel(ChannelSortMode.UserCount, "User count")
+        ];
         AnnouncementTemplates = new ObservableCollection<AnnouncementTemplateOptionViewModel>(
             AnnouncementTemplateFormatter.Definitions.Select(definition =>
             {
@@ -110,6 +122,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         inactivityTimeoutSeconds = Math.Max(0, settings.InactivityTimeoutSeconds);
         disableVoiceActivationDuringInactivity = settings.DisableVoiceActivationDuringInactivity;
         inactivityStatusMessage = settings.InactivityStatusMessage;
+        showVoiceActivationSlider = settings.ShowVoiceActivationSlider;
+        showChannelUserCounts = settings.ShowChannelUserCounts;
+        showUsernamesInsteadOfNicknames = settings.ShowUsernamesInsteadOfNicknames;
+        showChannelIcons = settings.ShowChannelIcons;
+        showChannelTopicsInChannelList = settings.ShowChannelTopicsInChannelList;
+        selectedChannelSortMode = settings.ChannelSortMode;
         ReplaceAudioDevices(audioDevices);
 
         SaveCommand = new RelayCommand(() => RequestClose?.Invoke(this, true));
@@ -127,6 +145,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public ObservableCollection<AudioDeviceOptionViewModel> OutputDevices { get; }
 
     public ObservableCollection<SoundPackOption> SoundPacks { get; }
+
+    public ObservableCollection<ChannelSortOptionViewModel> ChannelSortModes { get; }
 
     public ObservableCollection<AnnouncementTemplateOptionViewModel> AnnouncementTemplates { get; }
 
@@ -320,6 +340,42 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref inactivityStatusMessage, value);
     }
 
+    public bool ShowVoiceActivationSlider
+    {
+        get => showVoiceActivationSlider;
+        set => SetProperty(ref showVoiceActivationSlider, value);
+    }
+
+    public bool ShowChannelUserCounts
+    {
+        get => showChannelUserCounts;
+        set => SetProperty(ref showChannelUserCounts, value);
+    }
+
+    public bool ShowUsernamesInsteadOfNicknames
+    {
+        get => showUsernamesInsteadOfNicknames;
+        set => SetProperty(ref showUsernamesInsteadOfNicknames, value);
+    }
+
+    public bool ShowChannelIcons
+    {
+        get => showChannelIcons;
+        set => SetProperty(ref showChannelIcons, value);
+    }
+
+    public bool ShowChannelTopicsInChannelList
+    {
+        get => showChannelTopicsInChannelList;
+        set => SetProperty(ref showChannelTopicsInChannelList, value);
+    }
+
+    public ChannelSortMode SelectedChannelSortMode
+    {
+        get => selectedChannelSortMode;
+        set => SetProperty(ref selectedChannelSortMode, value);
+    }
+
     public AppSettings ToSettings()
     {
         return new AppSettings
@@ -356,7 +412,13 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             DisableVoiceActivationDuringInactivity = DisableVoiceActivationDuringInactivity,
             InactivityStatusMessage = string.IsNullOrWhiteSpace(InactivityStatusMessage)
                 ? string.Empty
-                : InactivityStatusMessage.Trim()
+                : InactivityStatusMessage.Trim(),
+            ShowVoiceActivationSlider = ShowVoiceActivationSlider,
+            ShowChannelUserCounts = ShowChannelUserCounts,
+            ShowUsernamesInsteadOfNicknames = ShowUsernamesInsteadOfNicknames,
+            ShowChannelIcons = ShowChannelIcons,
+            ShowChannelTopicsInChannelList = ShowChannelTopicsInChannelList,
+            ChannelSortMode = SelectedChannelSortMode
         };
     }
 
