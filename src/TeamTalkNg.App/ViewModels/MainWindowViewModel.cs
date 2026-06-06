@@ -44,6 +44,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
+    private string chatHistoryText = string.Empty;
     private double inputVolume = 50;
     private double outputVolume = 50;
     private int inputLevelPercent;
@@ -219,6 +220,20 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<ChannelTreeItemViewModel> Channels { get; } = [];
 
     public ObservableCollection<ChatMessageViewModel> ChatMessages { get; } = [];
+
+    public string ChatHistoryText
+    {
+        get => chatHistoryText;
+        private set => SetProperty(ref chatHistoryText, value);
+    }
+
+    public Visibility ChatHistoryListVisibility => settings.ChatHistoryViewMode == ChatHistoryViewMode.List
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public Visibility ChatHistoryTextVisibility => settings.ChatHistoryViewMode == ChatHistoryViewMode.Text
+        ? Visibility.Visible
+        : Visibility.Collapsed;
 
     public ChatMessageViewModel? SelectedChatMessage
     {
@@ -696,7 +711,7 @@ public sealed class MainWindowViewModel : ObservableObject
         currentChannelPath = "/";
         appliedInitialStatus = false;
         BuildDisconnectedTree();
-        ChatMessages.Clear();
+        ClearChatHistory();
         directMessageConversations.Clear();
         Transfers.Clear();
         SelectedTransfer = null;
@@ -1519,7 +1534,7 @@ public sealed class MainWindowViewModel : ObservableObject
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
         soundEvents.Configure(settings.PlaySoundEvents, settings.SoundPack, settings.SoundEventVolume, settings.SoundEventEnabled);
-        ApplyChatHistoryPrivacySetting();
+        ApplyChatHistoryPreferences();
         IsInputMeterVisible = settings.ShowInputMeter;
         ApplyDisplayPreferences();
         VoiceActivationLevelPercent = settings.VoiceActivationLevel;
@@ -1894,9 +1909,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var chatMessage = new ChatMessageViewModel(message, settings.HideDirectMessageTextInChatHistory);
-            ChatMessages.Add(chatMessage);
-            RememberDirectMessage(chatMessage);
+            AddChatMessage(message);
         });
 
         string announcement = message.IsSystem
@@ -1923,7 +1936,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 : message.IsDirect ? AnnouncementKind.DirectMessage : AnnouncementKind.ChannelMessage,
             eventKind: message.IsSystem
                 ? null
-                : message.IsDirect ? AnnouncementTemplateKind.DirectMessage : AnnouncementTemplateKind.ChannelMessage);
+                : message.IsDirect ? AnnouncementTemplateKind.DirectMessage : AnnouncementTemplateKind.ChannelMessage,
+            showInChatHistory: false);
     }
 
     private void OnFileTransferUpdated(object? sender, FileTransferSummary transfer)
@@ -2605,7 +2619,8 @@ public sealed class MainWindowViewModel : ObservableObject
         AnnouncementKind kind,
         bool interrupt = false,
         bool? includeBraille = null,
-        AnnouncementTemplateKind? eventKind = null)
+        AnnouncementTemplateKind? eventKind = null,
+        bool showInChatHistory = true)
     {
         if (!ShouldAnnounce(kind) || !ShouldAnnounceEvent(eventKind))
         {
@@ -2615,6 +2630,10 @@ public sealed class MainWindowViewModel : ObservableObject
         bool updateLiveRegion = ShouldUpdateStatusBar(kind);
         bool effectiveInterrupt = interrupt && settings.InterruptImportantAnnouncements;
         bool allowPriorityInterrupt = settings.InterruptImportantAnnouncements;
+        if (showInChatHistory && ShouldShowStatusEventInChatHistory(kind))
+        {
+            AddSystemChatHistoryEvent(text);
+        }
 
         return announcements.AnnounceAsync(new ScreenReaderAnnouncement(
             text,
@@ -2634,6 +2653,12 @@ public sealed class MainWindowViewModel : ObservableObject
 
         return kind is not (AnnouncementKind.ChannelMessage or AnnouncementKind.DirectMessage)
             || settings.ShowMessageAnnouncementsInStatusBar;
+    }
+
+    private bool ShouldShowStatusEventInChatHistory(AnnouncementKind kind)
+    {
+        return settings.ShowStatusEventsInChatHistory
+            && kind is not (AnnouncementKind.ChannelMessage or AnnouncementKind.DirectMessage or AnnouncementKind.Selection);
     }
 
     private bool ShouldAnnounce(AnnouncementKind kind)
@@ -2729,12 +2754,61 @@ public sealed class MainWindowViewModel : ObservableObject
         conversation.Add(message);
     }
 
-    private void ApplyChatHistoryPrivacySetting()
+    private void AddChatMessage(ChatMessage message)
+    {
+        var chatMessage = new ChatMessageViewModel(
+            message,
+            settings.HideDirectMessageTextInChatHistory,
+            settings.ChatTimestampFormat);
+        ChatMessages.Add(chatMessage);
+        RememberDirectMessage(chatMessage);
+        RefreshChatHistoryText();
+    }
+
+    private void AddSystemChatHistoryEvent(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        void Add()
+        {
+            AddChatMessage(new ChatMessage(DateTimeOffset.Now, "TeamTalk NG", text, IsSystem: true));
+        }
+
+        if (Application.Current.Dispatcher.CheckAccess())
+        {
+            Add();
+        }
+        else
+        {
+            Application.Current.Dispatcher.Invoke(Add);
+        }
+    }
+
+    private void ClearChatHistory()
+    {
+        ChatMessages.Clear();
+        RefreshChatHistoryText();
+    }
+
+    private void RefreshChatHistoryText()
+    {
+        ChatHistoryText = string.Join(Environment.NewLine, ChatMessages.Select(message => message.DisplayText));
+    }
+
+    private void ApplyChatHistoryPreferences()
     {
         foreach (ChatMessageViewModel message in ChatMessages)
         {
             message.HideDirectMessageText = settings.HideDirectMessageTextInChatHistory;
+            message.TimestampFormat = settings.ChatTimestampFormat;
         }
+
+        RefreshChatHistoryText();
+        OnPropertyChanged(nameof(ChatHistoryListVisibility));
+        OnPropertyChanged(nameof(ChatHistoryTextVisibility));
     }
 
     private static string GetDirectMessageParticipantName(string value)

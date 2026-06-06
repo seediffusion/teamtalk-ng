@@ -76,6 +76,10 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="200" />
@@ -96,26 +100,77 @@
 
             <TextBlock Grid.Row="2"
                        Grid.ColumnSpan="2"
+                       Text="Chat history"
+                       FontWeight="SemiBold"
+                       Margin="0,18,0,0"
+                       AutomationProperties.Name="Chat history display settings" />
+
+            <Label Grid.Row="3"
+                   Target="{Binding ElementName=ChatHistoryViewModeBox}"
+                   Content="Chat history view"
+                   Margin="0,12,0,0" />
+            <ComboBox x:Name="ChatHistoryViewModeBox"
+                      Grid.Row="3"
+                      Grid.Column="1"
+                      ItemsSource="{Binding ChatHistoryViewModes}"
+                      SelectedValue="{Binding SelectedChatHistoryViewMode}"
+                      SelectedValuePath="Value"
+                      DisplayMemberPath="Name"
+                      Margin="0,12,0,0"
+                      Background="{DynamicResource ControlBackgroundBrush}"
+                      Foreground="{DynamicResource TextBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      AutomationProperties.Name="Chat history view">
+              <ComboBox.ItemContainerStyle>
+                <Style TargetType="{x:Type ComboBoxItem}">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                </Style>
+              </ComboBox.ItemContainerStyle>
+            </ComboBox>
+
+            <Label Grid.Row="4"
+                   Target="{Binding ElementName=ChatTimestampFormatBox}"
+                   Content="Timestamp format"
+                   Margin="0,12,0,0" />
+            <controls:NativeTextBox x:Name="ChatTimestampFormatBox"
+                                    Grid.Row="4"
+                                    Grid.Column="1"
+                                    Text="{Binding ChatTimestampFormat, UpdateSourceTrigger=PropertyChanged}"
+                                    Margin="0,12,0,0"
+                                    TextBackground="{DynamicResource ControlBackgroundBrush}"
+                                    TextForeground="{DynamicResource TextBrush}"
+                                    AutomationProperties.Name="Chat timestamp format"
+                                    AutomationProperties.HelpText="Use .NET time formatting. Invalid formats fall back to HH:mm:ss." />
+
+            <CheckBox Grid.Row="5"
+                      Grid.Column="1"
+                      Content="Show status bar events in chat history"
+                      IsChecked="{Binding ShowStatusEventsInChatHistory}"
+                      Margin="0,12,0,0"
+                      AutomationProperties.Name="Show status bar events in chat history" />
+
+            <TextBlock Grid.Row="6"
+                       Grid.ColumnSpan="2"
                        Text="Channels and users"
                        FontWeight="SemiBold"
                        Margin="0,18,0,0"
                        AutomationProperties.Name="Channels and users display settings" />
 
-            <CheckBox Grid.Row="3"
+            <CheckBox Grid.Row="7"
                       Grid.Column="1"
                       Content="Show number of users in channel"
                       IsChecked="{Binding ShowChannelUserCounts}"
                       Margin="0,12,0,0"
                       AutomationProperties.Name="Show number of users in channel" />
 
-            <CheckBox Grid.Row="4"
+            <CheckBox Grid.Row="8"
                       Grid.Column="1"
                       Content="Show usernames instead of nicknames"
                       IsChecked="{Binding ShowUsernamesInsteadOfNicknames}"
                       Margin="0,8,0,0"
                       AutomationProperties.Name="Show usernames instead of nicknames" />
 
-            <StackPanel Grid.Row="5"
+            <StackPanel Grid.Row="9"
                         Grid.Column="1"
                         Margin="0,8,0,0">
               <CheckBox Content="Show icons for users and channels"
@@ -127,12 +182,12 @@
                         AutomationProperties.Name="Show channel topic in channel list" />
             </StackPanel>
 
-            <Label Grid.Row="6"
+            <Label Grid.Row="10"
                    Target="{Binding ElementName=ChannelSortModeBox}"
                    Content="Sort channels by"
                    Margin="0,12,0,0" />
             <ComboBox x:Name="ChannelSortModeBox"
-                      Grid.Row="6"
+                      Grid.Row="10"
                       Grid.Column="1"
                       ItemsSource="{Binding ChannelSortModes}"
                       SelectedValue="{Binding SelectedChannelSortMode}"

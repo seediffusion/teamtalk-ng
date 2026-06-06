@@ -2,7 +2,7 @@ namespace TeamTalkNg.App.Services;
 
 public sealed record AppSettings
 {
-    public const int CurrentSettingsVersion = 4;
+    public const int CurrentSettingsVersion = 5;
 
     public int SettingsVersion { get; init; } = CurrentSettingsVersion;
 
@@ -25,6 +25,12 @@ public sealed record AppSettings
     public bool ShowMessageAnnouncementsInStatusBar { get; init; }
 
     public bool HideDirectMessageTextInChatHistory { get; init; }
+
+    public ChatHistoryViewMode ChatHistoryViewMode { get; init; } = ChatHistoryViewMode.List;
+
+    public string ChatTimestampFormat { get; init; } = "HH:mm:ss";
+
+    public bool ShowStatusEventsInChatHistory { get; init; }
 
     public Dictionary<string, string> AnnouncementTemplates { get; init; } = [];
 

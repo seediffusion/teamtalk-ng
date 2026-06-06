@@ -1,22 +1,31 @@
+using System.Globalization;
 using TeamTalkNg.Core.TeamTalk;
 
 namespace TeamTalkNg.App.ViewModels;
 
 public sealed class ChatMessageViewModel : ObservableObject
 {
-    private bool hideDirectMessageText;
+    public const string DefaultTimestampFormat = "HH:mm:ss";
 
-    public ChatMessageViewModel(ChatMessage message, bool hideDirectMessageText = false)
+    private readonly DateTimeOffset timestamp;
+    private bool hideDirectMessageText;
+    private string timestampFormat = DefaultTimestampFormat;
+
+    public ChatMessageViewModel(
+        ChatMessage message,
+        bool hideDirectMessageText = false,
+        string? timestampFormat = DefaultTimestampFormat)
     {
-        Time = message.Timestamp.ToLocalTime().ToString("HH:mm:ss");
+        timestamp = message.Timestamp;
         Sender = message.Sender;
         Text = message.Text;
         IsDirect = message.IsDirect;
         DirectUserId = message.DirectUserId;
         this.hideDirectMessageText = hideDirectMessageText;
+        this.timestampFormat = NormalizeTimestampFormat(timestampFormat);
     }
 
-    public string Time { get; }
+    public string Time => FormatTimestamp(timestamp, timestampFormat);
 
     public string Sender { get; }
 
@@ -33,8 +42,20 @@ public sealed class ChatMessageViewModel : ObservableObject
         {
             if (SetProperty(ref hideDirectMessageText, value))
             {
-                OnPropertyChanged(nameof(DisplayText));
-                OnPropertyChanged(nameof(AccessibleName));
+                OnTextPropertiesChanged();
+            }
+        }
+    }
+
+    public string TimestampFormat
+    {
+        get => timestampFormat;
+        set
+        {
+            string normalized = NormalizeTimestampFormat(value);
+            if (SetProperty(ref timestampFormat, normalized))
+            {
+                OnTextPropertiesChanged();
             }
         }
     }
@@ -72,6 +93,33 @@ public sealed class ChatMessageViewModel : ObservableObject
     public override string ToString()
     {
         return AccessibleName;
+    }
+
+    public static string FormatTimestamp(DateTimeOffset timestamp, string? format)
+    {
+        string effectiveFormat = NormalizeTimestampFormat(format);
+        try
+        {
+            return timestamp.ToLocalTime().ToString(effectiveFormat, CultureInfo.CurrentCulture);
+        }
+        catch (FormatException)
+        {
+            return timestamp.ToLocalTime().ToString(DefaultTimestampFormat, CultureInfo.CurrentCulture);
+        }
+    }
+
+    private static string NormalizeTimestampFormat(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? DefaultTimestampFormat : value.Trim();
+    }
+
+    private void OnTextPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(Time));
+        OnPropertyChanged(nameof(DisplayText));
+        OnPropertyChanged(nameof(FullDisplayText));
+        OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(FullAccessibleName));
     }
 
     private string GetDirectMessageParticipantName()

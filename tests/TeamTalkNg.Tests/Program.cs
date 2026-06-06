@@ -143,6 +143,7 @@ internal static class AppSettingsTests
         PreservesOpenMicrophoneVoiceActivationLevel();
         DisablesAutoAwayByDefault();
         UsesAccessibleDisplayDefaults();
+        UsesChatHistoryDefaults();
 
         Console.WriteLine("TeamTalk NG settings tests passed.");
     }
@@ -184,6 +185,15 @@ internal static class AppSettingsTests
         Assert(settings.ShowChannelIcons, "Expected channel tree indicators to be visible by default.");
         Assert(!settings.ShowChannelTopicsInChannelList, "Expected channel topics to be hidden by default.");
         AssertEqual(ChannelSortMode.ServerOrder, settings.ChannelSortMode);
+    }
+
+    private static void UsesChatHistoryDefaults()
+    {
+        var settings = new AppSettings();
+
+        AssertEqual(ChatHistoryViewMode.List, settings.ChatHistoryViewMode);
+        AssertEqual(ChatMessageViewModel.DefaultTimestampFormat, settings.ChatTimestampFormat);
+        Assert(!settings.ShowStatusEventsInChatHistory, "Expected status events to stay out of chat history by default.");
     }
 
     private static void MigratesOldVoiceActivationDefault()
@@ -262,6 +272,8 @@ internal static class AppViewModelTests
         ShowsDirectMessageTextWhenPrivacyModeIsOff();
         HidesDirectMessageTextInChatHistoryWhenPrivacyModeIsOn();
         KeepsFullDirectMessageTextAvailableForThreadView();
+        AppliesCustomChatTimestampFormat();
+        FallsBackWhenChatTimestampFormatIsInvalid();
         ScopesLiveUserChannelEventsToExactCurrentChannel();
         FormatsInactivityStatusMessage();
         AppliesChannelTreeDisplaySettingsToVisibleAndAccessibleText();
@@ -313,6 +325,32 @@ internal static class AppViewModelTests
 
         Assert(viewModel.FullDisplayText.Contains("Secret stream note", StringComparison.Ordinal), "Expected thread view text to keep the full direct message.");
         Assert(viewModel.FullAccessibleName.Contains("Secret stream note", StringComparison.Ordinal), "Expected thread view accessible name to keep the full direct message.");
+    }
+
+    private static void AppliesCustomChatTimestampFormat()
+    {
+        DateTimeOffset timestamp = DateTimeOffset.Parse("2026-06-06T12:34:56+00:00");
+        var message = new ChatMessage(
+            timestamp,
+            "Alex",
+            "Test");
+
+        var viewModel = new ChatMessageViewModel(message, timestampFormat: "HH:mm");
+
+        AssertEqual(timestamp.ToLocalTime().ToString("HH:mm"), viewModel.Time);
+    }
+
+    private static void FallsBackWhenChatTimestampFormatIsInvalid()
+    {
+        DateTimeOffset timestamp = DateTimeOffset.Parse("2026-06-06T12:34:56+00:00");
+        var message = new ChatMessage(
+            timestamp,
+            "Alex",
+            "Test");
+
+        var viewModel = new ChatMessageViewModel(message, timestampFormat: "Q");
+
+        AssertEqual(timestamp.ToLocalTime().ToString(ChatMessageViewModel.DefaultTimestampFormat), viewModel.Time);
     }
 
     private static void ScopesLiveUserChannelEventsToExactCurrentChannel()

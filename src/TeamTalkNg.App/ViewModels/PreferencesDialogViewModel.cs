@@ -17,6 +17,9 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool showAnnouncementsInStatusBar;
     private bool showMessageAnnouncementsInStatusBar;
     private bool hideDirectMessageTextInChatHistory;
+    private ChatHistoryViewMode selectedChatHistoryViewMode;
+    private string chatTimestampFormat = ChatMessageViewModel.DefaultTimestampFormat;
+    private bool showStatusEventsInChatHistory;
     private bool playSoundEvents;
     private string selectedSoundPack = SoundEventService.DefaultSoundPackId;
     private int soundEventVolume = 100;
@@ -78,6 +81,11 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             new ChannelSortOptionViewModel(ChannelSortMode.Name, "Name"),
             new ChannelSortOptionViewModel(ChannelSortMode.UserCount, "User count")
         ];
+        ChatHistoryViewModes =
+        [
+            new ChatHistoryViewModeOptionViewModel(ChatHistoryViewMode.List, "List"),
+            new ChatHistoryViewModeOptionViewModel(ChatHistoryViewMode.Text, "Text")
+        ];
         AnnouncementTemplates = new ObservableCollection<AnnouncementTemplateOptionViewModel>(
             AnnouncementTemplateFormatter.Definitions.Select(definition =>
             {
@@ -103,6 +111,11 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         showAnnouncementsInStatusBar = settings.ShowAnnouncementsInStatusBar;
         showMessageAnnouncementsInStatusBar = settings.ShowMessageAnnouncementsInStatusBar;
         hideDirectMessageTextInChatHistory = settings.HideDirectMessageTextInChatHistory;
+        selectedChatHistoryViewMode = settings.ChatHistoryViewMode;
+        chatTimestampFormat = string.IsNullOrWhiteSpace(settings.ChatTimestampFormat)
+            ? ChatMessageViewModel.DefaultTimestampFormat
+            : settings.ChatTimestampFormat;
+        showStatusEventsInChatHistory = settings.ShowStatusEventsInChatHistory;
         playSoundEvents = settings.PlaySoundEvents;
         soundEventVolume = Math.Clamp(settings.SoundEventVolume, 0, 100);
         selectedSoundPack = SoundPacks.Any(soundPack => string.Equals(soundPack.Id, settings.SoundPack, StringComparison.OrdinalIgnoreCase))
@@ -147,6 +160,8 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     public ObservableCollection<SoundPackOption> SoundPacks { get; }
 
     public ObservableCollection<ChannelSortOptionViewModel> ChannelSortModes { get; }
+
+    public ObservableCollection<ChatHistoryViewModeOptionViewModel> ChatHistoryViewModes { get; }
 
     public ObservableCollection<AnnouncementTemplateOptionViewModel> AnnouncementTemplates { get; }
 
@@ -230,6 +245,24 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     {
         get => hideDirectMessageTextInChatHistory;
         set => SetProperty(ref hideDirectMessageTextInChatHistory, value);
+    }
+
+    public ChatHistoryViewMode SelectedChatHistoryViewMode
+    {
+        get => selectedChatHistoryViewMode;
+        set => SetProperty(ref selectedChatHistoryViewMode, value);
+    }
+
+    public string ChatTimestampFormat
+    {
+        get => chatTimestampFormat;
+        set => SetProperty(ref chatTimestampFormat, value);
+    }
+
+    public bool ShowStatusEventsInChatHistory
+    {
+        get => showStatusEventsInChatHistory;
+        set => SetProperty(ref showStatusEventsInChatHistory, value);
     }
 
     public bool PlaySoundEvents
@@ -390,6 +423,11 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             ShowAnnouncementsInStatusBar = ShowAnnouncementsInStatusBar,
             ShowMessageAnnouncementsInStatusBar = ShowMessageAnnouncementsInStatusBar,
             HideDirectMessageTextInChatHistory = HideDirectMessageTextInChatHistory,
+            ChatHistoryViewMode = SelectedChatHistoryViewMode,
+            ChatTimestampFormat = string.IsNullOrWhiteSpace(ChatTimestampFormat)
+                ? ChatMessageViewModel.DefaultTimestampFormat
+                : ChatTimestampFormat.Trim(),
+            ShowStatusEventsInChatHistory = ShowStatusEventsInChatHistory,
             AnnouncementTemplates = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.Template, StringComparer.OrdinalIgnoreCase),
             AnnouncementEventEnabled = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.IsEnabled, StringComparer.OrdinalIgnoreCase),
             PlaySoundEvents = PlaySoundEvents,
