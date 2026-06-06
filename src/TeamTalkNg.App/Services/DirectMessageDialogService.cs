@@ -5,9 +5,9 @@ namespace TeamTalkNg.App.Services;
 
 public sealed class DirectMessageDialogService : IDirectMessageDialogService
 {
-    public string? ShowDirectMessageDialog(string recipientName)
+    public string? ShowDirectMessageDialog(string recipientName, IReadOnlyList<ChatMessageViewModel> conversation)
     {
-        var viewModel = new DirectMessageDialogViewModel(recipientName);
+        var viewModel = new DirectMessageDialogViewModel(recipientName, conversation);
         var dialog = new DirectMessageDialog
         {
             Owner = Application.Current.MainWindow,

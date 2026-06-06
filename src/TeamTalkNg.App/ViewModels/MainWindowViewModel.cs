@@ -39,6 +39,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly INicknameDialogService nicknameDialogService;
     private readonly ISoundEventService soundEvents;
     private readonly DispatcherTimer inputLevelTimer;
+    private readonly Dictionary<int, ObservableCollection<ChatMessageViewModel>> directMessageConversations = [];
     private string connectionStatusText = "Disconnected";
     private string liveAnnouncement = "Ready";
     private string messageText = string.Empty;
@@ -658,6 +659,7 @@ public sealed class MainWindowViewModel : ObservableObject
         appliedInitialStatus = false;
         BuildDisconnectedTree();
         ChatMessages.Clear();
+        directMessageConversations.Clear();
         Transfers.Clear();
         SelectedTransfer = null;
         ClearMediaStreams();
@@ -1234,7 +1236,9 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         try
         {
-            string? message = directMessageDialogService.ShowDirectMessageDialog(recipientName);
+            string? message = directMessageDialogService.ShowDirectMessageDialog(
+                recipientName,
+                GetDirectMessageConversation(userId));
             if (string.IsNullOrWhiteSpace(message))
             {
                 await AnnounceAsync("Direct message canceled", AnnouncementPriority.Low, AnnouncementKind.System, includeBraille: false);
@@ -1475,6 +1479,7 @@ public sealed class MainWindowViewModel : ObservableObject
         settings = updatedSettings;
         themeService.UseTheme(settings.Theme);
         soundEvents.Configure(settings.PlaySoundEvents, settings.SoundPack, settings.SoundEventVolume, settings.SoundEventEnabled);
+        ApplyChatHistoryPrivacySetting();
         IsInputMeterVisible = settings.ShowInputMeter;
         VoiceActivationLevelPercent = settings.VoiceActivationLevel;
         if (teamTalkSession.Status == ConnectionStatus.Disconnected)
@@ -1698,7 +1703,9 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            ChatMessages.Add(new ChatMessageViewModel(message));
+            var chatMessage = new ChatMessageViewModel(message, settings.HideDirectMessageTextInChatHistory);
+            ChatMessages.Add(chatMessage);
+            RememberDirectMessage(chatMessage);
         });
 
         string announcement = message.IsSystem
@@ -2373,6 +2380,37 @@ public sealed class MainWindowViewModel : ObservableObject
 
         string cleanedFallback = GetDirectMessageParticipantName(fallback);
         return string.IsNullOrWhiteSpace(cleanedFallback) ? $"User {userId}" : cleanedFallback;
+    }
+
+    private IReadOnlyList<ChatMessageViewModel> GetDirectMessageConversation(int userId)
+    {
+        return directMessageConversations.TryGetValue(userId, out ObservableCollection<ChatMessageViewModel>? conversation)
+            ? conversation
+            : [];
+    }
+
+    private void RememberDirectMessage(ChatMessageViewModel message)
+    {
+        if (message is not { IsDirect: true, DirectUserId: > 0 })
+        {
+            return;
+        }
+
+        if (!directMessageConversations.TryGetValue(message.DirectUserId.Value, out ObservableCollection<ChatMessageViewModel>? conversation))
+        {
+            conversation = [];
+            directMessageConversations[message.DirectUserId.Value] = conversation;
+        }
+
+        conversation.Add(message);
+    }
+
+    private void ApplyChatHistoryPrivacySetting()
+    {
+        foreach (ChatMessageViewModel message in ChatMessages)
+        {
+            message.HideDirectMessageText = settings.HideDirectMessageTextInChatHistory;
+        }
     }
 
     private static string GetDirectMessageParticipantName(string value)

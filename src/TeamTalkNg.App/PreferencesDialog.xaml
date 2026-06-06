@@ -278,6 +278,10 @@
                       IsChecked="{Binding ShowMessageAnnouncementsInStatusBar}"
                       Margin="0,0,0,16"
                       AutomationProperties.Name="Show chat and direct message announcements in the status bar" />
+            <CheckBox Content="Hide direct message text in chat history"
+                      IsChecked="{Binding HideDirectMessageTextInChatHistory}"
+                      Margin="0,0,0,16"
+                      AutomationProperties.Name="Hide direct message text in chat history" />
 
             <TextBlock Text="Announcement templates"
                        FontWeight="SemiBold"

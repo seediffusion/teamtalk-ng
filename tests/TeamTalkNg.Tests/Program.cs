@@ -1,5 +1,6 @@
 using TeamTalkNg.Accessibility;
 using TeamTalkNg.App.Services;
+using TeamTalkNg.App.ViewModels;
 using TeamTalkNg.Core.Accessibility;
 using TeamTalkNg.Core.TeamTalk;
 using TeamTalkNg.Core.TeamTalk.ConnectionTargets;
@@ -8,6 +9,7 @@ using TeamTalkNg.TeamTalkSdk.Native;
 
 ParserTests.RunAll();
 AppSettingsTests.RunAll();
+AppViewModelTests.RunAll();
 SdkProbeTests.RunAll();
 SdkDispatchTests.RunAll();
 SoundPackTests.RunAll();
@@ -136,10 +138,18 @@ internal static class AppSettingsTests
     public static void RunAll()
     {
         UsesOfficialStyleAudioDefaults();
+        DoesNotHideDirectMessageTextByDefault();
         MigratesOldVoiceActivationDefault();
         PreservesOpenMicrophoneVoiceActivationLevel();
 
         Console.WriteLine("TeamTalk NG settings tests passed.");
+    }
+
+    private static void DoesNotHideDirectMessageTextByDefault()
+    {
+        var settings = new AppSettings();
+
+        Assert(!settings.HideDirectMessageTextInChatHistory, "Expected direct message text to remain visible by default.");
     }
 
     private static void UsesOfficialStyleAudioDefaults()
@@ -203,6 +213,80 @@ internal static class AppSettingsTests
         string path = Path.Combine(Path.GetTempPath(), $"teamtalk-ng-settings-{Guid.NewGuid():N}.json");
         File.WriteAllLines(path, lines);
         return path;
+    }
+
+    private static void Assert(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static void AssertEqual<T>(T expected, T actual)
+    {
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"Expected {expected}, got {actual}.");
+        }
+    }
+}
+
+internal static class AppViewModelTests
+{
+    public static void RunAll()
+    {
+        ShowsDirectMessageTextWhenPrivacyModeIsOff();
+        HidesDirectMessageTextInChatHistoryWhenPrivacyModeIsOn();
+        KeepsFullDirectMessageTextAvailableForThreadView();
+
+        Console.WriteLine("TeamTalk NG app view-model tests passed.");
+    }
+
+    private static void ShowsDirectMessageTextWhenPrivacyModeIsOff()
+    {
+        var message = new ChatMessage(
+            DateTimeOffset.Parse("2026-06-06T12:34:56+00:00"),
+            "Alex",
+            "Secret stream note",
+            IsDirect: true,
+            DirectUserId: 7);
+
+        var viewModel = new ChatMessageViewModel(message);
+
+        Assert(viewModel.DisplayText.Contains("Secret stream note", StringComparison.Ordinal), "Expected direct message text to be visible by default.");
+        Assert(viewModel.AccessibleName.Contains("Secret stream note", StringComparison.Ordinal), "Expected accessible name to include direct message text by default.");
+    }
+
+    private static void HidesDirectMessageTextInChatHistoryWhenPrivacyModeIsOn()
+    {
+        var message = new ChatMessage(
+            DateTimeOffset.Parse("2026-06-06T12:34:56+00:00"),
+            "Alex",
+            "Secret stream note",
+            IsDirect: true,
+            DirectUserId: 7);
+
+        var viewModel = new ChatMessageViewModel(message, hideDirectMessageText: true);
+
+        Assert(!viewModel.DisplayText.Contains("Secret stream note", StringComparison.Ordinal), "Expected direct message text to be hidden in chat history.");
+        AssertEqual($"{viewModel.Time} Direct message from Alex. Click or press Enter to view.", viewModel.DisplayText);
+        AssertEqual($"{viewModel.Time}, Direct message from Alex. Click or press Enter to view.", viewModel.AccessibleName);
+    }
+
+    private static void KeepsFullDirectMessageTextAvailableForThreadView()
+    {
+        var message = new ChatMessage(
+            DateTimeOffset.Parse("2026-06-06T12:34:56+00:00"),
+            "Alex",
+            "Secret stream note",
+            IsDirect: true,
+            DirectUserId: 7);
+
+        var viewModel = new ChatMessageViewModel(message, hideDirectMessageText: true);
+
+        Assert(viewModel.FullDisplayText.Contains("Secret stream note", StringComparison.Ordinal), "Expected thread view text to keep the full direct message.");
+        Assert(viewModel.FullAccessibleName.Contains("Secret stream note", StringComparison.Ordinal), "Expected thread view accessible name to keep the full direct message.");
     }
 
     private static void Assert(bool condition, string message)

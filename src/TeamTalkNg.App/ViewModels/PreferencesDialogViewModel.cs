@@ -16,6 +16,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
     private bool interruptImportantAnnouncements;
     private bool showAnnouncementsInStatusBar;
     private bool showMessageAnnouncementsInStatusBar;
+    private bool hideDirectMessageTextInChatHistory;
     private bool playSoundEvents;
     private string selectedSoundPack = SoundEventService.DefaultSoundPackId;
     private int soundEventVolume = 100;
@@ -86,6 +87,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         interruptImportantAnnouncements = settings.InterruptImportantAnnouncements;
         showAnnouncementsInStatusBar = settings.ShowAnnouncementsInStatusBar;
         showMessageAnnouncementsInStatusBar = settings.ShowMessageAnnouncementsInStatusBar;
+        hideDirectMessageTextInChatHistory = settings.HideDirectMessageTextInChatHistory;
         playSoundEvents = settings.PlaySoundEvents;
         soundEventVolume = Math.Clamp(settings.SoundEventVolume, 0, 100);
         selectedSoundPack = SoundPacks.Any(soundPack => string.Equals(soundPack.Id, settings.SoundPack, StringComparison.OrdinalIgnoreCase))
@@ -198,6 +200,12 @@ public sealed class PreferencesDialogViewModel : ObservableObject
         set => SetProperty(ref showMessageAnnouncementsInStatusBar, value);
     }
 
+    public bool HideDirectMessageTextInChatHistory
+    {
+        get => hideDirectMessageTextInChatHistory;
+        set => SetProperty(ref hideDirectMessageTextInChatHistory, value);
+    }
+
     public bool PlaySoundEvents
     {
         get => playSoundEvents;
@@ -301,6 +309,7 @@ public sealed class PreferencesDialogViewModel : ObservableObject
             InterruptImportantAnnouncements = InterruptImportantAnnouncements,
             ShowAnnouncementsInStatusBar = ShowAnnouncementsInStatusBar,
             ShowMessageAnnouncementsInStatusBar = ShowMessageAnnouncementsInStatusBar,
+            HideDirectMessageTextInChatHistory = HideDirectMessageTextInChatHistory,
             AnnouncementTemplates = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.Template, StringComparer.OrdinalIgnoreCase),
             AnnouncementEventEnabled = AnnouncementTemplates.ToDictionary(item => item.Id, item => item.IsEnabled, StringComparer.OrdinalIgnoreCase),
             PlaySoundEvents = PlaySoundEvents,

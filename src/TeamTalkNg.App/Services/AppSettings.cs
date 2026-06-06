@@ -24,6 +24,8 @@ public sealed record AppSettings
 
     public bool ShowMessageAnnouncementsInStatusBar { get; init; }
 
+    public bool HideDirectMessageTextInChatHistory { get; init; }
+
     public Dictionary<string, string> AnnouncementTemplates { get; init; } = [];
 
     public Dictionary<string, bool> AnnouncementEventEnabled { get; init; } = [];

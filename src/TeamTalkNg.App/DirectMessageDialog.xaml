@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Send Direct Message"
         Width="520"
-        Height="320"
+        Height="440"
         MinWidth="440"
-        MinHeight="280"
+        MinHeight="340"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextBrush}">
@@ -18,6 +18,7 @@
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
@@ -35,12 +36,48 @@
                BorderBrush="{DynamicResource BorderBrush}"
                AutomationProperties.Name="Direct message recipient" />
 
-      <Label Grid.Row="1" Target="{Binding ElementName=MessageBox}" Content="Message" />
+      <Label Grid.Row="1"
+             Target="{Binding ElementName=ConversationList}"
+             Content="History"
+             Margin="0,12,0,0" />
+      <ListView x:Name="ConversationList"
+                Grid.Row="1"
+                Grid.Column="1"
+                ItemsSource="{Binding Conversation}"
+                Margin="0,12,0,0"
+                Background="{DynamicResource ControlBackgroundBrush}"
+                Foreground="{DynamicResource TextBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                AutomationProperties.Name="{Binding ConversationName}">
+        <ListView.ItemContainerStyle>
+          <Style TargetType="{x:Type ListViewItem}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding FullAccessibleName}" />
+            <Setter Property="AutomationProperties.HelpText" Value="{Binding FullAccessibleName}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+          </Style>
+        </ListView.ItemContainerStyle>
+        <ListView.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding FullDisplayText}"
+                       TextWrapping="Wrap"
+                       TextTrimming="None"
+                       Foreground="{DynamicResource TextBrush}" />
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+
+      <Label Grid.Row="2"
+             Target="{Binding ElementName=MessageBox}"
+             Content="Message"
+             Margin="0,12,0,0" />
       <TextBox x:Name="MessageBox"
-               Grid.Row="1"
+               Grid.Row="2"
                Grid.Column="1"
                Text="{Binding Message, UpdateSourceTrigger=PropertyChanged}"
                AcceptsReturn="True"
+               Margin="0,12,0,0"
                TextWrapping="Wrap"
                VerticalScrollBarVisibility="Auto"
                Background="{DynamicResource ControlBackgroundBrush}"

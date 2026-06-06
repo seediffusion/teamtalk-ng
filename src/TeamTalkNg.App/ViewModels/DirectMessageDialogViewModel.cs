@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows.Input;
 
 namespace TeamTalkNg.App.ViewModels;
@@ -6,9 +7,10 @@ public sealed class DirectMessageDialogViewModel : ObservableObject
 {
     private string message = string.Empty;
 
-    public DirectMessageDialogViewModel(string recipientName)
+    public DirectMessageDialogViewModel(string recipientName, IReadOnlyList<ChatMessageViewModel> conversation)
     {
         RecipientName = recipientName;
+        Conversation = new ObservableCollection<ChatMessageViewModel>(conversation);
         SendCommand = new RelayCommand(() => RequestClose?.Invoke(this, true), CanSend);
         CancelCommand = new RelayCommand(() => RequestClose?.Invoke(this, false));
     }
@@ -16,6 +18,10 @@ public sealed class DirectMessageDialogViewModel : ObservableObject
     public event EventHandler<bool>? RequestClose;
 
     public string RecipientName { get; }
+
+    public ObservableCollection<ChatMessageViewModel> Conversation { get; }
+
+    public string ConversationName => $"Direct message history with {RecipientName}";
 
     public string Message
     {
