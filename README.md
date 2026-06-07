@@ -53,6 +53,25 @@ You can also set `TEAMTALKNG_TEAMTALK5_DLL` to an explicit DLL path for local te
 dotnet run --project tests\TeamTalkNg.Tests\TeamTalkNg.Tests.csproj
 ```
 
+## Windows Installer
+
+The Windows installer script is in `installer\windows\TeamTalkNg.iss`.
+
+Build a publish folder first:
+
+```powershell
+dotnet publish src\TeamTalkNg.App\TeamTalkNg.App.csproj -c Release -r win-x64 --self-contained true -o artifacts\publish\TeamTalkNG
+```
+
+For trusted prerelease builds that include BearWare's runtime, place
+`TeamTalk5.dll` in that publish folder before compiling the installer.
+
+Compile with Inno Setup:
+
+```powershell
+iscc installer\windows\TeamTalkNg.iss
+```
+
 ## License
 
 TeamTalk NG source code is licensed under the MIT License. See `LICENSE`.

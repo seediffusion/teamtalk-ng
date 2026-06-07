@@ -8,6 +8,7 @@
 
 # Binaries generated from builds
 bin/
+artifacts/
 
 # Local TeamTalk SDK/runtime binaries. Download from BearWare as needed.
 sdk/
