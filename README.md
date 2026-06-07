@@ -53,6 +53,14 @@ You can also set `TEAMTALKNG_TEAMTALK5_DLL` to an explicit DLL path for local te
 dotnet run --project tests\TeamTalkNg.Tests\TeamTalkNg.Tests.csproj
 ```
 
+## License
+
+TeamTalk NG source code is licensed under the MIT License. See `LICENSE`.
+
+Third-party runtime files and assets, including BearWare `TeamTalk5.dll`,
+BearWare-compatible sound files, Prismatoid if bundled, and .NET runtime
+components, remain under their own license terms. See `THIRD-PARTY-NOTICES.md`.
+
 ## Next Implementation Targets
 
 - Exercise the native SDK path against a real TeamTalk server and fill any struct-layout gaps found by `TT_DBG_SIZEOF`.

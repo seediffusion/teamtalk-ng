@@ -14,6 +14,7 @@
     <Product>TeamTalk NG</Product>
     <Description>Modern accessible Windows client for TeamTalk 5</Description>
     <AssemblyTitle>TeamTalk NG</AssemblyTitle>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,5 +26,7 @@
   <ItemGroup>
     <Content Include="Sounds\**\*.wav" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Sounds\README.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
