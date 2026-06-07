@@ -5,6 +5,15 @@
     <ImplicitUsings>false</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Company>Seediffusion</Company>
+    <Product>TeamTalk NG</Product>
+    <Description>Modern accessible Windows client for TeamTalk 5</Description>
+    <AssemblyTitle>TeamTalk NG</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>
